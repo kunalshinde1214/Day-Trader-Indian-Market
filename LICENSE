@@ -1,0 +1,127 @@
+INDIA DAY TRADER PERSONAL USE LICENSE
+Version 1.2 — 8 November 2026
+
+Skill creator and maintainer: Kunal Shinde.
+
+Creator attribution is not a declaration of copyright ownership, a waiver
+of any existing rights, or a transfer of rights from another author.
+
+1. Scope and third-party materials
+
+This license applies only to India Day Trader code, documentation and other
+project contributions that Kunal Shinde is legally authorized to license
+under these terms (the "Covered Materials"). It does not establish that
+authority merely by naming the skill's creator. Material for which such
+authority is absent is not brought under this license by its inclusion in
+the project. Verify licensing authority before distributing the release.
+
+This license does not claim ownership of third-party materials or replace
+their licenses. Materials originating from Jake Schincariol's
+day-trader-skill remain subject to the MIT license reproduced in
+third-party/day-trader-skill.LICENSE. See THIRD_PARTY_NOTICES.md.
+
+Where a file combines Covered Materials and third-party material, this
+license applies only to the Covered Materials. Nothing here limits rights
+independently granted by a third-party license in the third-party material.
+No ownership of broker APIs, exchange data, trademarks, or third-party
+research is transferred or claimed.
+
+2. Free personal-use permission
+
+To the extent of that licensing authority, Kunal Shinde grants you, as an
+individual, a worldwide, royalty-free,
+non-exclusive license to download, make private copies of, install, run,
+inspect and privately modify the Covered Materials solely for your own
+learning, research, analysis and trading for your own account. You may keep
+private backups and run private copies on devices or private computing
+services you control for those purposes. You must preserve the applicable
+copyright and license notices.
+
+Trading profits or other financial benefits from your own account do not,
+by themselves, violate this personal-use permission. This permission does
+not authorize trading for clients, an employer or other third parties, or
+providing software, signals, advisory or other services to others using the
+Covered Materials. Broker, exchange and applicable regulatory requirements
+remain separate from this license.
+
+3. Restrictions
+
+Except for the platform exception in section 4, a separate written license
+from Kunal Shinde, or rights that applicable law does not permit to be
+restricted, you may not:
+
+(a) publish, republish, redistribute, share publicly or sublicense the
+    Covered Materials, or copies or modifications of them, in source or
+    executable form;
+(b) sell, rent, lease, resell, bundle for distribution or otherwise
+    commercially distribute the Covered Materials or modifications;
+(c) offer the Covered Materials or their functionality to others as a hosted
+    service, managed bot, subscription product, API, white-label product or
+    similar service, whether paid or free;
+(d) remove or falsify copyright, attribution or license notices, or claim
+    that you authored or own the Covered Materials.
+
+Private modifications do not acquire permission for publication or resale.
+All permissions not expressly granted are reserved by their respective
+rights holders. This is a source-available personal-use license, not an
+open-source license.
+
+4. GitHub and hosting-platform exception
+
+If Kunal Shinde publishes the Covered Materials in a public GitHub
+repository, the permissions required by GitHub's applicable terms are not
+restricted by this license. This includes hosting, public viewing and
+copies made through GitHub's permitted fork functionality. This exception
+does not grant additional rights beyond those terms to sell,
+relicense, distribute outside that exception or operate a service using the
+Covered Materials. Public availability does not otherwise enlarge the
+personal-use permission.
+
+5. Attribution, retained rights and access credentials
+
+This license grants permission to use within its stated scope; it does not
+transfer copyright or other ownership. Rights remain with their respective
+holders. Kunal Shinde is credited as the creator and maintainer of this
+skill, without asserting ownership of every included component.
+No activation or license key
+is required for the personal-use permission granted by this version. API
+credentials for a user's broker account are separate and must not be shared.
+
+6. Termination
+
+The permission in this license terminates if you materially breach its
+conditions. On termination, stop using and delete copies of the Covered
+Materials under your control, except copies you must retain by law. This
+does not terminate independent third-party license rights or rights that
+cannot lawfully be terminated.
+
+7. No warranty; limitation of liability
+
+To the maximum extent permitted by applicable law, the Covered Materials
+are provided "AS IS" and "AS AVAILABLE", without warranties, express or
+implied, including merchantability, fitness for a particular purpose,
+non-infringement, accuracy, availability or trading performance. They do not
+promise any trading result or establish suitability for a particular user.
+
+Trading and use of the Covered Materials are at your own risk. Outputs are
+informational tools, not investment, legal or tax advice. You are responsible
+for your accounts, credentials, decisions, orders and independently verifying
+the data and applicable requirements. The software license supplies no
+broker, exchange, market-data or regulatory authorization. No affiliation
+with or endorsement by those parties is claimed. These statements do not
+override rights or obligations that applicable law does not permit to be
+excluded.
+
+To the maximum extent permitted by applicable law, Kunal Shinde shall not
+be liable for losses or damages arising from the Covered Materials or their
+use, including trading losses, lost profits, data loss or service outages.
+Nothing in this license excludes liability or statutory rights that cannot
+lawfully be excluded or restricted.
+
+8. Separate permissions
+
+Uses outside the personal-use permission require separate written
+permission from the relevant rights holder or an authorized licensor.
+Kunal Shinde may grant such permission only within his licensing authority.
+No permission is implied merely because a
+repository is publicly readable or a copy can be downloaded.

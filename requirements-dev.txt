@@ -1,0 +1,2 @@
+# Skill-metadata validation only. Runtime analysis uses the Python standard library.
+PyYAML==6.0.3

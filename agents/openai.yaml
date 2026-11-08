@@ -1,0 +1,4 @@
+interface:
+  display_name: "India Day Trader"
+  short_description: "Indian market analysis and paper trade risk checks"
+  default_prompt: "Use $india-day-trader to analyze an Indian intraday setup in paper mode and show its data coverage, costs, and risk checks."

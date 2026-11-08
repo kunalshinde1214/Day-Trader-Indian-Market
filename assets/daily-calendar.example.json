@@ -1,0 +1,11 @@
+{
+  "source": "",
+  "as_of": "",
+  "date": "",
+  "previous_session": "",
+  "is_open_day": null,
+  "special_session": false,
+  "exchanges": ["NSE", "BSE"],
+  "open": "09:15",
+  "close": "15:30"
+}

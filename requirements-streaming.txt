@@ -1,0 +1,2 @@
+# Optional, used only by streaming.py. Core analysis remains standard-library-only.
+websocket-client>=1.8,<2

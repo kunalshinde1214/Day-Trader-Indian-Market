@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "broker": "kite",
+  "effective_from": "2026-04-01",
+  "verified_on": "2026-10-31",
+  "review_after": "2026-11-30",
+  "source": "https://zerodha.com/charges/",
+  "status": "estimate_not_contract_note",
+  "brokerage_rate": 0.0003,
+  "brokerage_cap": 20,
+  "option_brokerage": 20,
+  "gst_rate": 0.18,
+  "sebi_rate": 0.000001,
+  "segments": {
+    "NSE:equity": {"stt_sell": 0.00025, "exchange_rate": 0.0000307, "stamp_buy": 0.00003},
+    "BSE:equity": {"stt_sell": 0.00025, "exchange_rate": 0.0000375, "stamp_buy": 0.00003},
+    "NFO:future": {"stt_sell": 0.0005, "exchange_rate": 0.0000183, "stamp_buy": 0.00002},
+    "NFO:option": {"stt_sell": 0.0015, "exchange_rate": 0.0003553, "stamp_buy": 0.00003},
+    "BFO:future": {"stt_sell": 0.0005, "exchange_rate": 0, "stamp_buy": 0.00002},
+    "BFO:option": {"stt_sell": 0.0015, "exchange_rate": 0.000325, "stamp_buy": 0.00003}
+  }
+}

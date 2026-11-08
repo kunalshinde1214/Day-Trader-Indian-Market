@@ -1,0 +1,9 @@
+{
+  "mode": "per_fill_roundtrip_reserve",
+  "source": "",
+  "broker": "kite",
+  "account_id": "",
+  "as_of": "",
+  "multiplier": 1.5,
+  "per_fill_buffer_inr": 1
+}
