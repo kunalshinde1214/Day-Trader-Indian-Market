@@ -26,6 +26,8 @@ def outcome(bar, stop, target, long):
 
 def replay(p, instrument, history, config, card):
     validate_config(config)
+    from analysis_rules import check_policy
+    check_policy(p, config)
     validate_rates(instrument, card, config["broker"])
     plan_math(p, instrument)
     if p["setup"] != config.get("setup", "orb"):
@@ -108,7 +110,7 @@ def replay(p, instrument, history, config, card):
         trigger=instant(hit["trigger_at"])
         if not time.fromisoformat(config["no_entries_before"]) <= trigger.time() <= time.fromisoformat(config["no_entries_after"]):
             continue
-        hp=plan_from_hit(hit,{**instrument,"master_date":d},config,trigger)
+        hp=plan_from_hit(hit,{**instrument,"master_date":d},config,trigger,rows=bars)
         state=None
         for b in bars:
             if instant(b["at"]) < trigger:

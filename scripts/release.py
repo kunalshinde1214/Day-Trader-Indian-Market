@@ -10,9 +10,9 @@ import sys
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION="0.8.1-public-alpha"
+VERSION="0.9.0-public-workflows-alpha"
 ROOT_FILES={"SKILL.md","README.md","LICENSE","THIRD_PARTY_NOTICES.md","RISK_DISCLOSURE.md","SECURITY.md","CONTRIBUTING.md","CHANGELOG.md",".gitignore",".gitattributes","requirements-dev.txt","requirements-streaming.txt"}
-DIR_TYPES={"scripts":{'.py'},"tests":{'.py'},"references":{'.md'},"assets":{'.json'},"agents":{'.yaml'},"third-party":{'.LICENSE'},".github":{'.yml'}}
+DIR_TYPES={"scripts":{'.py'},"tests":{'.py'},"references":{'.md'},"assets":{'.json'},"agents":{'.yaml'},"third-party":{'.LICENSE'},".github":{'.yml'},".claude-plugin":{'.json'},"skills":{'.md'}}
 DENY={"__pycache__","research","test-output","trader",".git",".env",".venv","node_modules"}
 
 
@@ -32,6 +32,18 @@ def static_checks(root=ROOT):
     files=release_files(root);paths={p.relative_to(root).as_posix() for p in files}
     if not {"SKILL.md","LICENSE","THIRD_PARTY_NOTICES.md","third-party/day-trader-skill.LICENSE"}<=paths:
         raise ValueError("Required skill/license files missing")
+    plugin=json.loads((root/".claude-plugin/plugin.json").read_text(encoding="utf-8"))
+    marketplace=json.loads((root/".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
+    if plugin.get("name")!="india-day-trader" or plugin.get("version")!=VERSION or plugin.get("skills")!=["./skills/"]:
+        raise ValueError("Plugin identity/version/skills mismatch")
+    if marketplace.get("name")!="kunal-india-trading" or marketplace["plugins"][0].get("source")!="./" or marketplace["plugins"][0].get("name")!=plugin["name"]:
+        raise ValueError("Marketplace identity/source mismatch")
+    expected={"trader-"+n for n in ("scanner","news","entry","exit","timemachine","budget","risk","broker","alerts","analyst","whales")}|{"india-daily","nifty","sensex","banknifty"}
+    actual={p.parent.name for p in (root/"skills").glob("*/SKILL.md")}
+    if actual!=expected:raise ValueError("Plugin command inventory mismatch")
+    for name in expected:
+        body=(root/"skills"/name/"SKILL.md").read_text(encoding="utf-8")
+        if not body.startswith("---\nname: "+name+"\n") or not re.search(r"^description: .+",body,re.M):raise ValueError("Plugin skill frontmatter invalid")
     links=0
     for path in files:
         content=path.read_text(encoding="utf-8-sig")
@@ -48,6 +60,7 @@ def static_checks(root=ROOT):
     if not skill.startswith("---\nname: india-day-trader\n") or not re.search(r"^description: .+",skill,re.M):
         raise ValueError("Skill frontmatter missing identity/description")
     return {"version":VERSION,"files":len(files),"local_links":links,"python_syntax":"PASS","json":"PASS",
+            "claude_plugin_commands":len(expected),"public_research":True,
             "live_execution_code":True,"live_enabled_by_default":False,"authenticated_execution_tested":False,
             "daily_commands":["/india-daily","/nifty","/sensex","/banknifty"],"portfolio_accounting":"canonical plus limited Kite collection; reviewed opening required",
             "streaming":"kite tradable quotes only","deployment":"render only; not installed"}
@@ -59,6 +72,7 @@ def package(out,root=ROOT):
     manifest={"version":VERSION,"mode":"paper-and-human-operated-execution-alpha","full_specification_complete":False,
               "daily_commands":["/india-daily","/nifty","/sensex","/banknifty"],"portfolio_accounting":"canonical plus limited Kite collection; reviewed opening required",
               "streaming":"kite tradable quotes only","deployment":"render only; not installed",
+              "claude_plugin_commands":15,"public_research":True,
               "live_enabled_by_default":False,"authenticated_execution_tested":False,
               "authenticated_broker_acceptance":False,"files":{p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in files}}
     out=Path(out);out.parent.mkdir(parents=True,exist_ok=True)

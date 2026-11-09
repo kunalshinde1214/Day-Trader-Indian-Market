@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0-public-workflows-alpha — 10 November 2026
+
+- Add Claude plugin/marketplace manifests and fifteen workflow skills: eleven roles plus India daily, Nifty, Sensex and Bank Nifty.
+- Add credential-free Yahoo chart and NSE EQ listing collectors, multi-tag daily screening, public daily briefings, one-/five-minute ORB and level entries, bounded watching and public historical replay.
+- Add explicit price/percentage/ATR/structural stop and R/price target rules. Broker-bound plans and historical replay bind these policies; policy changes require regenerated evidence.
+- Add per-symbol public news, disclosure headline discovery, source-preserving persistent deduplication, supplied XBRL/inline-XBRL facts and comparable YoY/contiguous-quarter TTM, plus explicit filing text/PDF extraction.
+- Extend release allowlists and checks to include every plugin wrapper and manifest. Public research stays outside broker execution clearance; authenticated acceptance and comprehensive production data remain pending.
+
 ## 0.8.1-public-alpha — 8 November 2026
 
 - Prepare the public source-available repository with installation instructions, a feature table, daily command examples and explicit alpha limits.

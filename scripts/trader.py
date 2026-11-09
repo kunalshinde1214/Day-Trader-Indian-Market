@@ -119,7 +119,8 @@ def pipeline(w,now):
     write(w/"watchlist.json",scan_result)
     hit=next((h for h in scan_result["hits"] if h["symbol"]==instrument["symbol"] and h["exchange"]==instrument["exchange"]),None)
     if hit is None: raise Block("SCAN: selected instrument has no rule match")
-    p=plan_from_hit(hit,instrument,c,now);write(w/"plan.json",p)
+    source_bars=read(w/"candles.json")["instruments"][instrument["exchange"]+":"+instrument["symbol"]]["bars"]
+    p=plan_from_hit(hit,instrument,c,now,rows=source_bars);write(w/"plan.json",p)
     rep=replay(p,instrument,read(w/"history.json"),c,card);write(w/"replay.json",rep)
     ctx["replay"]=rep
     order=size(p,instrument,c,ctx,card,now);write(w/"orders.json",[order]);write(w/"payload.json",payload(order))
@@ -167,7 +168,7 @@ def main(argv=None):
                     fresh(data["as_of"],now,c["snapshot_max_age_seconds"],"candles")
                     hit=setup_hit(data["bars"],now,c,i,data.get("prior_close"),data.get("daily_reference"))
                     if hit["state"]=="triggered" and (now-instant(hit["trigger_at"])).total_seconds()>c["plan_max_age_seconds"]: hit["state"]="expired"
-                    result=hit if a.command=="entry" else plan_from_hit(hit,i,c,now)
+                    result=hit if a.command=="entry" else plan_from_hit(hit,i,c,now,rows=data["bars"])
                     write(w/("entry.json" if a.command=="entry" else "plan.json"),result)
             elif a.command=="replay":
                 result=replay(read(w/"plan.json"),read(w/"instrument.json"),read(w/"history.json"),c,card)

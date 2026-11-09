@@ -333,7 +333,7 @@ def setup_hit(rows, now, config, instrument=None, prior_close=None, daily=None):
     raise Block("SETUP: unsupported scanner rule")
 
 
-def plan_from_hit(hit, instrument, config, now):
+def plan_from_hit(hit, instrument, config, now, rows=None):
     validate_config(config)
     validate_instrument(instrument, now)
     if instrument["broker"] != config["broker"]:
@@ -384,6 +384,12 @@ def plan_from_hit(hit, instrument, config, now):
     elif setup in {"breakout_20d", "bull_flag", "oversold_bounce"}:
         plan.update(stop_basis="intraday swing low through trigger plus tick buffer", stop_reference=float(reference),
                     daily_reference=copy.deepcopy(hit["daily_reference"]), diagnostics=hit["diagnostics"])
+    if "exit_stop" in config or "exit_target" in config:
+        from analysis_rules import exits, exit_policy
+        rules = exit_policy(config)
+        selected = exits(hit, step, rows=rows, reference=reference, buffer_ticks=config["stop_buffer_ticks"], **rules)
+        plan.update({k:v for k,v in selected.items() if k not in {"risk_per_unit", "reward_risk"}})
+        plan["stop_basis"] = "explicit exit_policy; ATR uses completed bars through entry only"
     plan_math(plan, instrument)
     return plan
 
@@ -420,6 +426,8 @@ def plan_math(p, i):
 
 def entry_context(p, i, c, ctx, now):
     validate_config(c)
+    from analysis_rules import check_policy
+    check_policy(p, c)
     validate_instrument(i, now)
     plan_math(p, i)
     if p["setup"] != c.get("setup", "orb"):

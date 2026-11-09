@@ -285,16 +285,22 @@ def main(argv=None):
     p.add_argument("command", choices=[*COMMANDS, *("/" + c for c in COMMANDS)])
     p.add_argument("--input"); p.add_argument("--demo", action="store_true"); p.add_argument("--now")
     p.add_argument("--collect-kite", action="store_true", help="Opt-in read-only collection using local Kite credentials")
+    p.add_argument("--collect-public", action="store_true", help="Credential-free public Yahoo index observations; research only")
     p.add_argument("--calendar"); p.add_argument("--events")
     p.add_argument("--with-context", action="store_true"); p.add_argument("--membership")
     p.add_argument("--phase", choices=["auto", "preopen", "intraday", "close"], default="auto")
     p.add_argument("--format", choices=["markdown", "json"], default="markdown"); p.add_argument("--brief", action="store_true"); p.add_argument("--out")
     a = p.parse_args(argv)
     try:
-        if sum((bool(a.input), a.demo, a.collect_kite)) != 1: raise Block("INPUT: choose exactly one input mode")
+        if sum((bool(a.input), a.demo, a.collect_kite, a.collect_public)) != 1: raise Block("INPUT: choose exactly one input mode")
         if a.demo and a.now: raise Block("DEMO: use its labelled fixed clock")
         if (a.with_context or a.membership) and not a.collect_kite or a.membership and not a.with_context: raise Block("INPUT: context flags require Kite collection")
-        if a.collect_kite:
+        if a.collect_public:
+            if a.now or a.calendar or a.events: raise Block("PUBLIC: use actual provider session; explicit inputs belong to --input mode")
+            from public_market import collect_daily
+            selected = list(INDICES) if a.command.removeprefix("/") == "india-daily" else [a.command.removeprefix("/")]
+            bundle = collect_daily(selected); now = instant()
+        elif a.collect_kite:
             if a.now or not a.calendar: raise Block("COLLECT: a dated calendar and live clock are required")
             from daily_collect import collect
             from kite_readonly import KiteReadOnly

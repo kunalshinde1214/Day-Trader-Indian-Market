@@ -1,6 +1,6 @@
 # Requirements and implementation status
 
-Development checkpoint: **8 November 2026**, version **0.8.1-public-alpha**. Includes public installation/risk/license documentation, a constituent-feed CLI fix and limited read-only Kite carry collection against reviewed opening inventory. Streaming, monitoring deployment files, daily index reports, paper analysis and human-operated execution are included. Each user supplies their broker/data entitlement, approved limits and sourced evidence. Example capital and loss limits are not approvals.
+Development checkpoint: **10 November 2026**, version **0.9.0-public-workflows-alpha**. Adds fifteen Claude plugin skills, credential-free charts and screening, one-minute/custom-level research, explicit exit policies, news and supplied XBRL analysis. Limited read-only Kite carry collection, streaming, monitoring deployment files, daily reports, paper analysis and human-operated execution are included. Each user supplies their broker/data entitlement, approved limits and sourced evidence for broker-bound workflows. Example capital and loss limits are not approvals.
 
 The full platform is not complete. Read [release status and remaining requirements](release-status.md) before making publication claims. All six requested scanners and five read-only adapters have offline coverage. A separate human-operated execution tool covers all five brokers and remains disabled by default; see [execution](execution.md).
 
@@ -25,9 +25,10 @@ Original code references: `trader-scanner/scan.py` (`orb_hit` / completed-bar ap
 
 | Module | Implemented | Remaining full-product work |
 | --- | --- | --- |
+| Public workflow/plugin | Fifteen namespaced Claude skills and marketplace; credential-free charts/listing; multi-tag daily screen; ORB/level research on one-/five-minute bars; public replay; explicit exit policies | Authenticated host invocation; broker-bound level/one-minute entries; exhaustive data coverage |
 | Daily briefings | Four aliases; three session phases; completed-bar scenarios; Markdown/JSON; Kite index history and optional constituent quotes; partial NSE announcement collection; public or reviewed membership | Authenticated feed acceptance; public membership transport/effective-date acceptance; complete macro/calendar/closing breadth feeds; additional index providers |
 | Universe / scan | Six rules; exact instrument/context checks; sourced membership/master/20-session turnover builder; Nifty 500 collector code | Live feed acceptance; automatic F&O membership/restrictions and historical membership |
-| News / analyst / disclosures | Named RSS collector, deduplication, source/release metadata, structured comparative reports and PIT/SAST/pledge/bulk/block processing | Comprehensive exchange coverage, symbol resolution and attachment parsing |
+| News / analyst / disclosures | Per-symbol and exchange RSS, persistent deduplication, headline disclosure discovery, explicit attachment/PDF text extraction, supported XBRL/inline-XBRL facts with matched YoY and quarter TTM; supplied PIT/SAST/pledge/bulk/block facts | Comprehensive exchange coverage, reliable issuer resolution, automatic filing retrieval, full taxonomy/format mapping and unstructured numeric fact verification |
 | Entry / exit plan | Selected rule, completion/expiration, structural stop/target; bounded polling and optional Kite stream quotes; separate reducing limit/stop-limit workflow | Other-broker streaming; authenticated stream and protective-order acceptance |
 | Replay | Seeded 10,000 paths; strict prior history; selected-rule historical matching; mandatory point-in-time references | Dependence-aware/pre-open models, slippage/liquidity and size-specific path costs |
 | Size / margin | Four conservative caps, stop charges, daily reservation, exact whole-lot margin proposal search | Portfolio/hedged margin models; authenticated margin acceptance |

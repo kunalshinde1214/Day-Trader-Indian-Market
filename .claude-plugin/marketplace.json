@@ -1,0 +1,14 @@
+{
+  "name": "kunal-india-trading",
+  "metadata": {"description": "Indian-market research and paper trading skills for personal use."},
+  "owner": {
+    "name": "Kunal Shinde"
+  },
+  "plugins": [
+    {
+      "name": "india-day-trader",
+      "source": "./",
+      "description": "Indian public-data research, daily briefings and paper workflows; separate human-operated execution."
+    }
+  ]
+}
