@@ -50,7 +50,7 @@ def link(value):
     return value
 
 
-def rss(body,source,retrieved):
+def rss(body,source,retrieved,*,nse_local_time=False):
     if len(body)>MAX_BYTES or b"<!DOCTYPE" in body.upper() or b"<!ENTITY" in body.upper():
         raise Block("FEED: oversized XML or document entities refused")
     root=ET.fromstring(body)
@@ -59,8 +59,13 @@ def rss(body,source,retrieved):
         title=(item.findtext("title") or "").strip()
         url=(item.findtext("link") or "").strip()
         rawdate=(item.findtext("pubDate") or "").strip()
+        assumed=False
         try:
-            published=parsedate_to_datetime(rawdate)
+            try:published=parsedate_to_datetime(rawdate)
+            except (ValueError,TypeError):
+                if not nse_local_time or source not in {SOURCES['announcements'],SOURCES['corporate_actions']}:raise
+                published=datetime.strptime(rawdate,'%d-%b-%Y %H:%M:%S').replace(tzinfo=IST)
+                assumed=True
             if published.tzinfo is None or published>retrieved: raise ValueError("time")
             if not title: raise ValueError("title")
             link(url)
@@ -69,6 +74,7 @@ def rss(body,source,retrieved):
         record={"headline":title,"url":url,"published_at":published.astimezone(IST).isoformat(),
                 "description":item.findtext("description") or "","source":source,
                 "symbol":None,"category":"exchange_announcement"}
+        if assumed:record.update(publication_time_raw=rawdate,timezone_basis='IST assumed for NSE local timestamp; feed omits offset',timezone_verified=False)
         key=fingerprint(record)
         if key not in seen: records.append({**record,"id":key,"retrieved_at":retrieved.isoformat()});seen.add(key)
     if root.tag!="rss": raise Block("FEED: expected RSS channel")

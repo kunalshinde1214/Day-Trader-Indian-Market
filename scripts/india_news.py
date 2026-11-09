@@ -32,19 +32,21 @@ def collect(sources, hours=24, *, fetcher=fetch, clock=instant):
     records={};coverage=[]
     for name in sources:
         try:
-            body=fetcher(FEEDS[name]);now=clock();feed=rss(body,FEEDS[name],now)
+            body=fetcher(FEEDS[name]);now=clock();feed=rss(body,FEEDS[name],now,nse_local_time=True)
             recent=[r for r in feed['records'] if instant(r['published_at'])>=now-timedelta(hours=hours)]
-            coverage.append({'source':name,'status':'OK','received':len(feed['records']),'recent':len(recent),'unparsed':len(feed['unparsed']),'retrieved_at':now.isoformat()})
+            coverage.append({'source':name,'status':'OK','received':len(feed['records']),'recent':len(recent),'unparsed':len(feed['unparsed']),'assumed_timezone_items':sum(r.get('timezone_verified') is False for r in feed['records']),'retrieved_at':now.isoformat()})
             for row in recent:
                 key=fingerprint({k:row[k] for k in ('headline','url','published_at')})
                 categories=[c for c,words in CATEGORIES.items() if any(w in row['headline'].lower() for w in words)]
                 if key in records:records[key]['sources'].append(name)
                 else:records[key]={'id':key,'headline':row['headline'],'url':row['url'],'published_at':row['published_at'],
-                                  'sources':[name],'categories':categories or ['market'],'classification_basis':'headline keywords; unverified'}
+                                  'sources':[name],'categories':categories or ['market'],'classification_basis':'headline keywords; unverified',
+                                  'timezone_basis':row.get('timezone_basis','Explicit feed offset'),'publication_time_raw':row.get('publication_time_raw'),
+                                  'timezone_verified':row.get('timezone_verified',True)}
         except (Block,OSError,ValueError,TypeError,KeyError,ET.ParseError):coverage.append({'source':name,'status':'FAILED','reason':'Unavailable or invalid feed; no bypass/retry'})
     successful=sum(s['status']=='OK' for s in coverage)
     return {'schema':'india_news_v1','as_of':clock().isoformat(),'hours':hours,
-            'status':'BLOCKED' if not successful else 'PARTIAL' if successful<len(sources) or any(s.get('unparsed') for s in coverage) else 'COLLECTED',
+            'status':'BLOCKED' if not successful else 'PARTIAL' if successful<len(sources) or any(s.get('unparsed') or s.get('assumed_timezone_items') for s in coverage) else 'COLLECTED',
             'records':sorted(records.values(),key=lambda r:instant(r['published_at']),reverse=True),'sources':coverage,
             'coverage':'Selected RSS items only; not complete market or event clearance','submitted':False}
 
@@ -64,6 +66,7 @@ def markdown(report,limit=30):
     for row in rows:
         url=row['url'].replace(' ','%20').replace('(','%28').replace(')','%29').replace('<','%3C').replace('>','%3E')
         lines.extend([f"- [{safe(row['headline'])}]({url})",f"  {safe(', '.join(row['sources']))} · {row['published_at']} · {safe(', '.join(row['categories']))}"])
+        if row.get('timezone_verified') is False:lines.append('  Timezone: IST assumed; publisher timestamp has no offset.')
     if not rows:lines.append('No recent unseen headlines returned. This does not mean no market news exists.')
     lines.extend(['','Source coverage:'])
     for s in report['sources']:lines.append(f"- {s['source']}: {s['status']}; recent {s.get('recent','unknown')}; unparsed {s.get('unparsed','unknown')}")

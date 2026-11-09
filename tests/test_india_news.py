@@ -32,3 +32,19 @@ class NewsTests(unittest.TestCase):
         with self.assertRaises(Block):fetch('https://evil.example')
     def test_invalid_window(self):
         with self.assertRaises(Block):collect(['nse-actions'],721)
+    def test_nse_local_time_is_explicitly_assumed(self):
+        body=BODY.replace(b'Tue, 10 Nov 2026 03:00:00 GMT',b'10-Nov-2026 08:30:00')
+        r=collect(['nse-actions'],fetcher=lambda u:body,clock=lambda:NOW)
+        self.assertEqual(len(r['records']),1);self.assertEqual(r['status'],'PARTIAL')
+        self.assertFalse(r['records'][0]['timezone_verified']);self.assertIn('IST assumed',markdown(r))
+    def test_unrelated_source_never_gets_nse_timezone(self):
+        body=BODY.replace(b'Tue, 10 Nov 2026 03:00:00 GMT',b'10-Nov-2026 08:30:00')
+        r=collect(['et-markets'],fetcher=lambda u:body,clock=lambda:NOW)
+        self.assertEqual(r['records'],[])
+    def test_default_rss_remains_strict_for_risk_consumers(self):
+        from data import rss,SOURCES
+        body=BODY.replace(b'Tue, 10 Nov 2026 03:00:00 GMT',b'10-Nov-2026 08:30:00')
+        self.assertEqual(rss(body,SOURCES['corporate_actions'],NOW)['records'],[])
+    def test_future_nse_local_time_stays_rejected(self):
+        body=BODY.replace(b'Tue, 10 Nov 2026 03:00:00 GMT',b'11-Nov-2026 08:30:00')
+        self.assertEqual(collect(['nse-actions'],fetcher=lambda u:body,clock=lambda:NOW)['records'],[])

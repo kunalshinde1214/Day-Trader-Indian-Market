@@ -2,6 +2,8 @@
 
 ## Unreleased — Indian market news briefing
 
+- Support NSE's local timestamp format in the personal news reader with visible assumed-IST provenance; preserve strict default parsing for other consumers. Add four regression tests.
+
 - Add a market-wide news collection and Markdown/JSON display workflow with default NSE feeds and optional personal-use Economic Times markets RSS, publication-time checks, source coverage and persistent deduplication.
 - Add eight offline news workflow tests. Existing v0.9.0 release assets remain unchanged.
 
