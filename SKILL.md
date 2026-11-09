@@ -46,6 +46,7 @@ Within this skill, route `/india-daily`, `/nifty`, `/sensex` and `/banknifty` (o
 
 | Request | Use |
 | --- | --- |
+| `/india-news` / market-wide news briefing | `scripts/india_news.py`; [news workflow](references/india-news.md). Alias within this skill; Claude plugin entry is `trader-news` |
 | Account-free charts / screening / level entry / news / XBRL / plugin install | `scripts/public_market.py`, `scripts/research.py`; [public workflow guide](references/public-workflows.md). Never promote public outputs to execution evidence |
 | `/india-daily`, `/nifty`, `/sensex`, `/banknifty` | `scripts/daily.py`; [daily reports and input contract](references/daily.md). Use `--demo` only for an explicitly labelled demonstration |
 | Scan / entry / plan / replay / size / risk / ticket | `scripts/trader.py`; [commands](references/commands.md), [setup selection and rules](references/setups.md) |

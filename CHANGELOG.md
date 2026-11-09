@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Indian market news briefing
+
+- Add a market-wide news collection and Markdown/JSON display workflow with default NSE feeds and optional personal-use Economic Times markets RSS, publication-time checks, source coverage and persistent deduplication.
+- Add eight offline news workflow tests. Existing v0.9.0 release assets remain unchanged.
+
 ## 0.9.0-public-workflows-alpha — 10 November 2026
 
 - Add Claude plugin/marketplace manifests and fifteen workflow skills: eleven roles plus India daily, Nifty, Sensex and Bank Nifty.

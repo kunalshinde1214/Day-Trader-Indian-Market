@@ -36,6 +36,8 @@ The plugin provides the eleven original workflow roles adapted to India, plus fo
 
 ## Public market data — no brokerage credentials
 
+Market-wide news now has a [collect-and-display workflow](references/india-news.md): run `python scripts/india_news.py` for NSE feeds, or add `--sources nse-announcements nse-actions et-markets` for an optional personal-use Economic Times briefing. Output includes linked headlines, IST publication times, categories and source coverage.
+
 ```bash
 python scripts/public_market.py universe --out reports/nse-equities.json
 python scripts/public_market.py scan --symbols RELIANCE.NS TCS.NS INFY.NS --out reports/public-scan.json
