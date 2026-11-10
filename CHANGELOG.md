@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.4-dhan-carry-alpha
+
+- Add read-only Dhan carry collection with repeated books, account checks, exact holding identity, actual fill reconciliation and fresh marks.
+- Keep availability reservations separate from executed sales; validate delivery/derivative product mapping and overnight position totals.
+- Add 26 offline tests covering the supported subset and failure paths. Authenticated acceptance remains pending; live execution stays intraday-only.
+
 ## 0.9.3-upstox-carry-alpha
 
 - Add read-only Upstox carry collection with repeated holdings/positions/orders/trades/MTF reads and profile identity checks.

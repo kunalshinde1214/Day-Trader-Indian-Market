@@ -36,6 +36,13 @@ def trade_time(value, day, broker):
 
 def trade_product(broker, row, allow_carry=False, *, instrument=None):
     if allow_carry:
+        if broker == "dhan":
+            product = {"INTRADAY": "MIS", "CNC": "CNC", "MARGIN": "NRML"}.get(row.get("productType"))
+            if product is None or not instrument or instrument.get("broker") != broker:
+                raise Block("TRADES: mapped Dhan product required")
+            if product == "CNC" and instrument["kind"] != "equity" or product == "NRML" and instrument["kind"] not in {"future", "option"}:
+                raise Block("TRADES: Dhan product/instrument mismatch")
+            return product
         if broker == "upstox":
             if row.get("product") == "I": return "MIS"
             if row.get("product") != "D" or not instrument or instrument.get("broker") != broker:
@@ -44,7 +51,7 @@ def trade_product(broker, row, allow_carry=False, *, instrument=None):
             if instrument["kind"] in {"future", "option"}: return "NRML"
             raise Block("TRADES: unsupported delivery instrument")
         if broker != "kite" or row.get("product") not in {"MIS", "CNC", "NRML"}:
-            raise Block("TRADES: carry normalization supports Kite and Upstox only")
+            raise Block("TRADES: carry normalization supports Kite, Upstox and Dhan only")
         return row["product"]
     return _product(broker, row)
 

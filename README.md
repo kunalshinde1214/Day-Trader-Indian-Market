@@ -6,7 +6,7 @@ Created and maintained by **Kunal Shinde**. This repository contains the reusabl
 
 [![Offline validation](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml/badge.svg)](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml)
 
-**Release: 0.9.3-upstox-carry-alpha.** Includes a fifteen-skill Claude plugin, credential-free public-market research and the broker-bound paper workflows. Live execution starts disabled. The full production specification is unfinished, and no authenticated broker acceptance or real-trade validation is claimed. See [release status](references/release-status.md) and [remaining requirements](references/requirements.md).
+**Release: 0.9.4-dhan-carry-alpha.** Includes a fifteen-skill Claude plugin, credential-free public-market research and the broker-bound paper workflows. Live execution starts disabled. The full production specification is unfinished, and no authenticated broker acceptance or real-trade validation is claimed. See [release status](references/release-status.md) and [remaining requirements](references/requirements.md).
 
 > **Use this skill at your own risk.** Trading can lose money; derivatives and leverage can cause losses beyond the amount you expected to risk. Outputs are informational tools, not investment advice, a recommendation, a promise of returns or a suitability assessment. Verify every data point, instrument, quantity, price and order yourself. Start with the synthetic demos and paper mode. Read the [risk disclosure](RISK_DISCLOSURE.md) before connecting an account.
 
@@ -77,14 +77,14 @@ The last command needs your sourced input file. For automatic Kite index reads, 
 | Brokers | Read-only adapters and separate human-operated execution transports for Kite, Upstox, Dhan, Angel One and FYERS; authenticated acceptance pending |
 | Live controls | Per-action human confirmations, refreshed evidence, persisted intents, no automatic ambiguous retry, recovery and reducing limit/stop-limit workflows |
 | Journal | Fill imports, account reconciliation, duplicate/conflict detection, audited fee corrections and CSV export |
-| Carry accounting | Reviewed opening inventory, product-specific positions, pooled cost basis and daily P&L; limited automatic Kite and Upstox collection |
+| Carry accounting | Reviewed opening inventory, product-specific positions, pooled cost basis and daily P&L; limited automatic Kite, Upstox and Dhan collection |
 | Monitoring | Bounded polling, local alerts, entry halt, opt-in webhook delivery and five-broker WebSocket quote adapters |
 | Deployment | Reviewable Windows Task Scheduler/systemd files; rendering does not install or activate a service |
 | Research inputs | Sourced news/disclosure processing, comparative reports, event review and expiry/flow diagnostics |
 | Public workflows | NSE EQ listing; five multi-tag daily patterns; public index/equity history; one-/five-minute ORB and custom levels; bounded watch; research replay |
 | Financial filings | Supported supplied XBRL/inline-XBRL facts, basis-matched YoY, four-quarter revenue/profit TTM and explicit filing/PDF text extraction |
 
-Dhan, Angel One and FYERS carry collectors, comprehensive exchange-data coverage, unsupported inventory adjustments and mixed-account live execution remain pending. Stops and exits require their own human actions: this is **not an unattended trading bot**. A running watcher or an entry acknowledgment does not install a broker stop.
+Angel One and FYERS carry collectors, comprehensive exchange-data coverage, unsupported inventory adjustments and mixed-account live execution remain pending. Stops and exits require their own human actions: this is **not an unattended trading bot**. A running watcher or an entry acknowledgment does not install a broker stop.
 
 ## Connect your own broker
 
@@ -110,7 +110,7 @@ Upstox/FYERS use a separate SDK environment; follow [streaming setup](references
 - [Daily reports](references/daily.md) and [six setup definitions](references/setups.md)
 - [Broker setup](references/brokers.md) and [human-operated execution](references/execution.md)
 - [Journal and service operations](references/account-service.md)
-- [Carry accounting](references/portfolio.md) and [Kite carry collection](references/kite-portfolio.md) and [Upstox carry collection](references/upstox-portfolio.md)
+- [Carry accounting](references/portfolio.md) and [Kite carry collection](references/kite-portfolio.md) and [Upstox carry collection](references/upstox-portfolio.md) and [Dhan carry collection](references/dhan-portfolio.md)
 - [Streaming/deployment](references/streaming-deployment.md)
 - [Risk disclosure](RISK_DISCLOSURE.md), [security reporting](SECURITY.md) and [contributing](CONTRIBUTING.md)
 - [Release status](references/release-status.md), [changelog](CHANGELOG.md), [coverage matrix](references/requirements.md) and [target specification](references/product-spec.md)
@@ -119,7 +119,7 @@ Upstox/FYERS use a separate SDK environment; follow [streaming setup](references
 
 ```bash
 python scripts/release.py --check
-python scripts/release.py --out dist/india-day-trader-0.9.3-upstox-carry-alpha.zip
+python scripts/release.py --out dist/india-day-trader-0.9.4-dhan-carry-alpha.zip
 ```
 
 The release command runs the offline suite and checks Python syntax, JSON and packaged documentation links. It builds an allowlisted ZIP with file hashes and refuses to overwrite an existing archive. Research documents, account files, journals, dependencies, logs and generated demos are excluded. GitHub Actions runs the same checks on Python 3.10, 3.12 and 3.13; inspect the linked run for its actual result. Passing synthetic tests does not prove broker connectivity, live reliability or profitability.
