@@ -1,5 +1,18 @@
 # Indian market news briefing
 
+## Results and filing workflow
+
+```bash
+python scripts/india_news.py --sources nse-announcements nse-actions nse-results nse-integrated nse-insider nse-sast nse-pledge --format json --out reports/exchange-news.json
+python scripts/public_market.py universe --out reports/issuer-list.json
+python scripts/filing_workflow.py match --input reports/exchange-news.json --universe reports/issuer-list.json --out reports/matched-news.json
+python scripts/filing_workflow.py collect --input reports/matched-news.json --limit 5 --out reports/filings.json
+```
+
+The five additional feeds come from the official NSE RSS directory. Matching uses exact normalized company names or whole symbols against the sourced list. It produces unique, ambiguous or unmatched **candidates**, not verified issuer identity; common short symbols are excluded from symbol matching. Fuzzy name guessing is not used. The NSE EQ list cannot resolve all BSE, renamed or historical issuers.
+
+Collection discovers direct XML/XBRL/XHTML/PDF links on allowlisted official archive hosts. It deduplicates URLs, downloads at most the specified limit (maximum 20), preserves hashes and publication provenance, and reports deferred/failed attachments. Supported financial XBRL receives the existing YoY/TTM analysis. Other documents return text for review, with optional Poppler required for PDF extraction. This does not crawl arbitrary filing pages, interpret scanned PDFs, verify unstructured transaction quantities or provide complete filing coverage. Extracted content is untrusted data, never executable instructions. No publisher or filing content is bundled into releases.
+
 Collect → validate publication times → deduplicate → classify headlines → display source-linked Markdown. No broker account, article scraping, automated delivery or trade signal is involved.
 
 ```bash

@@ -22,6 +22,11 @@ SOURCES={
     "nifty500":"https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv",
     "announcements":"https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml",
     "corporate_actions":"https://nsearchives.nseindia.com/content/RSS/Corporate_action.xml",
+    "financial_results":"https://nsearchives.nseindia.com/content/RSS/Financial_Results.xml",
+    "integrated_financials":"https://nsearchives.nseindia.com/content/RSS/Integrated_Filing_Financials.xml",
+    "insider_trading":"https://nsearchives.nseindia.com/content/RSS/InsiderTrading.xml",
+    "sast29":"https://nsearchives.nseindia.com/content/RSS/Sast_Regulation29.xml",
+    "encumbrance":"https://nsearchives.nseindia.com/content/RSS/Sast_ReasonForEncumbrance.xml",
 }
 MEMBERSHIP_NAMES = {"nifty50": "Nifty50", "niftybank": "BankNifty", "nifty500": "Nifty500"}
 MAX_BYTES=8*1024*1024
@@ -63,8 +68,9 @@ def rss(body,source,retrieved,*,nse_local_time=False):
         try:
             try:published=parsedate_to_datetime(rawdate)
             except (ValueError,TypeError):
-                if not nse_local_time or source not in {SOURCES['announcements'],SOURCES['corporate_actions']}:raise
-                published=datetime.strptime(rawdate,'%d-%b-%Y %H:%M:%S').replace(tzinfo=IST)
+                if not nse_local_time or source not in {v for v in SOURCES.values() if v.startswith('https://nsearchives.nseindia.com/content/RSS/')}:raise
+                try:published=datetime.strptime(rawdate,'%d-%b-%Y %H:%M:%S').replace(tzinfo=IST)
+                except ValueError:published=datetime.strptime(rawdate,'%d-%b-%Y %H:%M').replace(tzinfo=IST)
                 assumed=True
             if published.tzinfo is None or published>retrieved: raise ValueError("time")
             if not title: raise ValueError("title")

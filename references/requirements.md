@@ -1,6 +1,6 @@
 # Requirements and implementation status
 
-Development checkpoint: **10 November 2026**, version **0.9.0-public-workflows-alpha**. Adds fifteen Claude plugin skills, credential-free charts and screening, one-minute/custom-level research, explicit exit policies, news and supplied XBRL analysis. Limited read-only Kite carry collection, streaming, monitoring deployment files, daily reports, paper analysis and human-operated execution are included. Each user supplies their broker/data entitlement, approved limits and sourced evidence for broker-bound workflows. Example capital and loss limits are not approvals.
+Development checkpoint: **10 November 2026**, version **0.9.1-news-filings-alpha**. Adds fifteen Claude plugin skills, credential-free charts and screening, one-minute/custom-level research, explicit exit policies, news and supplied XBRL analysis. Limited read-only Kite carry collection, streaming, monitoring deployment files, daily reports, paper analysis and human-operated execution are included. Each user supplies their broker/data entitlement, approved limits and sourced evidence for broker-bound workflows. Example capital and loss limits are not approvals.
 
 The full platform is not complete. Read [release status and remaining requirements](release-status.md) before making publication claims. All six requested scanners and five read-only adapters have offline coverage. A separate human-operated execution tool covers all five brokers and remains disabled by default; see [execution](execution.md).
 
@@ -42,6 +42,8 @@ Original code references: `trader-scanner/scan.py` (`orb_hit` / completed-bar ap
 | Release | Packaging allowlist, deterministic hashes, GitHub CI definition, public README, risk/security/contribution guidance, retained licenses and attribution | Verify the target commit's GitHub CI and release status; full-product acceptance remains outstanding |
 
 ## Acceptance
+
+Account ownership and acceptance are end-user responsibilities: see [bring-your-own-account setup](user-setup.md). No developer brokerage account is required to publish the documented public/paper skill. This changes release prerequisites, not the evidence: publisher authenticated acceptance remains unperformed. Unimplemented engineering capabilities remain roadmap work.
 
 The offline suite exercises every setup/broker combination, including 10,000-path replay and recomputed risk before paper tickets. See [release status](release-status.md) for test count and acceptance limits. [Setup rules](setups.md) documents exact definitions; [operations](operations.md) documents ingestion, journal, monitoring and proposal schemas.
 

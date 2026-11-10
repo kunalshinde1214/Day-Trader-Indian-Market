@@ -6,7 +6,7 @@ Created and maintained by **Kunal Shinde**. This repository contains the reusabl
 
 [![Offline validation](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml/badge.svg)](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml)
 
-**Release: 0.9.0-public-workflows-alpha.** Includes a fifteen-skill Claude plugin, credential-free public-market research and the broker-bound paper workflows. Live execution starts disabled. The full production specification is unfinished, and no authenticated broker acceptance or real-trade validation is claimed. See [release status](references/release-status.md) and [remaining requirements](references/requirements.md).
+**Release: 0.9.1-news-filings-alpha.** Includes a fifteen-skill Claude plugin, credential-free public-market research and the broker-bound paper workflows. Live execution starts disabled. The full production specification is unfinished, and no authenticated broker acceptance or real-trade validation is claimed. See [release status](references/release-status.md) and [remaining requirements](references/requirements.md).
 
 > **Use this skill at your own risk.** Trading can lose money; derivatives and leverage can cause losses beyond the amount you expected to risk. Outputs are informational tools, not investment advice, a recommendation, a promise of returns or a suitability assessment. Verify every data point, instrument, quantity, price and order yourself. Start with the synthetic demos and paper mode. Read the [risk disclosure](RISK_DISCLOSURE.md) before connecting an account.
 
@@ -88,6 +88,8 @@ The four other brokers' streaming/carry collectors, comprehensive exchange-data 
 
 ## Connect your own broker
 
+Each user supplies and validates their own account. The publisher does not supply a broker account or credentials. Follow the [end-user setup and read-only acceptance guide](references/user-setup.md). Public research needs no account; broker integrations are implemented but not independently account-tested by the publisher.
+
 1. Read [broker setup](references/brokers.md) and choose your broker, market segments and data entitlement.
 2. Keep API credentials in your local environment. Never paste tokens into chat, source files, issues or commits.
 3. Supply a current instrument master, dated session/restriction/event evidence, your account identity, approved risk limits and broker-specific fee card. Example limits are not personal approvals.
@@ -117,7 +119,7 @@ Install it in your own virtual environment if needed. Core demos do not require 
 
 ```bash
 python scripts/release.py --check
-python scripts/release.py --out dist/india-day-trader-0.9.0-public-workflows-alpha.zip
+python scripts/release.py --out dist/india-day-trader-0.9.1-news-filings-alpha.zip
 ```
 
 The release command runs the offline suite and checks Python syntax, JSON and packaged documentation links. It builds an allowlisted ZIP with file hashes and refuses to overwrite an existing archive. Research documents, account files, journals, dependencies, logs and generated demos are excluded. GitHub Actions runs the same checks on Python 3.10, 3.12 and 3.13; inspect the linked run for its actual result. Passing synthetic tests does not prove broker connectivity, live reliability or profitability.

@@ -1,8 +1,11 @@
 # Release status — 10 November 2026
 
-Version: **0.9.0-public-workflows-alpha**. Adds fifteen Claude plugin skills, credential-free public research, index collection, multi-tag screening, one-minute/custom-level entry research, flexible exits, news discovery and supplied XBRL analysis. Includes limited Kite carry collection, streaming, monitoring deployment files, daily commands, paper analysis and human-operated execution. Live starts disabled. This is **not the completed production specification**. No authenticated broker account was connected, real order submitted, webhook delivered or production monitoring service activated during development.
+Version: **0.9.1-news-filings-alpha**. Adds fifteen Claude plugin skills, credential-free public research, index collection, multi-tag screening, one-minute/custom-level entry research, flexible exits, news discovery and supplied XBRL analysis. Includes limited Kite carry collection, streaming, monitoring deployment files, daily commands, paper analysis and human-operated execution. Live starts disabled. This is **not the completed production specification**. No authenticated broker account was connected, real order submitted, webhook delivered or production monitoring service activated during development.
 
 ## Implemented and locally verified
+
+- News briefing and official filing workflow: eight selectable feeds, explicit NSE timezone assumptions, issuer-candidate matching, bounded official attachment collection and financial parsing/text-review fallback. User-owned broker setup and read-only acceptance are documented; a developer brokerage account is not required for public distribution.
+- On 10 November, public Upstox and Dhan master probes passed (50,642 and 156,091 normalized supported records). Angel and FYERS public probes remained blocked. These results are not authenticated acceptance.
 
 - **Public workflows and installation:** fifteen Claude plugin wrappers and marketplace metadata; public listing/charts, five multi-tag daily patterns, completed one-/five-minute ORB and level entry research, bounded watch and research replay. Broker-bound planning/replay supports explicit stop/target policies. Public plans cannot pass broker execution gates.
 - **News and filing research:** per-symbol RSS, source-preserving persistent deduplication, headline disclosure classification, explicit attachment text/PDF extraction and supported XBRL/inline-XBRL facts with basis-matched YoY and contiguous-quarter TTM. Discovery and extraction do not verify filing facts or complete coverage. See [public workflows](public-workflows.md).
@@ -24,7 +27,7 @@ Version: **0.9.0-public-workflows-alpha**. Adds fifteen Claude plugin skills, cr
 
 ## Validation evidence
 
-Run `python scripts/release.py --check` for the exact packaged code, links and full offline suite. The suite includes **503 test methods**, including 40 public-workflow, daily-source, research and exit-policy tests, 3 standalone public-feed CLI tests, 35 Kite carry-collector tests, 43 streaming/deployment/context tests, 38 portfolio tests, 32 daily-report/collector tests, 24 account/service tests and 50 execution tests. Existing analysis/adapter/release tests include the watcher/stream integration check. Loops cover all four daily commands in three phases, all 30 setup/broker paper workflows and all five execution/trade-book contracts. Local validation uses Python 3.12; [GitHub CI](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml) targets 3.10/3.12/3.13. Inspect the run for the exact commit rather than assuming it passed. Tests use simulated responses and send no actual trade or notification.
+Run `python scripts/release.py --check` for the exact packaged code, links and full offline suite. The suite includes **527 test methods**, including 40 public-workflow, daily-source, research and exit-policy tests, 3 standalone public-feed CLI tests, 35 Kite carry-collector tests, 43 streaming/deployment/context tests, 38 portfolio tests, 32 daily-report/collector tests, 24 account/service tests and 50 execution tests. Existing analysis/adapter/release tests include the watcher/stream integration check. Loops cover all four daily commands in three phases, all 30 setup/broker paper workflows and all five execution/trade-book contracts. Local validation uses Python 3.12; [GitHub CI](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml) targets 3.10/3.12/3.13. Inspect the run for the exact commit rather than assuming it passed. Tests use simulated responses and send no actual trade or notification.
 
 Additional checks passed with websocket-client 1.9.2 over a real loopback WebSocket handshake/subscription/heartbeat/close using synthetic credentials, and native Windows Task Scheduler parsing of a generated task definition. No task was registered or started. These checks do not establish authenticated streaming, Linux activation or production service reliability.
 
@@ -46,7 +49,7 @@ The supplied proposal also discusses advanced replay, slippage/liquidity, option
 ## Package and use
 
 ```text
-python scripts/release.py --out dist/india-day-trader-0.9.0-public-workflows-alpha.zip
+python scripts/release.py --out dist/india-day-trader-0.9.1-news-filings-alpha.zip
 ```
 
 The command runs tests before producing the archive and refuses to overwrite an existing ZIP. Its manifest lists daily commands, canonical accounting plus limited Kite collection requiring reviewed opening evidence, Kite-only streaming, render-only deployment, packaged hashes, live disabled by default, and full-spec/authenticated completion false. Earlier archives remain historical checkpoints. Unpack the single skill folder and run a labelled demo first. Distribute only with the alpha scope and acceptance limits stated clearly. A whole-product completion percentage would conceal outstanding engineering and external acceptance requirements; use the explicit counts above.

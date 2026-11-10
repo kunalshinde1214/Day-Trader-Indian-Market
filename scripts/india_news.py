@@ -16,6 +16,8 @@ from research import CATEGORIES, unseen
 
 FEEDS={"nse-announcements":SOURCES["announcements"],"nse-actions":SOURCES["corporate_actions"],
        "et-markets":"https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms"}
+FEEDS.update({'nse-results':SOURCES['financial_results'],'nse-integrated':SOURCES['integrated_financials'],
+              'nse-insider':SOURCES['insider_trading'],'nse-sast':SOURCES['sast29'],'nse-pledge':SOURCES['encumbrance']})
 
 
 def fetch(url):

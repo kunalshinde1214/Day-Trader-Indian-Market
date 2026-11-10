@@ -48,3 +48,8 @@ class NewsTests(unittest.TestCase):
     def test_future_nse_local_time_stays_rejected(self):
         body=BODY.replace(b'Tue, 10 Nov 2026 03:00:00 GMT',b'11-Nov-2026 08:30:00')
         self.assertEqual(collect(['nse-actions'],fetcher=lambda u:body,clock=lambda:NOW)['records'],[])
+    def test_sast_minute_precision_is_preserved(self):
+        body=BODY.replace(b'Tue, 10 Nov 2026 03:00:00 GMT',b'10-Nov-2026 08:30')
+        r=collect(['nse-sast'],fetcher=lambda u:body,clock=lambda:NOW)
+        self.assertEqual(r['records'][0]['publication_time_raw'],'10-Nov-2026 08:30')
+        self.assertFalse(r['records'][0]['timezone_verified'])

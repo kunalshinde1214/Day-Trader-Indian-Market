@@ -9,6 +9,8 @@ An India adaptation of Jake Schincariol's day-trader-skill. Work in a `trader/` 
 
 ## Start
 
+Users bring their own broker accounts. Follow [user setup and local acceptance](references/user-setup.md); do not require the publisher to hold a brokerage account before public distribution. Never infer authenticated acceptance from offline tests or another user's account.
+
 Use Python 3.10+. Core analysis uses the standard library; optional Kite streaming has a separate dependency file. Resolve script paths against this skill folder. Read [commands and data contracts](references/commands.md) for exact commands and input shapes.
 
 Public users should read the [risk disclosure](RISK_DISCLOSURE.md) and [personal-use license](LICENSE). This is a source-available alpha, not an open-source license or a completed production trading platform. Do not describe demo outputs as current data or performance evidence.
