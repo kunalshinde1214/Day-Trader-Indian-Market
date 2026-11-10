@@ -23,6 +23,7 @@ FUNDS = PREFIX + "user/v1/getRMS"
 POSITIONS = PREFIX + "order/v1/getPosition"
 ORDERS = PREFIX + "order/v1/getOrderBook"
 TRADES = PREFIX + "order/v1/getTradeBook"
+HOLDINGS = PREFIX + "portfolio/v1/getHolding"
 CANDLES = PREFIX + "historical/v1/getCandleData"
 QUOTES = PREFIX + "market/v1/quote"
 MARGIN = PREFIX + "margin/v1/batch"
@@ -132,7 +133,7 @@ class AngelReadOnly:
         return values
 
     def request(self, method, path, body=None):
-        if not ((method == "GET" and path in {PROFILE, FUNDS, POSITIONS, ORDERS, TRADES}) or
+        if not ((method == "GET" and path in {PROFILE, FUNDS, POSITIONS, ORDERS, TRADES, HOLDINGS}) or
                 (method == "POST" and path in {CANDLES, QUOTES, MARGIN})):
             raise Block("READ_ONLY: endpoint/method not allowed; live execution unavailable")
         settings = self.credentials()

@@ -10,6 +10,9 @@ def quote_key(instrument):
         from dhan_readonly import segment_for
         return segment_for(instrument["exchange"])+":"+instrument["token"]
     if broker=="angel":return instrument["exchange"]+":"+instrument["token"]
+    if broker=="fyers":
+        from fyers_readonly import full_symbol
+        return full_symbol(instrument['symbol'],instrument['exchange'])
     return instrument["exchange"]+":"+instrument["symbol"]
 
 

@@ -16,6 +16,7 @@ from core import Block, IST, fingerprint, instant, integer, number, positive
 HOST = "https://api-t1.fyers.in"
 PROFILE, FUNDS, POSITIONS, ORDERS = ["/api/v3/" + x for x in ("profile", "funds", "positions", "orders")]
 TRADES = "/api/v3/tradebook"
+HOLDINGS = "/api/v3/holdings"
 HISTORY, QUOTES, DEPTH = ["/data/" + x for x in ("history", "quotes", "depth")]
 MARGIN = "/api/v3/multiorder/margin"
 SEGMENTS = {"NSE_CM": (10, 10, "NSE"), "BSE_CM": (12, 10, "BSE"),
@@ -118,7 +119,7 @@ class FyersReadOnly:
         return values
 
     def request(self, method, path, query=None, body=None):
-        if not ((method == "GET" and path in {PROFILE, FUNDS, POSITIONS, ORDERS, TRADES, HISTORY, QUOTES, DEPTH}) or
+        if not ((method == "GET" and path in {PROFILE, FUNDS, POSITIONS, ORDERS, TRADES, HOLDINGS, HISTORY, QUOTES, DEPTH}) or
                 (method == "POST" and path == MARGIN)):
             raise Block("READ_ONLY: endpoint/method not allowed; live execution unavailable")
         settings = self.credentials()

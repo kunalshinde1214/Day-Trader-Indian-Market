@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.5-five-broker-carry-alpha
+
+- Add conservative Angel One/FYERS carry collectors with repeated books, exact identity, fill reconciliation and fresh marks; document unresolved provider multiplier/collateral conventions explicitly.
+- Correct FYERS derivative quote keys to use provider NSE/BSE prefixes.
+- Add 44 offline collector tests. All five brokers now have limited carry collector code; full-product and authenticated acceptance remain incomplete.
+
 ## 0.9.4-dhan-carry-alpha
 
 - Add read-only Dhan carry collection with repeated books, account checks, exact holding identity, actual fill reconciliation and fresh marks.
