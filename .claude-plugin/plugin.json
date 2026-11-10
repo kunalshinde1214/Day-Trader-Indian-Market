@@ -1,6 +1,6 @@
 {
   "name": "india-day-trader",
-  "version": "0.9.2-broker-streams-alpha",
+  "version": "0.9.3-upstox-carry-alpha",
   "description": "Indian public-data research, daily briefings and paper workflows; separate human-operated execution.",
   "author": {
     "name": "Kunal Shinde"

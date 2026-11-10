@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.3-upstox-carry-alpha
+
+- Add read-only Upstox carry collection with repeated holdings/positions/orders/trades/MTF reads and profile identity checks.
+- Map delivery products by instrument kind, reconcile opening inventory and actual fills, preserve reservation-versus-fill distinctions and require fresh last-trade marks.
+- Add 30 regression tests for inventory/P&L, derivatives, unsupported exposure, account changes, read-only routes and CLI output. Live execution remains intraday-only; authenticated acceptance is pending.
+
 ## 0.9.2-broker-streams-alpha
 
 - Add Dhan and Angel binary quote streams and isolated Upstox/FYERS official SDK workers; enforce TLS certificate/hostname checks, bounded reconnects, quote identity/freshness checks and stop latches.

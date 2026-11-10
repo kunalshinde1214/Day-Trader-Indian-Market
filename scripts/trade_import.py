@@ -34,10 +34,17 @@ def trade_time(value, day, broker):
     return parsed
 
 
-def trade_product(broker, row, allow_carry=False):
+def trade_product(broker, row, allow_carry=False, *, instrument=None):
     if allow_carry:
+        if broker == "upstox":
+            if row.get("product") == "I": return "MIS"
+            if row.get("product") != "D" or not instrument or instrument.get("broker") != broker:
+                raise Block("TRADES: mapped Upstox delivery instrument required")
+            if instrument["kind"] == "equity": return "CNC"
+            if instrument["kind"] in {"future", "option"}: return "NRML"
+            raise Block("TRADES: unsupported delivery instrument")
         if broker != "kite" or row.get("product") not in {"MIS", "CNC", "NRML"}:
-            raise Block("TRADES: carry normalization supports Kite MIS/CNC/NRML only")
+            raise Block("TRADES: carry normalization supports Kite and Upstox only")
         return row["product"]
     return _product(broker, row)
 
@@ -55,7 +62,7 @@ def normalize_trades(raw, snapshot, instruments, now, *, allow_carry=False):
     if len(orders) != len(snapshot["orders"]): raise Block("TRADES: duplicate order identity")
     out, seen, totals = [], {}, defaultdict(int)
     for r in raw["trades"]:
-        if b == "kite" and "user_id" in r and r["user_id"] != account:
+        if b in {"kite", "upstox"} and "user_id" in r and r["user_id"] != account:
             raise Block("TRADES: cross-account fill")
         for key in ("dhanClientId", "clientcode", "clientId", "fy_id"):
             if key in r and r[key] != account: raise Block("TRADES: cross-account fill")
@@ -81,7 +88,8 @@ def normalize_trades(raw, snapshot, instruments, now, *, allow_carry=False):
             if len(matches) != 1: raise Block("TRADES: ambiguous Angel master identity")
             r = {**r, "symboltoken": matches[0]["token"]}
         ident = match_instrument(b, r, instruments)
-        product = trade_product(b, r, allow_carry)
+        instrument = next(i for i in instruments if all(i[k] == ident[k] for k in ident))
+        product = trade_product(b, r, allow_carry, instrument=instrument)
         if any(order[k] != ident[k] for k in ident) or order["side"] != side or product != order["product"]:
             raise Block("TRADES: order/fill identity or direction mismatch")
         at = trade_time(stamp, raw["date"], b)

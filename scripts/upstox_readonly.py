@@ -72,7 +72,8 @@ class UpstoxReadOnly:
 
     def request(self, method, path, query=None, body=None):
         fixed = {"/v2/market-quote/quotes", "/v2/user/profile", "/v2/user/get-funds-and-margin",
-                 "/v2/portfolio/short-term-positions", "/v2/order/retrieve-all", "/v2/order/trades/get-trades-for-day"}
+                 "/v2/portfolio/short-term-positions", "/v2/portfolio/long-term-holdings", "/v3/portfolio/mtf-positions",
+                 "/v2/order/retrieve-all", "/v2/order/trades/get-trades-for-day"}
         encoded_key = r"(?:NSE|BSE)_(?:EQ|FO)%7C[A-Za-z0-9]+"
         history = rf"/v3/historical-candle/{encoded_key}/(?:minutes/5|days/1)/\d{{4}}-\d{{2}}-\d{{2}}/\d{{4}}-\d{{2}}-\d{{2}}"
         intraday = rf"/v3/historical-candle/intraday/{encoded_key}/(?:minutes/5|days/1)"

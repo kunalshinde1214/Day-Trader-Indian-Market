@@ -2,7 +2,7 @@
 
 `scripts/portfolio.py` reconciles sourced opening inventory, journal fills, all current orders and current inventory. It supports canonical `CNC` equity delivery, `NRML` futures/options and `MIS` intraday positions. These labels describe the normalized contract; other brokers' native product codes must be explicitly mapped by the evidence provider.
 
-This module accounts from supplied evidence and makes no broker calls, order submissions, automatic product conversions or position liquidation. A portfolio report is deliberately **not** an account risk ledger and cannot enable the intraday live tool. The five-broker raw trade-import CLI continues to accept intraday accounts only. A separate limited Kite collector supplies carry evidence; other-broker carry normalization and authenticated acceptance remain outstanding.
+This module accounts from supplied evidence and makes no broker calls, order submissions, automatic product conversions or position liquidation. A portfolio report is deliberately **not** an account risk ledger and cannot enable the intraday live tool. The five-broker raw trade-import CLI continues to accept intraday accounts only. Separate limited [Kite](kite-portfolio.md) and [Upstox](upstox-portfolio.md) collectors supply carry evidence. Dhan/Angel/FYERS carry collection and authenticated acceptance remain outstanding.
 
 ## Workflow
 
