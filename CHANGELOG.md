@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.2-broker-streams-alpha
+
+- Add Dhan and Angel binary quote streams and isolated Upstox/FYERS official SDK workers; enforce TLS certificate/hostname checks, bounded reconnects, quote identity/freshness checks and stop latches.
+- Integrate all five brokers into analysis/watch stream selection and render-only Windows/systemd deployment. Preserve independent live-execution evidence checks.
+- Add 17 offline regression tests and document separate optional SDK environments. SDK imports were checked; authenticated broker streaming remains end-user acceptance work.
+
 ## Unreleased â€” Indian market news briefing
 
 - Add five official NSE results/disclosure feeds, exact issuer-candidate matching and bounded official attachment discovery/retrieval with financial-XBRL analysis or explicit text-review fallback. Add eleven workflow regression tests.

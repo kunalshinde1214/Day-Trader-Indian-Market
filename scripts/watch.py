@@ -25,8 +25,9 @@ def cycle(workdir,journal,now,client=None):
             ctx["quote"]=quote
             # Do not overwrite account/calendar evidence or fabricate fresh timestamps.
             write(w/"quote.json",quote)
-        if c.get("quote_feed")=="kite_stream":
-            from streaming import read_quote
+        if c.get("quote_feed") in {"kite_stream","dhan_stream","angel_stream","upstox_stream","fyers_stream"}:
+            if c['quote_feed']!=i['broker']+'_stream':raise Block('STREAM: configured broker mismatch')
+            from market_stream import read_quote
             ctx["quote"]=read_quote(w,i,now,c["snapshot_max_age_seconds"])
         health.update(broker=c["broker"],account_id=c["account_id"],instrument_hash=fingerprint(i))
         age=c["snapshot_max_age_seconds"]

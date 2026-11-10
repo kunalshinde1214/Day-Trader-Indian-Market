@@ -10,8 +10,8 @@ import sys
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION="0.9.1-news-filings-alpha"
-ROOT_FILES={"SKILL.md","README.md","LICENSE","THIRD_PARTY_NOTICES.md","RISK_DISCLOSURE.md","SECURITY.md","CONTRIBUTING.md","CHANGELOG.md",".gitignore",".gitattributes","requirements-dev.txt","requirements-streaming.txt"}
+VERSION="0.9.2-broker-streams-alpha"
+ROOT_FILES={"SKILL.md","README.md","LICENSE","THIRD_PARTY_NOTICES.md","RISK_DISCLOSURE.md","SECURITY.md","CONTRIBUTING.md","CHANGELOG.md",".gitignore",".gitattributes","requirements-dev.txt","requirements-streaming.txt","requirements-streaming-sdk.txt"}
 DIR_TYPES={"scripts":{'.py'},"tests":{'.py'},"references":{'.md'},"assets":{'.json'},"agents":{'.yaml'},"third-party":{'.LICENSE'},".github":{'.yml'},".claude-plugin":{'.json'},"skills":{'.md'}}
 DENY={"__pycache__","research","test-output","trader",".git",".env",".venv","node_modules"}
 
@@ -63,7 +63,7 @@ def static_checks(root=ROOT):
             "claude_plugin_commands":len(expected),"public_research":True,
             "live_execution_code":True,"live_enabled_by_default":False,"authenticated_execution_tested":False,
             "daily_commands":["/india-daily","/nifty","/sensex","/banknifty"],"portfolio_accounting":"canonical plus limited Kite collection; reviewed opening required",
-            "streaming":"kite tradable quotes only","deployment":"render only; not installed"}
+            "streaming":"five broker tradable quote adapters; authenticated acceptance pending","deployment":"render only; not installed"}
 
 
 def package(out,root=ROOT):
@@ -71,7 +71,7 @@ def package(out,root=ROOT):
     files=release_files(root)
     manifest={"version":VERSION,"mode":"paper-and-human-operated-execution-alpha","full_specification_complete":False,
               "daily_commands":["/india-daily","/nifty","/sensex","/banknifty"],"portfolio_accounting":"canonical plus limited Kite collection; reviewed opening required",
-              "streaming":"kite tradable quotes only","deployment":"render only; not installed",
+              "streaming":"five broker tradable quote adapters; authenticated acceptance pending","deployment":"render only; not installed",
               "claude_plugin_commands":15,"public_research":True,
               "live_enabled_by_default":False,"authenticated_execution_tested":False,
               "authenticated_broker_acceptance":False,"files":{p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in files}}

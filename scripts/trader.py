@@ -36,10 +36,12 @@ def runtime_context(w,ctx):
         ctx["local_halt"]=read(w/"state"/"halt.json").get("halted") is not False
     if (w/"state"/"monitor.json").exists():
         ctx["monitor"]=read(w/"state"/"monitor.json")
-    if (w/"config.json").exists() and read(w/"config.json").get("quote_feed")=="kite_stream":
-        from streaming import read_quote
+    if (w/"config.json").exists() and read(w/"config.json").get("quote_feed") in {"kite_stream","dhan_stream","angel_stream","upstox_stream","fyers_stream"}:
+        from market_stream import read_quote
         config=read(w/"config.json")
-        ctx["quote"]=read_quote(w,read(w/"instrument.json"),instant(),config["snapshot_max_age_seconds"])
+        instrument=read(w/"instrument.json")
+        if config['quote_feed']!=instrument['broker']+'_stream' or config.get('broker',instrument['broker'])!=instrument['broker']:raise Block('STREAM: configured broker mismatch')
+        ctx["quote"]=read_quote(w,instrument,instant(),config["snapshot_max_age_seconds"])
     return ctx
 
 

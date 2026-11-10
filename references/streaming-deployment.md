@@ -26,13 +26,34 @@ Duration is bounded to 1–43,200 seconds, with 0–5 reconnect attempts and cap
 
 To select the stream for analysis and the watcher, set `"quote_feed": "kite_stream"` in the local config. The selected `instrument.json` must exactly match a streamed master record. Missing/stopped/stale streams block this route; there is no silent REST fallback. Omit that setting to retain the existing REST/file route. Live execution still refreshes its own authoritative broker evidence. Completed candles, calendar, restrictions, account reconciliation and event evidence need independent refresh; a quote stream does not establish them. `--broker-poll` continues refreshing the watcher's history/REST inputs, with the selected stream quote applied afterward.
 
-Transport testing used websocket-client **1.9.2** with a real local WebSocket handshake, masked subscription messages, heartbeat and close, using synthetic credentials. This is not authenticated Kite acceptance. Other brokers' streaming transports remain unimplemented.
+Transport testing used websocket-client **1.9.2** with a real local WebSocket handshake, masked subscription messages, heartbeat and close, using synthetic credentials. This is not authenticated Kite acceptance.
+
+## Dhan, Angel One, Upstox and FYERS streaming
+
+`market_stream.py` adds bounded read-only streams for these four brokers. Select 1–100 same-day normalized tradable instruments in a JSON `instruments` array. Index, currency and commodity feeds are excluded. Choose the broker matching every instrument:
+
+```text
+python scripts/market_stream.py run --broker dhan --workdir trader --master trader/stream-instruments.json --duration 3600 --retries 3
+python scripts/market_stream.py status --broker dhan --workdir trader
+python scripts/market_stream.py stop --broker dhan --workdir trader
+python scripts/market_stream.py clear-stop --broker dhan --workdir trader
+```
+
+Dhan and Angel use `requirements-streaming.txt`. Dhan requires local `DHAN_CLIENT_ID` and `DHAN_ACCESS_TOKEN`; Angel requires `ANGEL_API_KEY`, `ANGEL_CLIENT_CODE`, `ANGEL_ACCESS_TOKEN` and `ANGEL_FEED_TOKEN`. Dhan ticker packets carry rupee prices and last-trade seconds. Angel snapshot packets carry paise prices, exchange milliseconds and last-trade seconds. Angel's text heartbeat is handled separately from quotes. Unknown instruments, malformed packets and stale trades cannot create usable quotes.
+
+For Upstox/FYERS, create a dedicated user virtual environment and install **only** `requirements-streaming-sdk.txt` there. FYERS pins websocket-client 1.6.1, which conflicts with the newer minimum in `requirements-streaming.txt`; do not combine the two requirements files. Use that environment's Python for the runner and deployment specification. Upstox requires `UPSTOX_ACCESS_TOKEN`; FYERS requires `FYERS_APP_ID` and `FYERS_ACCESS_TOKEN`. Pinned SDK imports were checked locally; authenticated connections remain untested.
+
+The SDK runs in a child process that is terminated on shutdown. Its output is suppressed and temporary SDK logs are removed. Certificate and hostname verification are enforced even when an SDK supplies insecure TLS options. Upstox uses LTPC mode with provider trade/exchange clocks. FYERS uses full symbol updates and maps derivative exchange names to its provider symbols. FYERS and Dhan have only a last-trade clock in the selected messages; no independent exchange timestamp is claimed.
+
+Set `quote_feed` to `dhan_stream`, `angel_stream`, `upstox_stream` or `fyers_stream` for analysis/watching. The config, selected master and feed broker must agree. Each broker has its own state file, writer lock and stop latch. The same five-second process heartbeat and fresh trade checks apply; reconnects and shutdown clear cached quotes. SDK startup may take 15 seconds and process cleanup up to six seconds beyond a stop boundary. No stream submits orders, refreshes credentials or proves account acceptance.
+
+Protocol references: [Dhan live feed](https://dhanhq.co/docs/v2/live-market-feed/), [Angel SmartWebSocketV2](https://github.com/angel-one/smartapi-python/blob/main/SmartApi/smartWebSocketV2.py), [Upstox V3 feed](https://upstox.com/developer/api-documentation/v3/get-market-data-feed/), [FYERS data socket](https://fyers.in/api-docs/v3/api/websockets/data-socket/).
 
 ## Deployment files
 
 Prepare a JSON spec with `schema: "readonly_deployment_v1"`, `target: "windows"` or `"systemd"`, a lowercase `name`, absolute `python`, `skill_dir` and `workdir` paths, and `component: "monitor"` or `"stream"`.
 
-Monitor specs additionally require integer `cycles` (1–8640), `interval` (5–60 seconds), `max_failures` (1–20), and boolean `broker_poll`. Stream specs require an absolute `master` path, `duration` (1–43,200 seconds) and `retries` (0–5). Example monitor settings:
+Monitor specs additionally require integer `cycles` (1–8640), `interval` (5–60 seconds), `max_failures` (1–20), and boolean `broker_poll`. Stream specs require an absolute `master` path, `duration` (1–43,200 seconds) and `retries` (0–5). Optional `broker` selects `kite` (default), `upstox`, `dhan`, `angel` or `fyers`; both start and stop commands target that broker. Example monitor settings:
 
 ```json
 {

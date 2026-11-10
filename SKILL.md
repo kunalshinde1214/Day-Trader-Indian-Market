@@ -11,7 +11,7 @@ An India adaptation of Jake Schincariol's day-trader-skill. Work in a `trader/` 
 
 Users bring their own broker accounts. Follow [user setup and local acceptance](references/user-setup.md); do not require the publisher to hold a brokerage account before public distribution. Never infer authenticated acceptance from offline tests or another user's account.
 
-Use Python 3.10+. Core analysis uses the standard library; optional Kite streaming has a separate dependency file. Resolve script paths against this skill folder. Read [commands and data contracts](references/commands.md) for exact commands and input shapes.
+Use Python 3.10+. Core analysis uses the standard library; optional streaming has separate dependency environments described in [streaming setup](references/streaming-deployment.md). Resolve script paths against this skill folder. Read [commands and data contracts](references/commands.md) for exact commands and input shapes.
 
 Public users should read the [risk disclosure](RISK_DISCLOSURE.md) and [personal-use license](LICENSE). This is a source-available alpha, not an open-source license or a completed production trading platform. Do not describe demo outputs as current data or performance evidence.
 
@@ -59,7 +59,7 @@ Within this skill, route `/india-daily`, `/nifty`, `/sensex` and `/banknifty` (o
 | Live preparation / human execution / recovery | `scripts/live.py`; read [execution contracts and boundaries](references/execution.md) first |
 | Broker fill imports / intraday fee reserve / supervised polling / notifications | `scripts/trade_import.py`, `scripts/service.py`, `scripts/delivery.py`; [account and service operations](references/account-service.md) |
 | Opening inventory / carry positions / portfolio accounting | `scripts/portfolio.py`, `scripts/portfolio_collect.py`; [carry accounting](references/portfolio.md), [Kite collection](references/kite-portfolio.md). Kite collection requires reviewed opening evidence; never substitutes for the intraday execution ledger |
-| Streaming quotes / Windows or Linux monitoring deployment | `scripts/streaming.py`, `scripts/deployment.py`; [streaming and deployment](references/streaming-deployment.md). Kite-only tradable quotes; deployment rendering does not install services |
+| Streaming quotes / Windows or Linux monitoring deployment | `scripts/streaming.py` (Kite), `scripts/market_stream.py` (other four brokers), `scripts/deployment.py`; [streaming and deployment](references/streaming-deployment.md). Tradable quotes only; authenticated acceptance is pending and deployment rendering does not install services |
 | Development coverage / missing components | [requirements and status](references/requirements.md) |
 | Multiple-broker architecture / India roadmap / licensing | [public product specification](references/product-spec.md), [license](LICENSE), [third-party notices](THIRD_PARTY_NOTICES.md) |
 

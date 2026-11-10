@@ -142,7 +142,8 @@ class StreamingTests(unittest.TestCase):
             with patch("sys.stdout",new_callable=io.StringIO) as output:
                 self.assertEqual(main(["capabilities","--broker",broker]),0)
                 result=json.loads(output.getvalue())
-            self.assertEqual(result["streaming"],broker=="kite"); self.assertFalse(result["live_execution"])
+            self.assertTrue(result["streaming"]); self.assertFalse(result["live_execution"])
+            self.assertEqual(result["streaming_runner"],"scripts/streaming.py" if broker=="kite" else "scripts/market_stream.py")
             self.assertFalse(result["streaming_authenticated_tested"])
 
     def test_non_upgrade_response_is_closed_and_rejected(self):

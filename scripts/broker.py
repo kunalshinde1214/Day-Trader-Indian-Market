@@ -37,8 +37,8 @@ def main(argv=None):
         client = adapter(a.broker)
         if a.command == "capabilities":
             print(json.dumps({"broker": a.broker, "instruments": True, "candles": True, "quotes": True,
-                "account": True, "margin_estimates": True, "streaming": a.broker=="kite", "live_execution": False,
-                "streaming_runner": "scripts/streaming.py" if a.broker=="kite" else None,
+                "account": True, "margin_estimates": True, "streaming": True, "live_execution": False,
+                "streaming_runner": "scripts/streaming.py" if a.broker=="kite" else "scripts/market_stream.py",
                 "streaming_authenticated_tested": False,
                 "authenticated_integration_tested": False}))
             return 0

@@ -47,8 +47,12 @@ def render(spec):
     elif component == "stream":
         duration, retries = integer(spec["duration"]), integer(spec["retries"], minimum=0)
         if duration > 43200 or retries > 5: raise Block("DEPLOY: bounded streaming settings required")
-        args = [str(cls(skill) / "scripts/streaming.py"), "run", "--workdir", work, "--master", path(spec["master"], target), "--duration", str(duration), "--retries", str(retries)]
-        stop = [executable, str(cls(skill) / "scripts/streaming.py"), "stop", "--workdir", work]
+        broker = spec.get("broker", "kite")
+        if broker not in {"kite", "upstox", "dhan", "angel", "fyers"}: raise Block("DEPLOY: supported stream broker required")
+        script = str(cls(skill) / ("scripts/streaming.py" if broker == "kite" else "scripts/market_stream.py"))
+        selected = [] if broker == "kite" else ["--broker", broker]
+        args = [script, "run", *selected, "--workdir", work, "--master", path(spec["master"], target), "--duration", str(duration), "--retries", str(retries)]
+        stop = [executable, script, "stop", *selected, "--workdir", work]
     else: raise Block("DEPLOY: only read-only monitor/stream components can be deployed")
     files = {}
     if target == "windows":
