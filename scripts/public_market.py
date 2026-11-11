@@ -141,8 +141,12 @@ def public_plan(hit, *, stop="or-mid", target="2R", step="0.01"):
             "warning":WARNING,"execution_eligible":False,"submitted":False}
 
 
-def public_replay(bundle, *, paths=10000, seed=19):
+def public_replay(bundle, *, paths=10000, seed=19, sampling="independent", block_bars=None):
     from replay import outcome
+    from replay_sampling import policy, draw_slots, limitation
+    options={"replay_seed":seed,"replay_sampling":sampling}
+    if block_bars is not None:options["replay_block_bars"]=block_bars
+    selected=policy(options)
     p,h=bundle["plan"],bundle["history"]
     if p.get("schema")!="public_plan_v1" or h.get("schema")!="public_chart_v1" or p["symbol"]!=h["symbol"] or p.get("execution_eligible") is not False:raise Block("REPLAY: exact public plan/history required")
     interval=integer(p["interval_minutes"])
@@ -160,7 +164,7 @@ def public_replay(bundle, *, paths=10000, seed=19):
         d=instant(b["at"]).date()
         if d<at.date():sessions.setdefault(d,[]).append(b)
     complete=[]
-    for day,rows in sessions.items():
+    for day,rows in sorted(sessions.items()):
         try:complete.append(prefix(rows,datetime.combine(day,end.timetz()),interval))
         except Block:continue
     if len(complete)<5:raise Block("REPLAY: need at least five complete prior sessions")
@@ -170,13 +174,13 @@ def public_replay(bundle, *, paths=10000, seed=19):
     rng=random.Random(seed);counts={"stop":0,"target":0,"still_open":0}
     for _ in range(paths):
         price=float(e);state=None
-        for slot in pool:
-            state,price=outcome(tuple(price*x for x in rng.choice(slot)),float(s),float(t),side=="BUY")
+        for ratios in draw_slots(pool,rng,selected):
+            state,price=outcome(tuple(price*x for x in ratios),float(s),float(t),side=="BUY")
             if state:break
         counts[state or "still_open"]+=1
-    return {"paths":paths,"seed":seed,"history_sessions":len(complete),"dropped_sessions":len(sessions)-len(complete),"outcomes":counts,
+    return {"paths":paths,"seed":seed,"sampling":selected,"history_sessions":len(complete),"dropped_sessions":len(sessions)-len(complete),"outcomes":counts,
             "plan_hash":fingerprint(p),"history_hash":fingerprint(h),"execution_eligible":False,"submitted":False,
-            "limitations":["Public unadjusted exact-symbol history; no survivorship correction.","Independent same-slot bootstrap conditioned on entry; not calibrated probabilities.","No fees, liquidity, queue or slippage model; not a broker risk replay."]}
+            "limitations":["Public unadjusted exact-symbol history; no survivorship correction.",limitation(selected),"Conditioned on entry; not calibrated probabilities; repeated draws are not additional historical evidence.","No fees, liquidity, queue or slippage model; not a broker risk replay."]}
 
 
 def collect_daily(selected, *, fetcher=request, clock=instant):
@@ -214,6 +218,7 @@ def main(argv=None):
     p.add_argument("--interval",choices=["1d","5m","1m"],default="5m");p.add_argument("--setup",choices=["orb","level"],default="orb")
     p.add_argument("--level");p.add_argument("--side",choices=["BUY","SELL"],default="BUY");p.add_argument("--stop",default="or-mid");p.add_argument("--target",default="2R");p.add_argument("--step",default="0.01")
     p.add_argument("--cycles",type=int,default=1);p.add_argument("--every",type=int,default=30);p.add_argument("--paths",type=int,default=10000);p.add_argument("--seed",type=int,default=19)
+    p.add_argument("--sampling",choices=("independent","block","session"),default="independent");p.add_argument("--block-bars",type=int)
     a=p.parse_args(argv)
     try:
         if a.out and Path(a.out).exists():raise Block("OUTPUT: choose a new path")
@@ -223,7 +228,7 @@ def main(argv=None):
         elif a.command=="scan": result=scan(a.symbols or ([r["symbol"] for r in read(a.input)["members"]] if a.input else []))
         elif a.command=="chart":result=collect_chart(a.symbol,a.interval)
         elif a.command=="plan":result=public_plan(read(a.input),stop=a.stop,target=a.target,step=a.step)
-        elif a.command=="replay":result=public_replay(read(a.input),paths=a.paths,seed=a.seed)
+        elif a.command=="replay":result=public_replay(read(a.input),paths=a.paths,seed=a.seed,sampling=a.sampling,block_bars=a.block_bars)
         else:
             if a.interval=="1d" or not 1<=a.cycles<=120 or not 15<=a.every<=300 or a.command=="watch" and a.input:raise Block("WATCH: bounded live intraday reads required")
             outputs=[]

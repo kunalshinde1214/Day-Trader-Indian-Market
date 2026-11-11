@@ -58,7 +58,9 @@ python scripts/public_market.py replay --input reports/public-replay-input.json 
 
 Input is an object containing `plan` (the complete `public_plan_v1` output) and `history` (an exact-symbol, same-interval `public_chart_v1` output). At least five complete prior regular sessions are required; incomplete sessions are dropped, the plan date is excluded, and splits block. The one-minute provider window can contain fewer than five complete prior sessions; supply additional sourced history or retain the block. Never invent missing history.
 
-Replay samples independent same-time-slot returns from entry until 15:30, handles adverse opening gaps and counts stop first when both levels occur in one bar. Frequencies are not calibrated probabilities. This public model has no fee, slippage, liquidity, queue or historical signal-matching model and cannot substitute for the cost-aware broker replay. It reports input hashes, sample counts and assumptions.
+Replay defaults to independent same-time-slot returns from entry until 15:30. Add `--sampling block --block-bars 6` to retain six consecutive same-clock observations from one historical session per block, or `--sampling session` to retain one historical session throughout each path. Blocks use the chart interval and truncate at the horizon; block joins break dependence. Repeated paths do not add independent historical evidence. See [replay configuration](commands.md) for broker equivalents and evidence regeneration requirements.
+
+All modes handle adverse opening gaps and count stop first when both levels occur in one bar. Frequencies are not calibrated probabilities. This public model has no fee, slippage, liquidity, queue or historical signal-matching model and cannot substitute for the cost-aware broker replay. It reports input hashes, sample counts, sampling settings and assumptions.
 
 ## News, filings and company analysis
 

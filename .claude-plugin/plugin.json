@@ -1,6 +1,6 @@
 {
   "name": "india-day-trader",
-  "version": "0.9.5-five-broker-carry-alpha",
+  "version": "0.9.6-dependent-replay-alpha",
   "description": "Indian public-data research, daily briefings and paper workflows; separate human-operated execution.",
   "author": {
     "name": "Kunal Shinde"

@@ -9,6 +9,7 @@ import random
 
 from core import Block, IST, instant, completed_bars, plan_math, charges, fingerprint, integer, number, setup_hit, plan_from_hit, validate_config, validate_rates, validate_gap_reference
 from patterns import DAILY_SETUPS, daily_reference
+from replay_sampling import policy, draw_slots, limitation
 
 
 def outcome(bar, stop, target, long):
@@ -82,6 +83,8 @@ def replay(p, instrument, history, config, card):
     if n > 100000:
         raise Block("REPLAYS: maximum 100000 paths")
     rng=random.Random(config["replay_seed"])
+    sampling=policy(config)
+    tail=pool[first:]
     long=p["side"]=="BUY"
     counts=Counter()
     all_costs=0.0
@@ -90,8 +93,8 @@ def replay(p, instrument, history, config, card):
     for _ in range(n):
         price=float(p["entry"])
         state=None
-        for k in range(first,len(keys)):
-            bar=tuple(price*x for x in rng.choice(pool[k]))
+        for ratios in draw_slots(tail,rng,sampling):
+            bar=tuple(price*x for x in ratios)
             state,price=outcome(bar,float(p["stop"]),float(p["target"]),long)
             if state:
                 break
@@ -129,8 +132,9 @@ def replay(p, instrument, history, config, card):
             "historical_same_side_firings":fired,"historical_outcomes":dict(historical),
             "historical_target_first_pct":round(100*historical["target"]/fired,2) if fired else None,
             "costs": {"quantity":lot,"average_round_trip_estimate_inr":round(all_costs/n,2),"reprice_after_sizing":True},
-            "method":"Same-slot independent bootstrap conditioned on observed entry; stop first in ambiguous bars; adverse gap-open stop fills.",
-            "limitations":["Synthetic frequencies are not calibrated probabilities.","Independently sampled bars lose serial dependence and may miss event regimes.","No pre-open gap forecast, slippage model, order queue or liquidity simulation.","History is conditional on this exact instrument and may be insufficient for short-lived option contracts."]}
+            "sampling":sampling,
+            "method":f"Same-slot {sampling['mode']} bootstrap conditioned on observed entry; stop first in ambiguous bars; adverse gap-open stop fills.",
+            "limitations":["Synthetic frequencies are not calibrated probabilities; repeated draws are not additional historical evidence.",limitation(sampling),"No pre-open gap forecast, slippage model, order queue or liquidity simulation.","History is conditional on this exact instrument and may be insufficient for short-lived option contracts."]}
     if p["setup"] == "orb":
         result["historical_same_side_orb_firings"] = fired
     elif p["setup"] == "vwap_reclaim":

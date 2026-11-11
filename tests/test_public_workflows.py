@@ -141,6 +141,16 @@ class PublicTests(unittest.TestCase):
         for k in range(1,6):old+=bars(5,75,NOW-timedelta(days=k))
         h['bars']=old+bars();bundle={'plan':p,'history':h}
         r=public_replay(bundle,paths=10);self.assertEqual(sum(r['outcomes'].values()),10);self.assertEqual(r,public_replay(bundle,paths=10))
+        for mode in ('block','session'):
+            result=public_replay(bundle,paths=10,sampling=mode)
+            self.assertEqual(result,public_replay(bundle,paths=10,sampling=mode))
+            self.assertEqual(result['sampling']['mode'],mode)
+            self.assertEqual(sum(result['outcomes'].values()),10)
+            self.assertFalse(result['execution_eligible'])
+        output=io.StringIO()
+        with patch('public_market.read',return_value=bundle), contextlib.redirect_stdout(output):
+            self.assertEqual(main(['replay','--input','fixture.json','--paths','10','--sampling','block','--block-bars','3']),0)
+        self.assertEqual(json.loads(output.getvalue())['sampling'],{'mode':'block','block_bars':3})
         h['bars']=old[1:]
         with self.assertRaises(Block):public_replay(bundle,paths=10)
 

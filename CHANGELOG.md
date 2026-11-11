@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.6-dependent-replay-alpha
+
+- Add optional contiguous same-clock block and whole-session bootstrap replay for broker and public workflows; retain independent sampling as the default.
+- Bind risk replay evidence to sampling settings and integer seed. Older reports without sampling metadata must be regenerated.
+- Document finite historical evidence and the remaining pre-open, liquidity, slippage and size-specific cost gaps.
+
 ## 0.9.5-five-broker-carry-alpha
 
 - Add conservative Angel One/FYERS carry collectors with repeated books, exact identity, fill reconciliation and fresh marks; document unresolved provider multiplier/collateral conventions explicitly.

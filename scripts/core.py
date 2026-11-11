@@ -125,6 +125,8 @@ def validate_config(c):
     for key in ("max_trades_per_day", "max_orders_per_day", "replay_paths", "minimum_history_sessions"):
         integer(c[key], key)
     clocks = [time.fromisoformat(c[k]) for k in ("no_entries_before", "no_entries_after", "flat_by")]
+    from replay_sampling import policy
+    policy(c)
     if not clocks[0] <= clocks[1] < clocks[2]:
         raise Block("CONFIG: inconsistent entry and flat-by times")
 
@@ -449,6 +451,9 @@ def entry_context(p, i, c, ctx, now):
         raise Block("ACCOUNT: snapshot belongs to a different broker/account")
     fresh(p["as_of"], now, c["plan_max_age_seconds"], "plan")
     replay_result = ctx.get("replays", {}).get(fingerprint(p)) or ctx["replay"]
+    from replay_sampling import policy
+    if replay_result.get("sampling") != policy(c) or replay_result.get("seed") != c["replay_seed"]:
+        raise Block("REPLAY: sampling or seed changed; regenerate replay")
     if replay_result["plan_hash"] != fingerprint(p) or replay_result["paths"] < c["replay_paths"] or replay_result["history_sessions"] < c["minimum_history_sessions"]:
         raise Block("REPLAY: run the configured replay for this exact plan first")
     quote = ctx.get("quotes", {}).get(i["exchange"]+":"+i["symbol"]) or ctx["quote"]

@@ -96,6 +96,30 @@ class CoreTests(unittest.TestCase):
         self.p["target"]+=1
         with self.assertRaisesRegex(Block,"REPLAY"): self.order()
 
+    def test_replay_sampling_and_seed_bound_to_risk(self):
+        for change in ({"replay_sampling":"session"}, {"replay_sampling":"block","replay_block_bars":3}, {"replay_seed":20}):
+            self.c={**self.config,**change}
+            with self.assertRaisesRegex(Block,"REPLAY"):self.order()
+
+    def test_dependent_replay_reproducible_and_accepted(self):
+        for mode in ("block","session"):
+            self.c.update(replay_sampling=mode,replay_paths=20)
+            result=replay(self.p,self.i,self.h,self.c,self.r)
+            self.assertEqual(result,replay(self.p,self.i,self.h,self.c,self.r))
+            self.assertEqual(result["sampling"]["mode"],mode)
+            self.ctx["replay"]=result
+            self.order()
+
+    def test_legacy_unlabelled_replay_requires_regeneration(self):
+        self.ctx["replay"].pop("sampling")
+        with self.assertRaisesRegex(Block,"REPLAY"):self.order()
+
+    def test_block_length_change_invalidates_replay(self):
+        self.c.update(replay_sampling="block",replay_block_bars=3,replay_paths=20)
+        self.ctx["replay"]=replay(self.p,self.i,self.h,self.c,self.r)
+        self.c["replay_block_bars"]=6
+        with self.assertRaisesRegex(Block,"REPLAY"):self.order()
+
     def test_quote_beyond_target(self):
         self.ctx["quote"]["price"]=self.p["target"]
         with self.assertRaisesRegex(Block,"EXPIRED"): self.order()
