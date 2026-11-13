@@ -186,14 +186,14 @@ class DhanReadOnly:
         segment = segment_for(exchange)
         if instrument_type not in KINDS or (KINDS[instrument_type] == "equity") != segment.endswith("_EQ") or not symbol:
             raise Block("DHAN_HISTORY: verified broker_instrument and matching exchange required")
-        if interval == "5minute":
+        if interval in {"minute", "5minute"}:
             if not start or not end:
                 raise Block("DHAN_HISTORY: explicit offset-bearing bounds required")
             first, last = instant(start), instant(end)
             if first >= last or last > instant() or last-first > timedelta(days=90):
                 raise Block("DHAN_HISTORY: invalid range; at most 90 days ending no later than now")
             path = "/charts/intraday"
-            bounds = {"fromDate": first.strftime("%Y-%m-%d %H:%M:%S"), "toDate": last.strftime("%Y-%m-%d %H:%M:%S"), "interval": "5"}
+            bounds = {"fromDate": first.strftime("%Y-%m-%d %H:%M:%S"), "toDate": last.strftime("%Y-%m-%d %H:%M:%S"), "interval": "1" if interval == "minute" else "5"}
         elif interval == "day":
             first = datetime.combine(date.fromisoformat(start), time(), IST)
             last = datetime.combine(date.fromisoformat(end), time(), IST)
@@ -225,8 +225,8 @@ class DhanReadOnly:
             if at == last:
                 boundary_count += 1
                 continue
-            if interval == "5minute" and (at.minute % 5 or at.second or at.microsecond):
-                raise Block("DHAN_CANDLES: invalid five-minute grid")
+            if interval in {"minute", "5minute"} and (at.minute % (1 if interval == "minute" else 5) or at.second or at.microsecond):
+                raise Block("DHAN_CANDLES: invalid configured minute grid")
             o, h, l, c = [positive(data[k][n]) for k in ("open", "high", "low", "close")]
             if not l <= min(o, c) <= max(o, c) <= h:
                 raise Block("DHAN_CANDLES: inconsistent OHLC")

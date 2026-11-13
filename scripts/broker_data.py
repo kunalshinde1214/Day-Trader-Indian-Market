@@ -34,17 +34,20 @@ def normalize_quote(result,i,now,max_age):
     return {**quote,"symbol":i["symbol"]}
 
 
-def refresh(client,instrument,now,max_age=60):
+def refresh(client,instrument,now,max_age=60,interval=5):
+    if type(interval) is not int or interval not in (1,5):raise Block("INTERVAL: use integer 1 or 5")
     validate_instrument(instrument,now)
     i=instrument
     first=now.replace(hour=9,minute=15,second=0,microsecond=0)
-    last=now.replace(minute=(now.minute//5)*5,second=0,microsecond=0)
+    last=now.replace(minute=(now.minute//interval)*interval,second=0,microsecond=0)
     if last<=first:raise Block("BARS: first completed bar unavailable")
     kwargs={}
     if i["broker"]=="upstox":kwargs["intraday"]=True
     if i["broker"]=="dhan":kwargs["instrument_type"]=i["broker_instrument"]
-    candles=client.candles(i["token"],i["symbol"],i["exchange"],first.isoformat(),last.isoformat(),"5minute",**kwargs)
+    name="minute" if interval==1 else "5minute"
+    candles=client.candles(i["token"],i["symbol"],i["exchange"],first.isoformat(),last.isoformat(),name,**kwargs)
+    if candles.get("interval","5minute")!=name:raise Block("INTERVAL: provider returned a different interval")
     if any(str(candles.get(k))!=str(i[k]) for k in ("broker","exchange","symbol","token")):raise Block("BARS: identity mismatch")
-    bars=session_bars(candles["bars"],now)
+    bars=session_bars(candles["bars"],now,interval)
     quote=normalize_quote(client.quotes([quote_key(i)]),i,now,max_age)
-    return {"source":i["broker"],"as_of":candles["as_of"],"bars":bars},quote
+    return {"source":i["broker"],"as_of":candles["as_of"],"interval":name,"bars":bars},quote

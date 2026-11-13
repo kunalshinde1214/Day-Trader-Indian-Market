@@ -43,17 +43,19 @@ def match_instrument(broker, row, instruments):
     return {k: matches[0][k] for k in ("exchange", "symbol", "token")}
 
 
-def _product(broker, row):
+def _product(broker, row, allow_carry=False):
     key = "producttype" if broker == "angel" else "productType" if broker in {"dhan", "fyers"} else "product"
     expected = {"kite": "MIS", "upstox": "I"}.get(broker, "INTRADAY")
+    if allow_carry and broker == "kite" and row[key] in {"MIS", "CNC", "NRML"}:
+        return row[key]
     if row[key] != expected:
         raise Block("PRODUCT: execution supports a fully mapped intraday account only")
     return "MIS"
 
 
-def normalize_order(broker, row, instruments):
+def normalize_order(broker, row, instruments, allow_carry=False):
     ident = match_instrument(broker, row, instruments)
-    product = _product(broker, row)
+    product = _product(broker, row, allow_carry)
     if broker in {"kite", "upstox"}:
         oid, qty, filled, side, status, price, trigger, typ = [row[k] for k in (
             "order_id", "quantity", "filled_quantity", "transaction_type", "status", "price", "trigger_price", "order_type")]

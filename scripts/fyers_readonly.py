@@ -196,11 +196,11 @@ class FyersReadOnly:
         ticker = full_symbol(symbol, exchange)
         if token_exchange(token) != exchange:
             raise Block("FYERS_IDENTITY: token/exchange mismatch")
-        if interval == "5minute":
+        if interval in {"minute", "5minute"}:
             first, last = source_time(start), source_time(end)
-            if any(t.second or t.microsecond or t.minute % 5 for t in (first, last)):
+            if any(t.second or t.microsecond or t.minute % (1 if interval == "minute" else 5) for t in (first, last)):
                 raise Block("FYERS_RANGE: five-minute boundaries required")
-            resolution, limit, duration = "5", 100, timedelta(minutes=5)
+            resolution, limit, duration = ("1", 100, timedelta(minutes=1)) if interval == "minute" else ("5", 100, timedelta(minutes=5))
         elif interval == "day":
             first, last = [datetime.combine(date.fromisoformat(v), time(), IST) for v in (start, end)]
             resolution, limit, duration = "D", 366, timedelta(days=1)
@@ -209,7 +209,7 @@ class FyersReadOnly:
         if first >= last or last > instant() or last-first > timedelta(days=limit):
             raise Block("FYERS_RANGE: invalid/future range or request limit exceeded")
         data = self.request("GET", HISTORY, query={"symbol": ticker, "resolution": resolution, "date_format": "0",
-            "range_from": str(int(first.timestamp())), "range_to": str(int((last-(duration if interval == "5minute" else timedelta(seconds=1))).timestamp())), "cont_flag": "0", "oi_flag": "0"})
+            "range_from": str(int(first.timestamp())), "range_to": str(int((last-(duration if interval in {"minute", "5minute"} else timedelta(seconds=1))).timestamp())), "cont_flag": "0", "oi_flag": "0"})
         rows = data.get("candles")
         if not isinstance(rows, list):
             raise Block("FYERS_CANDLES: array required; null is not empty history")
@@ -218,10 +218,10 @@ class FyersReadOnly:
             if not isinstance(row, list) or len(row) != 6:
                 raise Block("FYERS_CANDLES: six fields required")
             at = epoch(row[0])
-            if at in seen or not first <= at < last or (interval == "5minute" and at + duration > last):
+            if at in seen or not first <= at < last or (interval in {"minute", "5minute"} and at + duration > last):
                 raise Block("FYERS_CANDLES: duplicate, incomplete or out-of-range bar")
-            if interval == "5minute" and (at.minute % 5 or at.second or at.microsecond):
-                raise Block("FYERS_CANDLES: invalid five-minute grid")
+            if interval in {"minute", "5minute"} and (at.minute % (1 if interval == "minute" else 5) or at.second or at.microsecond):
+                raise Block("FYERS_CANDLES: invalid configured minute grid")
             seen.add(at)
             o, h, l, c = [positive(v) for v in row[1:5]]
             if not l <= min(o, c) <= max(o, c) <= h:

@@ -17,7 +17,7 @@ def cycle(workdir,journal,now,client=None):
         c=read(w/"config.json");ctx=read(w/"context.json");i=read(w/"instrument.json")
         if client is not None:
             from broker_data import refresh
-            data,quote=refresh(client,i,now,c["snapshot_max_age_seconds"])
+            data,quote=refresh(client,i,now,c["snapshot_max_age_seconds"],interval=c.get("interval_minutes",5))
             candles=read(w/"candles.json");key=i["exchange"]+":"+i["symbol"]
             old=candles["instruments"][key]
             candles["instruments"][key]={**old,**data};candles.update(source=i["broker"],as_of=data["as_of"])
@@ -52,6 +52,8 @@ def cycle(workdir,journal,now,client=None):
         if (w/"state"/"halt.json").exists() and read(w/"state"/"halt.json").get("halted") is not False:
             messages.append("LOCAL_HALT: user stop remains latched")
         data=read(w/"candles.json")["instruments"][key]
+        from entry_policy import check_candles
+        check_candles(data,c)
         fresh(data["as_of"],now,age,"candles")
         hit=setup_hit(data["bars"],now,c,i,data.get("prior_close"),data.get("daily_reference"))
         if hit["state"]=="triggered":

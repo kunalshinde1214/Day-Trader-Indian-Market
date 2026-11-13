@@ -43,7 +43,12 @@ def wire_payload(action):
     i = action["instrument"]
     if i["broker"] != broker:
         raise Block("BROKER: instrument mismatch")
-    p = {**i, "account_id": action["account_id"], "product": "MIS", "side": action["side"], "entry": action["price"]}
+    product = action.get("product", "MIS")
+    if product != "MIS" and (broker != "kite" or action["kind"] != "exit" or product not in {"CNC","NRML"}):
+        raise Block("PRODUCT: carry transport supports Kite reducing limit exits only")
+    if product == "CNC" and i["kind"] != "equity" or product == "NRML" and i["kind"] == "equity":
+        raise Block("PRODUCT: instrument/product mismatch")
+    p = {**i, "account_id": action["account_id"], "product": product, "side": action["side"], "entry": action["price"]}
     result = payload({"plan": p, "quantity": integer(action["quantity"])})
     if action["kind"] == "stop":
         trigger, limit = positive(action["trigger_price"]), positive(action["price"])

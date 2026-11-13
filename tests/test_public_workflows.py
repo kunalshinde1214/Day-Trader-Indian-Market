@@ -53,6 +53,20 @@ class PublicTests(unittest.TestCase):
         self.assertEqual(len(chart(p,'^NSEI','5m',NOW)['bars']),4)
         with self.assertRaises(Block):public_entry(chart(p,'^NSEI','5m',NOW),NOW)
 
+    def test_trailing_in_progress_bar_is_dropped_not_blocking(self):
+        rows=bars()+[{**bars()[-1],"at":(NOW-timedelta(seconds=55)).isoformat()}]
+        p=payload(rows,selected='^NSEI')
+        h=chart(p,'^NSEI','5m',NOW)
+        self.assertEqual(len(h['bars']),4);self.assertEqual(h['dropped_in_progress_bar'],(NOW-timedelta(seconds=55)).isoformat())
+        self.assertIsNone(self.history()['dropped_in_progress_bar'])
+        p=payload(rows,selected='^NSEI');p['chart']['result'][0]['timestamp'][1]+=7
+        with self.assertRaises(Block):public_entry(chart(p,'^NSEI','5m',NOW),NOW)
+
+    def test_skill_routes_avoid_leading_slash_arguments(self):
+        # Git Bash on Windows rewrites a leading-slash argument into a filesystem path.
+        for path in [*(ROOT/"skills").glob("*/SKILL.md"),ROOT/"README.md",*(ROOT/"references").glob("*.md")]:
+            with self.subTest(path=path.name):self.assertNotRegex(path.read_text(encoding="utf-8"),r'daily\.py"? /')
+
     def test_duplicate_and_future_timestamps(self):
         for stamp in (int(NOW.timestamp())+1,int(instant(bars()[0]['at']).timestamp())):
             p=payload();p['chart']['result'][0]['timestamp'][-1]=stamp

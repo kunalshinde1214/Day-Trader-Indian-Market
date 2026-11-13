@@ -1,6 +1,6 @@
 """Human-operated live broker tool. Never invoke mutations on behalf of a user.
 
-Run snapshot/reconcile/status for read-only acceptance. entry/exit/stop/cancel
+Run snapshot/reconcile/status for read-only acceptance. entry/exit/stop/cancel/protection-step
 require two exact interactive confirmations and repeat all checks before sending.
 """
 from __future__ import annotations
@@ -95,20 +95,35 @@ def protection(snapshot):
         if not p["quantity"]:
             continue
         side = "SELL" if p["quantity"] > 0 else "BUY"
-        rows = [r for r in snapshot["orders"] if r["exchange"] == p["exchange"] and r["token"] == p["token"]
-                and r["side"] == side and r["status"] in {"OPEN", "PARTIAL"} and r["order_type"] == "SL"]
+        working = [r for r in snapshot["orders"]
+                   if all(r[k] == p[k] for k in ("exchange", "symbol", "token", "product"))
+                   and r["status"] not in TERMINAL]
+        exits = [r for r in working if r["side"] == side]
+        rows = [r for r in exits if r["status"] in {"OPEN", "PARTIAL"} and r["order_type"] == "SL"]
         covered = sum(r["quantity"] - r["filled_quantity"] for r in rows if r["raw_status"] in {"TRIGGER PENDING", "PENDING"})
         # Broker PENDING can mean a working limit, so only explicit trigger-pending
         # is guaranteed waiting protection. Others require broker UI inspection.
         verified = sum(r["quantity"] - r["filled_quantity"] for r in rows if r["raw_status"] == "TRIGGER PENDING")
+        exit_units = sum(r["quantity"] - r["filled_quantity"] for r in exits)
+        entry_units = sum(r["quantity"] - r["filled_quantity"] for r in working if r["side"] != side)
+        excess = max(0, exit_units - abs(p["quantity"]))
+        unknown = any(r["status"] not in {"OPEN", "PARTIAL"} for r in working)
+        state = "UNPROTECTED_OR_UNVERIFIED"
+        if unknown: state = "ORDER_STATE_UNVERIFIED"
+        elif excess: state = "OVER_EXIT_RISK"
+        elif entry_units: state = "POSITION_CAN_INCREASE"
+        elif verified == abs(p["quantity"]): state = "STOP_WAITING"
         result.append({**p, "stop_quantity_reported": covered, "waiting_stop_quantity_verified": verified,
-                       "state": "STOP_WAITING" if verified == abs(p["quantity"]) else "UNPROTECTED_OR_UNVERIFIED"})
+                       "working_exit_quantity": exit_units, "excess_exit_quantity": excess,
+                       "working_entry_quantity": entry_units,
+                       "uncovered_quantity": max(0, abs(p["quantity"]) - verified),
+                       "state": state})
     return result
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("command", choices=["snapshot", "reconcile-account", "status", "preview", "entry", "exit", "stop", "cancel", "bind", "panic-preview"])
+    p.add_argument("command", choices=["snapshot", "reconcile-account", "status", "preview", "entry", "exit", "stop", "cancel", "bind", "panic-preview", "protection-preview", "protection-step"])
     p.add_argument("--workdir", required=True)
     p.add_argument("--kind", choices=["entry", "exit", "stop", "cancel"], default="entry")
     p.add_argument("--quantity", type=int); p.add_argument("--price"); p.add_argument("--trigger")
@@ -122,7 +137,28 @@ def main(argv=None):
         client = adapter(c["broker"])
         store = ExecutionStore(w / "state" / "execution.sqlite")
         approval = TerminalApproval()
-        if a.command in {"snapshot", "reconcile-account", "status", "bind", "panic-preview"}:
+        if a.command in {'protection-preview', 'protection-step'}:
+            from protection import preview as protection_preview
+            def protection_observation():
+                b = load_bundle(w)
+                if any(b['config'][k] != c[k] for k in ('broker', 'account_id')):
+                    raise Block('ACCOUNT: protection configuration changed')
+                i = b['instrument']
+                b['context']['quote'] = normalize_quote(client.quotes([quote_key(i)]), i, instant(), 30)
+                snap = snapshot(client, w, b)
+                records = store.observe(snap, instant())
+                decision = protection_preview(w / 'state/protection.sqlite', b, snap,
+                                              read(w / 'live-profile.json'), read(w / 'protection-policy.json'), instant(), records)
+                return decision, snap
+            result, _ = protection_observation()
+            if a.command == 'protection-step' and result['review'] is not None:
+                def refresh_protection():
+                    decision, snap = protection_observation()
+                    if decision['review'] is None:
+                        raise Block('REVIEW_CHANGED: protection no longer proposes an action')
+                    return decision['review'], snap
+                result = execute(store, LiveBroker(c['broker'], client), approval, refresh_protection)
+        elif a.command in {"snapshot", "reconcile-account", "status", "bind", "panic-preview"}:
             snap = snapshot(client, w, bundle)
             write(w / "state" / "live-snapshot.json", snap)
             if a.command == "reconcile-account":

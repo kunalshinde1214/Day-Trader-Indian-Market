@@ -14,7 +14,7 @@ from decimal import Decimal, InvalidOperation, ROUND_FLOOR, ROUND_CEILING, ROUND
 IST = timezone(timedelta(hours=5, minutes=30))
 D = Decimal
 BROKERS = {"kite", "upstox", "dhan", "angel", "fyers"}
-SETUPS = {"orb", "vwap_reclaim", "gap_and_go", "breakout_20d", "bull_flag", "oversold_bounce"}
+SETUPS = {"orb", "level", "vwap_reclaim", "gap_and_go", "breakout_20d", "bull_flag", "oversold_bounce"}
 
 
 class Block(ValueError):
@@ -111,6 +111,8 @@ def validate_config(c):
         raise Block("CONFIG: allow_short must be a boolean")
     if not isinstance(c.get("monitor_required",False),bool):
         raise Block("CONFIG: monitor_required must be a boolean")
+    if not isinstance(c.get("require_instrument_session",False),bool):
+        raise Block("CONFIG: require_instrument_session must be a boolean")
     if c.get("setup", "orb") not in SETUPS:
         raise Block("SETUP: unsupported setup; choose one of " + ", ".join(sorted(SETUPS)))
     if positive(c.get("gap_min_pct", 0.7), "gap_min_pct") > 100:
@@ -127,6 +129,8 @@ def validate_config(c):
     clocks = [time.fromisoformat(c[k]) for k in ("no_entries_before", "no_entries_after", "flat_by")]
     from replay_sampling import policy
     policy(c)
+    from entry_policy import interval
+    interval(c)
     if not clocks[0] <= clocks[1] < clocks[2]:
         raise Block("CONFIG: inconsistent entry and flat-by times")
 
@@ -170,8 +174,10 @@ def charges(entry, exit_price, qty, side, instrument, card, day):
     return {k: money(v) for k, v in result.items()}
 
 
-def completed_bars(rows, now, day=None):
+def completed_bars(rows, now, day=None, interval=5):
     """Bar timestamps are starts; reject duplicate or malformed OHLC, exclude forming bars."""
+    if type(interval) is not int or interval not in (1, 5):
+        raise Block("BARS: interval must be 1 or 5")
     out, seen = [], set()
     for row in rows:
         ts = instant(row["at"])
@@ -182,9 +188,9 @@ def completed_bars(rows, now, day=None):
         number(row["volume"], "volume")
         if not l <= min(o, c) <= max(o, c) <= h:
             raise Block("BARS: inconsistent OHLC")
-        if ts.second or ts.microsecond or ts.minute % 5:
-            raise Block("BARS: timestamps must start on a five-minute grid")
-        if ts + timedelta(minutes=5) > now:
+        if ts.second or ts.microsecond or ts.minute % interval:
+            raise Block("BARS: timestamps must start on the configured minute grid")
+        if ts + timedelta(minutes=interval) > now:
             continue
         if day and ts.date().isoformat() != day:
             continue
@@ -193,35 +199,36 @@ def completed_bars(rows, now, day=None):
     return sorted(out, key=lambda x: x["at"])
 
 
-def session_bars(rows, now):
+def session_bars(rows, now, interval=5):
     """Require the complete regular-session prefix, including the latest closed bar."""
-    bars = completed_bars(rows, now, now.date().isoformat())
+    bars = completed_bars(rows, now, now.date().isoformat(), interval)
     start = now.replace(hour=9, minute=15, second=0, microsecond=0)
     close = start.replace(hour=15, minute=30)
     bars = [b for b in bars if instant(b["at"]) < close]
-    expected = max(0, int((min(now, close) - start).total_seconds() // 300))
+    expected = max(0, int((min(now, close) - start).total_seconds() // (interval*60)))
     if len(bars) != expected:
         raise Block("BARS: missing opening, intervening or latest completed bar")
     for k, b in enumerate(bars):
-        if instant(b["at"]) != start + timedelta(minutes=5*k):
+        if instant(b["at"]) != start + timedelta(minutes=interval*k):
             raise Block("BARS: missing opening or intervening bar")
     return bars
 
 
-def orb(rows, now):
-    bars = session_bars(rows, now)
-    if len(bars) < 4:
+def orb(rows, now, interval=5):
+    bars = session_bars(rows, now, interval)
+    opening = 15//interval
+    if len(bars) <= opening:
         return {"state": "waiting", "setup": "orb", "reason": "Need opening range plus a completed trigger bar"}
-    high = max(float(b["high"]) for b in bars[:3])
-    low = min(float(b["low"]) for b in bars[:3])
-    for k, b in enumerate(bars[3:], 3):
+    high = max(float(b["high"]) for b in bars[:opening])
+    low = min(float(b["low"]) for b in bars[:opening])
+    for k, b in enumerate(bars[opening:], opening):
         if float(b["close"]) > high or float(b["close"]) < low:
             level = high if float(b["close"]) > high else low
             return {"state": "triggered", "setup": "orb", "side": "BUY" if float(b["close"]) > high else "SELL",
-                    "rule_version": 1, "reference_price": level,
+                    "rule_version": 1, "reference_price": level, "interval_minutes":interval,
                     "percent_over_level": money((number(b["close"])/number(level)-1)*100),
                     "entry": b["close"], "range_high": high, "range_low": low,
-                    "trigger_at": (instant(b["at"]) + timedelta(minutes=5)).isoformat(),
+                    "trigger_at": (instant(b["at"]) + timedelta(minutes=interval)).isoformat(),
                     "turnover_estimate_inr": money(sum(number(x["close"])*number(x["volume"]) for x in bars[:k+1])),
                     "label": "matched a rule"}
     return {"state": "waiting", "setup": "orb", "range_high": high, "range_low": low}
@@ -322,9 +329,13 @@ def gap_and_go(rows, now, config, instrument, prior_close):
 
 
 def setup_hit(rows, now, config, instrument=None, prior_close=None, daily=None):
+    from entry_policy import interval, level_hit
+    minutes = interval(config)
     setup = config.get("setup", "orb")
     if setup == "orb":
-        return orb(rows, now)
+        return orb(rows, now, minutes)
+    if setup == "level":
+        return level_hit(rows, now, config, instrument)
     if setup == "vwap_reclaim":
         return vwap_reclaim(rows, now, config["no_entries_before"], config["no_entries_after"])
     if setup == "gap_and_go":
@@ -342,6 +353,8 @@ def plan_from_hit(hit, instrument, config, now, rows=None):
         raise Block("BROKER: instrument belongs to a different broker")
     if hit["state"] != "triggered":
         raise Block("ENTRY: no completed trigger")
+    from entry_policy import check as check_entry, interval, level_reference
+    check_entry(hit, config)
     setup = hit.get("setup")
     version = hit.get("rule_version", 1)
     if setup not in SETUPS or setup != config.get("setup", "orb") or type(version) is not int or version != 1:
@@ -356,6 +369,9 @@ def plan_from_hit(hit, instrument, config, now, rows=None):
         reference = (number(hit["range_high"]) + number(hit["range_low"])) / 2
     elif setup == "vwap_reclaim":
         reference = positive(hit["vwap"])
+    elif setup == "level":
+        level_reference(hit.get("level_entry"), instrument, instant(hit["trigger_at"]))
+        reference = positive(hit["stop_reference"])
     elif setup == "gap_and_go":
         validate_gap_reference(hit.get("gap_reference"), instrument, instant(hit["trigger_at"]).date().isoformat())
         if number(hit["gap_min_pct"]) != number(config.get("gap_min_pct", 0.7)):
@@ -377,6 +393,9 @@ def plan_from_hit(hit, instrument, config, now, rows=None):
             "symbol": instrument["symbol"], "exchange": instrument["exchange"], "token": instrument["token"],
             "side": hit["side"], "entry": entry, "stop": stop, "target": target,
             "setup": setup, "rule_version": 1, "as_of": hit["trigger_at"], "flat_by": config["flat_by"], "product": "MIS"}
+    plan["interval_minutes"] = interval(config)
+    if setup == "level":
+        plan.update(level_entry=copy.deepcopy(hit["level_entry"]), stop_reference=float(reference), stop_basis="observed intraday extreme plus tick buffer")
     if setup == "vwap_reclaim":
         plan.update(stop_basis="trigger-bar session VWAP plus configured tick buffer", stop_reference=float(reference))
     elif setup == "gap_and_go":
@@ -397,6 +416,14 @@ def plan_from_hit(hit, instrument, config, now, rows=None):
 
 
 def plan_math(p, i):
+    from entry_policy import interval, level_reference
+    interval(p)
+    if p.get("setup") == "level":
+        level, available = level_reference(p.get("level_entry"), i, instant(p["as_of"]))
+        if p["side"] != p["level_entry"]["side"]:
+            raise Block("LEVEL: plan side differs from level evidence")
+        if available > instant(p["as_of"])-timedelta(minutes=interval(p)) or not (positive(p["entry"])>level if p["side"]=="BUY" else positive(p["entry"])<level):
+            raise Block("LEVEL: level must precede the trigger bar and entry must exceed it in the selected direction")
     version = p.get("rule_version", 1 if p.get("setup") == "orb" else None)
     if p.get("setup") not in SETUPS or type(version) is not int or version != 1:
         raise Block("SETUP: unsupported plan setup/version; regenerate the plan")
@@ -471,6 +498,9 @@ def entry_context(p, i, c, ctx, now):
             raise Block(f"SOURCE: {key} missing provenance")
         fresh(snap["as_of"], now, c["snapshot_max_age_seconds"], key)
     session, restrictions, event, account = [ctx[k] for k in ("session", "restrictions", "event", "account")]
+    if c.get("require_instrument_session") is True or "instrument_session" in ctx:
+        from session_policy import validate
+        validate(ctx.get("instrument_session"), i, c, now)
     if session["date"] != now.date().isoformat() or session["is_open_day"] is not True or session["halted"] is not False:
         raise Block("CLOCK: holiday, closed session, halt or unknown status")
     if now.weekday() >= 5 and session.get("special_session") is not True:
@@ -523,6 +553,20 @@ def cost_metrics(p, i, card, q, day):
             "reward_at_target_before_cost_inr": money(reward*q), "charges_at_stop": at_stop, "charges_at_target": at_target}
 
 
+def execution_metrics(p, i, c, ctx, card, q, now, model=None):
+    result=cost_metrics(p,i,card,q,now.date().isoformat())
+    if c.get("liquidity_model") is not None:
+        from liquidity import evidence, stress
+        model=model if model is not None else evidence(p,i,c,ctx,now)
+        stressed=stress(p,model,q)
+        fees=charges(p["entry"],stressed["stress_exit_price"],q,p["side"],i,card,now.date().isoformat())
+        # Never credit a tax reduction against the adverse price reserve.
+        result["loss_at_stop_inr"]=money(number(result["loss_at_stop_inr"])+number(stressed["slippage_reserve_inr"])+max(D(0),number(fees["total"])-number(result["charges_at_stop"]["total"])))
+        result["liquidity_stress"]=stressed
+        result["stressed_stop_charges"]=fees
+    return result
+
+
 def size(p, i, c, ctx, card, now):
     validate_rates(i, card, c["broker"])
     multiplier = entry_context(p, i, c, ctx, now)
@@ -535,6 +579,9 @@ def size(p, i, c, ctx, card, now):
     limits = {"loss": number(c["max_loss_per_trade_inr"])*multiplier/risk,
               "position": max(D(0), number(c["budget"])*number(c["max_position_pct"])/100-held)/e,
               "order": number(c["max_order_inr"])/e, "cash": max(D(0), cash)/e}
+    from liquidity import evidence
+    model=evidence(p,i,c,ctx,now)
+    if model is not None:limits["liquidity"]=number(model["capacity"])
     lot = integer(i["lot_size"])
     q = int(min(limits.values())//lot)*lot
     per_loss = number(c["max_loss_per_trade_inr"])*multiplier
@@ -543,7 +590,7 @@ def size(p, i, c, ctx, card, now):
     lo, hi = 0, q//lot
     while lo < hi:
         mid = (lo+hi+1)//2
-        m = cost_metrics(p, i, card, mid*lot, now.date().isoformat())
+        m = execution_metrics(p, i, c, ctx, card, mid*lot, now, model=model)
         fits = number(m["loss_at_stop_inr"]) <= min(per_loss, daily_left) and number(m["notional_inr"])+number(m["charges_at_stop"]["total"]) <= cash
         if fits:
             lo = mid
@@ -552,7 +599,7 @@ def size(p, i, c, ctx, card, now):
     q = lo*lot
     if not q:
         raise Block("ZERO_SIZE: no whole share/lot fits risk, daily limit and capital")
-    m = cost_metrics(p, i, card, q, now.date().isoformat())
+    m = execution_metrics(p, i, c, ctx, card, q, now, model=model)
     if number(m["notional_inr"]) < number(c["min_order_inr"]):
         raise Block("MIN_ORDER: below minimum order value")
     if number(m["charges_at_target"]["total"]) > number(c["max_cost_fraction"])*number(m["reward_at_target_before_cost_inr"]):
@@ -610,7 +657,7 @@ def check_order(order, i, c, ctx, card, now):
     maximum = size(p, i, c, ctx, card, now)
     if q > maximum["quantity"]:
         raise Block("SIZE: order exceeds recomputed limit")
-    m = cost_metrics(p, i, card, q, now.date().isoformat())
+    m = execution_metrics(p, i, c, ctx, card, q, now)
     if number(m["notional_inr"]) < number(c["min_order_inr"]) or number(m["charges_at_target"]["total"]) > number(c["max_cost_fraction"])*number(m["reward_at_target_before_cost_inr"]):
         raise Block("COST_SIZE: actual quantity fails minimum/cost check")
     # Derivative margins must be an exact quantity/payload quote, never a scaled per-lot guess.

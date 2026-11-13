@@ -206,11 +206,11 @@ class AngelReadOnly:
         symbol_token(token); exchange_name(exchange)
         if not isinstance(symbol, str) or not symbol.strip():
             raise Block("ANGEL_IDENTITY: verified master symbol required")
-        if interval == "5minute":
+        if interval in {"minute", "5minute"}:
             first, last = source_time(start), source_time(end)
             if any(t.second or t.microsecond for t in (first, last)):
                 raise Block("ANGEL_RANGE: request bounds need exact minutes")
-            max_days, api_interval = 100, "FIVE_MINUTE"
+            max_days, api_interval = (30, "ONE_MINUTE") if interval == "minute" else (100, "FIVE_MINUTE")
         elif interval == "day":
             first = datetime.combine(date.fromisoformat(start), time(), IST)
             last = datetime.combine(date.fromisoformat(end), time(), IST)
@@ -236,8 +236,8 @@ class AngelReadOnly:
             if at == last:
                 boundary += 1
                 continue
-            if interval == "5minute" and (at.minute % 5 or at.second or at.microsecond):
-                raise Block("ANGEL_CANDLES: invalid five-minute grid")
+            if interval in {"minute", "5minute"} and (at.minute % (1 if interval == "minute" else 5) or at.second or at.microsecond):
+                raise Block("ANGEL_CANDLES: invalid configured minute grid")
             o, h, l, c = [positive(value) for value in row[1:5]]
             if not l <= min(o, c) <= max(o, c) <= h:
                 raise Block("ANGEL_CANDLES: inconsistent OHLC")

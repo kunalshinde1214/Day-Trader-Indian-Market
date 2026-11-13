@@ -75,8 +75,8 @@ class UpstoxReadOnly:
                  "/v2/portfolio/short-term-positions", "/v2/portfolio/long-term-holdings", "/v3/portfolio/mtf-positions",
                  "/v2/order/retrieve-all", "/v2/order/trades/get-trades-for-day"}
         encoded_key = r"(?:NSE|BSE)_(?:EQ|FO)%7C[A-Za-z0-9]+"
-        history = rf"/v3/historical-candle/{encoded_key}/(?:minutes/5|days/1)/\d{{4}}-\d{{2}}-\d{{2}}/\d{{4}}-\d{{2}}-\d{{2}}"
-        intraday = rf"/v3/historical-candle/intraday/{encoded_key}/(?:minutes/5|days/1)"
+        history = rf"/v3/historical-candle/{encoded_key}/(?:minutes/[15]|days/1)/\d{{4}}-\d{{2}}-\d{{2}}/\d{{4}}-\d{{2}}-\d{{2}}"
+        intraday = rf"/v3/historical-candle/intraday/{encoded_key}/(?:minutes/[15]|days/1)"
         allowed = method == "GET" and (path in fixed or re.fullmatch(history, path) or re.fullmatch(intraday, path))
         if not allowed and not (method == "POST" and path == "/v2/charges/margin"):
             raise Block("READ_ONLY: endpoint/method not allowed; live execution unavailable")
@@ -154,16 +154,16 @@ class UpstoxReadOnly:
         key = instrument_key(token)
         if SEGMENTS[key.split("|")[0]] != exchange or not symbol:
             raise Block("UPSTOX_IDENTITY: key/exchange and symbol required")
-        if interval not in {"5minute", "day"}:
+        if interval not in {"minute", "5minute", "day"}:
             raise Block("HISTORY_RANGE: unsupported interval")
-        unit = "minutes/5" if interval == "5minute" else "days/1"
+        unit = {"minute":"minutes/1", "5minute":"minutes/5", "day":"days/1"}[interval]
         encoded = urllib.parse.quote(key, safe="")
         if intraday:
             path = f"/v3/historical-candle/intraday/{encoded}/{unit}"
             first = last = instant().date()
         else:
             first, last = date.fromisoformat(start), date.fromisoformat(end)
-            if first > last or last >= instant().date() or (interval == "5minute" and (last-first).days > 30):
+            if first > last or last >= instant().date() or (interval in {"minute", "5minute"} and (last-first).days > 30):
                 raise Block("HISTORY_RANGE: use prior dates, <=30 days for five-minute bars; intraday for today")
             path = f"/v3/historical-candle/{encoded}/{unit}/{last}/{first}"
         data = self.request("GET", path)
@@ -179,8 +179,8 @@ class UpstoxReadOnly:
                 o, h, l, c = [positive(v) for v in row[1:5]]
                 if not l <= min(o, c) <= max(o, c) <= h:
                     raise Block("UPSTOX_CANDLES: inconsistent OHLC")
-                if interval == "5minute" and (at.second or at.microsecond or at.minute % 5):
-                    raise Block("UPSTOX_CANDLES: invalid five-minute grid")
+                if interval in {"minute", "5minute"} and (at.second or at.microsecond or at.minute % (1 if interval == "minute" else 5)):
+                    raise Block("UPSTOX_CANDLES: invalid configured minute grid")
                 bars.append({"at": at.isoformat(), "open": float(o), "high": float(h), "low": float(l),
                              "close": float(c), "volume": float(number(row[5]))})
         except (KeyError, TypeError, IndexError):

@@ -7,7 +7,7 @@ The publisher supplies the skill, not a brokerage account, credentials, data sub
 ```bash
 python scripts/india_news.py --sources nse-announcements nse-actions et-markets
 python scripts/public_market.py scan --symbols RELIANCE.NS TCS.NS
-python scripts/daily.py /india-daily --collect-public
+python scripts/daily.py india-daily --collect-public
 ```
 
 Public daily collection can block outside a supported current session or when data is stale/incomplete. Synthetic demos remain explicitly labelled. Read [news and filings](india-news.md) for automatic filing collection, and [public workflows](public-workflows.md) for research limitations.

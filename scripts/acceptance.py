@@ -14,6 +14,7 @@ def main(argv=None):
     p.add_argument("--broker",required=True,choices=sorted(BROKERS))
     p.add_argument("--public-master",action="store_true")
     p.add_argument("--authenticated-readonly",action="store_true")
+    p.add_argument("--interval-minutes",type=int,choices=(1,5),default=5)
     p.add_argument("--instrument");p.add_argument("--account-id");p.add_argument("--payload");p.add_argument("--out",required=True)
     a=p.parse_args(argv)
     try:
@@ -35,7 +36,8 @@ def main(argv=None):
             account=client.account()
             if account.get("account_id")!=a.account_id:raise Block("PROBE: observed account mismatch")
             checks["account_identity_matches"]=True
-            candles,quote=refresh(client,i,instant())
+            candles,quote=refresh(client,i,instant(),interval=a.interval_minutes)
+            checks["interval_minutes"]=a.interval_minutes
             checks.update(completed_session_bars=len(candles["bars"]),quote_timestamp=quote["as_of"])
             if a.payload:
                 margin=client.margin(read(a.payload))

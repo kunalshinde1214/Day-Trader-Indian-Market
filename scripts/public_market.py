@@ -59,7 +59,11 @@ def chart(raw, selected, interval, now):
     q=quote[0]
     if any(not isinstance(q.get(k),list) or len(q[k])!=len(stamps) for k in ("open","high","low","close","volume")):
         raise Block("PUBLIC: misaligned arrays")
-    rows=[];missing=[];seen=set()
+    rows=[];missing=[];seen=set();dropped=None
+    step={"5m":300,"1m":60}.get(interval)
+    if step and len(stamps)>1 and integer(stamps[-1])%step and datetime.fromtimestamp(integer(stamps[-1]),IST)<=now:
+        # Yahoo appends the still-forming bar stamped with the latest trade time; it is incomplete and off the candle grid.
+        dropped=datetime.fromtimestamp(integer(stamps[-1]),IST).isoformat();stamps=stamps[:-1]
     for n,stamp in enumerate(stamps):
         at=datetime.fromtimestamp(integer(stamp),IST)
         if at in seen or at>now: raise Block("PUBLIC: duplicate/future bar")
@@ -74,7 +78,7 @@ def chart(raw, selected, interval, now):
     last=rows[-1]["at"]
     return {"schema":"public_chart_v1","symbol":selected,"interval":interval,"source":"yahoo_public_chart",
             "source_url":"https://finance.yahoo.com/quote/"+urllib.parse.quote(selected,safe="")+"/", "as_of":now.isoformat(),
-            "last_bar_at":last,"last_bar_age_seconds":(now-instant(last)).total_seconds(),"bars":rows,"missing_bars":missing,
+            "last_bar_at":last,"last_bar_age_seconds":(now-instant(last)).total_seconds(),"bars":rows,"missing_bars":missing,"dropped_in_progress_bar":dropped,
             "regular_session":meta.get("currentTradingPeriod",{}).get("regular"),"corporate_actions":r.get("events",{}),
             "price_basis":"unadjusted_provider_OHLC", "warning":WARNING,"execution_eligible":False,"submitted":False}
 

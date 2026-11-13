@@ -30,7 +30,11 @@ These commands send no orders. Reads use existing read-only adapters. Snapshot n
 
 All live entries also obtain an exact, fresh broker margin estimate, including equities. The live profile adds caps to the analysis risk limits. Demo/synthetic source labels and the example `PAPER-DEMO` account are rejected for real entries. The tool does not authenticate accounts or buy subscriptions.
 
+The current development version additionally requires fresh, dated `context.instrument_session` evidence for every live entry, even when optional in paper analysis. It binds the exact instrument and account to continuous-market hours and the broker square-off cutoff, excludes auctions and requires an official exchange source. See the [session contract](india-expansion.md). Missing evidence blocks entries; it does not block the separate reducing-exit/cancellation path. This is a supplied evidence check, not automatic exchange-rule certification.
+
 ## Human-operated actions
+
+For the separate, limited Kite workflow that reduces supported CNC/NRML/MIS positions in an account with mixed inventory, see [mixed-inventory exits](mixed-inventory-exits.md). It retains exact human confirmations and the shared durable intent log. It does not relax this file's original intraday-only entry workflow.
 
 Each following command requires its own two confirmations. Examples are syntax only, not approved prices or quantities:
 
@@ -66,6 +70,10 @@ Known IDs reconcile through fresh broker reads. If a placement timed out without
 Cancellation IDs are recorded before the request. A timed-out cancel retains its identity and remains locked until a terminal broker observation. Partial fills remain exposure even when the rest is cancelled. Regressing fill counts or contradictory terminal states block recovery.
 
 `panic-preview` immediately writes the local entry halt, lists outstanding orders and current positions, and sends no order. Approve cancellations individually, confirm terminal states, refresh remaining positions, then approve reducing limit exits. If the API is unavailable or an intent is unresolved, use the broker's own controls and reconcile afterwards. Keep the original intent database; deleting it is not recovery. The tool does not promise that a stop, a limit exit or an exchange halt can guarantee flatness at a deadline.
+
+## Protection-status interpretation (unreleased)
+
+`status` evaluates waiting-stop quantities for the exact exchange, symbol, token and product. Remaining quantities exclude fills. `STOP_WAITING` requires exact coverage with no additional working entry or excess exit quantity; it never guarantees execution. Independent stop and target orders that could sell/buy more than the remaining position produce `OVER_EXIT_RISK`. Pending exposure-increasing orders produce `POSITION_CAN_INCREASE`; ambiguous working states produce `ORDER_STATE_UNVERIFIED`. Triggered limits and generic pending orders do not count as verified waiting stops. Reports include uncovered, excess-exit and working-entry quantities. These diagnostics send no orders and do not install unattended protection.
 
 ## Official contracts checked during implementation
 

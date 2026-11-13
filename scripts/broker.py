@@ -29,7 +29,7 @@ def main(argv=None):
     parser.add_argument("--instrument", help="Selected normalized instrument JSON from this broker's master")
     parser.add_argument("--from", dest="start")
     parser.add_argument("--to", dest="end")
-    parser.add_argument("--interval", choices=["5minute", "day"], default="5minute")
+    parser.add_argument("--interval", choices=["minute", "5minute", "day"], default="5minute")
     parser.add_argument("--intraday", action="store_true", help="Upstox current-day candles")
     parser.add_argument("--payload")
     a = parser.parse_args(argv)

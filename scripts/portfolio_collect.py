@@ -56,7 +56,7 @@ def canonical_order(row, instruments, master, day, as_of, account_id):
             "filled_quantity": filled, "side": row["transaction_type"], "status": status}
 
 
-def normalize(raw, opening, instruments, now):
+def normalize(raw, opening, instruments, now, *, execution_details=False):
     day = now.date().isoformat()
     pair, master = validate_opening(opening, instruments, now)
     evidence(raw, now, day, pair)
@@ -143,12 +143,16 @@ def normalize(raw, opening, instruments, now):
         report = reconcile_portfolio(journal, snapshot, instruments, now)
     finally: journal.close()
     if not report["inventory_reconciled"]: raise Block("PORTFOLIO_COLLECT: inventory did not reconcile")
-    return {"schema": "portfolio_collection_v1", "opening": opening, "snapshot": snapshot, "fills": batch, "report": report,
+    result = {"schema": "portfolio_collection_v1", "opening": opening, "snapshot": snapshot, "fills": batch, "report": report,
             "raw_hash": fingerprint(raw), "opening_hash": fingerprint(opening), "execution_eligible": False,
             "submitted": False, "authenticated_acceptance": False}
+    if execution_details:
+        from live_state import normalize_order
+        result["execution_orders"]=[normalize_order("kite",row,instruments,allow_carry=True) for row in raw["orders"]]
+    return result
 
 
-def fetch(client, account_id, opening, instruments, clock=instant):
+def fetch(client, account_id, opening, instruments, clock=instant, *, execution_details=False):
     started = clock()
     if validate_opening(opening, instruments, started)[0] != ("kite", account_id) or client.account_id() != account_id:
         raise Block("PORTFOLIO_COLLECT: connected/opening account mismatch")
@@ -164,7 +168,7 @@ def fetch(client, account_id, opening, instruments, clock=instant):
     raw = {**book, "verification": verification, "quotes": quotes, "schema": "kite_portfolio_read_v1", "broker": "kite",
            "account_id": account_id, "source": "kite", "date": ended.date().isoformat(), "started_at": started.isoformat(),
            "as_of": ended.isoformat(), "complete": True}
-    return normalize(raw, opening, instruments, ended)
+    return normalize(raw, opening, instruments, ended, execution_details=execution_details)
 
 
 def main(argv=None):

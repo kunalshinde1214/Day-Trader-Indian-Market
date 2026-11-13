@@ -1,8 +1,14 @@
-# Release status — 11 November 2026
+# Release status — 13 November 2026
 
-Version: **0.9.6-dependent-replay-alpha**. Adds fifteen Claude plugin skills, credential-free public research, index collection, multi-tag screening, one-minute/custom-level entry research, flexible exits, news discovery and supplied XBRL analysis. Includes limited five-broker carry collection, streaming, monitoring deployment files, daily commands, paper analysis and human-operated execution. Live starts disabled. This is **not the completed production specification**. No authenticated broker account was connected, real order submitted, webhook delivered or production monitoring service activated during development.
+Version: **0.9.7-india-expansion-alpha**. Adds fifteen Claude plugin skills, credential-free public research, index collection, multi-tag screening, one-minute/custom-level entry research, flexible exits, news discovery and supplied XBRL analysis. Includes limited five-broker carry collection, streaming, monitoring deployment files, daily commands, paper analysis and human-operated execution. Live starts disabled. This is **not the completed production specification**. No authenticated broker account was connected, real order submitted, webhook delivered or production monitoring service activated during development.
+
+## New in 0.9.7
+
+See the [Indian-market expansion guide](india-expansion.md) for changes after 0.9.6: broker-bound minute/custom-level entries, liquidity stress, exact Kite basket-margin research, combined public collection, persistent filing backlog and instrument-session checks (mandatory for live entry). The separate [Kite mixed-inventory exit workflow](mixed-inventory-exits.md) adds human-operated reducing exits with product/account reconciliation and delivery-authorization evidence. Protection diagnostics now detect overlapping exits and pending exposure increases. The complete requested production scope remains unfinished.
 
 ## Implemented and locally verified
+
+Release validation on 13 November: `python scripts/release.py --check` passed **734 tests**, Python syntax, JSON and **214 packaged local links** across **154 files**. 0.9.7 also fixes two public-workflow defects: daily routes now use bare command names (`daily.py nifty`) because Git Bash on Windows rewrites a leading-slash argument into a filesystem path, and public Yahoo charts drop the trailing still-forming bar so live intraday briefings no longer block. These checks do not establish authenticated acceptance.
 
 - News briefing and official filing workflow: eight selectable feeds, explicit NSE timezone assumptions, issuer-candidate matching, bounded official attachment collection and financial parsing/text-review fallback. User-owned broker setup and read-only acceptance are documented; a developer brokerage account is not required for public distribution.
 - On 10 November, public Upstox and Dhan master probes passed (50,642 and 156,091 normalized supported records). Angel and FYERS public probes remained blocked. These results are not authenticated acceptance.
@@ -52,7 +58,7 @@ The supplied proposal also discusses advanced replay, slippage/liquidity, option
 ## Package and use
 
 ```text
-python scripts/release.py --out dist/india-day-trader-0.9.6-dependent-replay-alpha.zip
+python scripts/release.py --out dist/india-day-trader-0.9.7-india-expansion-alpha.zip
 ```
 
 The command runs tests before producing the archive and refuses to overwrite an existing ZIP. Its manifest lists daily commands, canonical accounting plus five limited broker collectors requiring reviewed opening evidence, five-broker streaming adapters, render-only deployment, packaged hashes, live disabled by default, and full-spec/authenticated completion false. Earlier archives remain historical checkpoints. Unpack the single skill folder and run a labelled demo first. Distribute only with the alpha scope and acceptance limits stated clearly. A whole-product completion percentage would conceal outstanding engineering and external acceptance requirements; use the explicit counts above.

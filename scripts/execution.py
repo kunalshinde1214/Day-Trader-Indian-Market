@@ -69,6 +69,8 @@ def prepare(kind, bundle, snapshot, profile, now, *, quantity=None, price=None, 
                     ctx["event"].get("source", ""), ctx["restrictions"].get("source", "")]
         if account == "PAPER-DEMO" or any(any(word in s.lower() for word in ("synthetic", "fictional", "demo")) for s in evidence):
             raise Block("DEMO_INPUT: synthetic evidence can never authorize a real entry")
+        from session_policy import validate as validate_session
+        validate_session(ctx.get("instrument_session"), i, c, now)
         if any(r["status"] not in TERMINAL for r in snapshot["orders"]) or any(r["quantity"] for r in snapshot["positions"]):
             raise Block("ACCOUNT_BUSY: close/reconcile existing exposure before a new entry")
         a = ctx["account"]
@@ -187,6 +189,8 @@ class ExecutionStore:
             if instant(r["created_at"]).date().isoformat() != snapshot["date"]: continue
             if r["state"] in UNRESOLVED: raise Block("RESERVATIONS: reconcile unresolved execution first")
             a = r["review"]["action"]
+            if a.get("product", "MIS") != "MIS":
+                raise Block("RESERVATIONS: carry exits need portfolio reconciliation; never merge with intraday risk groups")
             if a["kind"] == "cancel": continue
             oid = r["order_id"]
             if not oid or oid in claimed: raise Block("RESERVATIONS: missing or duplicate order identity")
@@ -215,7 +219,7 @@ class ExecutionStore:
             self.db.execute("INSERT INTO intents(id,broker,account,review_hash,body,state,created_at,order_id) VALUES(?,?,?,?,?,'SUBMITTING',?,?)",
                             (key, a["broker"], a["account_id"], review["review_hash"], json.dumps(review, allow_nan=False), now.isoformat(),
                              a["order_id"] if a["kind"] == "cancel" else None))
-            self._event(key, "SUBMITTING", now, {"approval": "two-stage human confirmation", "review_hash": review["review_hash"]})
+            self._event(key, "SUBMITTING", now, {"approval": review.get("authorization_mode", "two-stage human confirmation"), "review_hash": review["review_hash"]})
             self.db.commit()
             return key
         except BaseException:
@@ -230,6 +234,8 @@ class ExecutionStore:
     @staticmethod
     def matches(action, row):
         if any(action["instrument"][k] != row[k] for k in ("exchange", "symbol", "token")):
+            return False
+        if action.get("product", "MIS") != row["product"]:
             return False
         if action["kind"] == "cancel":
             return action["order_id"] == row["order_id"]

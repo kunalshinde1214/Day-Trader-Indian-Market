@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.7-india-expansion-alpha
+
+- Fix daily plugin routes on Windows: call `daily.py nifty` (no leading slash), since Git Bash rewrites `/nifty` into a filesystem path.
+- Fix live public intraday briefings blocking: drop Yahoo's trailing still-forming, off-grid bar and record it as `dropped_in_progress_bar`.
+
+- Add a persistent intraday protection controller with stop/target/cutoff decisions, cancel-before-replace sequencing, fresh remaining quantities, and separate preview/human-operated step commands. Unattended submission remains unfinished.
+
+- Harden protection diagnostics against overlapping stop/target exits, pending entries, ambiguous states and product mismatches; count only remaining unfilled units.
+
+- Add a separate opt-in human-operated Kite mixed-inventory reducing-exit/cancellation workflow; preserve CNC/NRML/MIS identity through reconciliation, payloads and recovery. Add delivery-authorization evidence checks, shared-intent ambiguity blocking and regression tests. No authenticated acceptance or unattended execution is claimed.
+
+- Add broker-bound one-minute ORB and one-/five-minute point-in-time custom levels across five candle adapters, replay, watcher and risk checks.
+- Add optional visible-depth/participation sizing caps and adverse stop-slippage reserves; exact Kite basket-margin prefix estimates remain research-only.
+- Add combined Indian public market/calendar/news/filing collection and a durable bounded filing backlog.
+- Add optional dated instrument-session evidence for separate continuous-market and broker cutoffs; document current CAS and API-algo source findings.
+- Broad mixed-inventory execution, unattended protection and actual broker/production acceptance remain outstanding.
+
 ## 0.9.6-dependent-replay-alpha
 
 - Add optional contiguous same-clock block and whole-session bootstrap replay for broker and public workflows; retain independent sampling as the default.

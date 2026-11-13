@@ -57,6 +57,10 @@ def initialize(workdir, broker="kite", synthetic=False, setup="orb"):
     config=read(ROOT/"assets/config.example.json")
     config["broker"]=broker
     config["setup"]=setup
+    if synthetic and setup=="level":
+        token="NSE_EQ|DEMO00000001" if broker=="upstox" else "10100000999999" if broker=="fyers" else "999999999"
+        config["level_entry"]={"broker":broker,"symbol":"DEMO-EQ","exchange":"NSE","token":token,
+            "side":"BUY","price":101,"for_session":"2026-10-30","available_at":"2026-10-30T09:15:00+05:30","source":"synthetic demo level"}
     card=read(ROOT/"assets/charges.example.json")
     if synthetic:
         card.update(broker=broker,source="synthetic_demo_rates_not_broker_pricing",status="fictional_test_only")
@@ -72,6 +76,7 @@ def initialize(workdir, broker="kite", synthetic=False, setup="orb"):
 
 
 def scan(universe,candles,ctx,c,now):
+    from entry_policy import check_candles
     validate_config(c)
     if not universe.get("source") or not candles.get("source"):
         raise Block("SOURCE: universe and candles must be attributed")
@@ -98,6 +103,7 @@ def scan(universe,candles,ctx,c,now):
             if number(i["average_daily_turnover_inr"]) < number(c["liquidity_floor_turnover_inr"]):
                 raise Block("LIQUIDITY: below turnover floor")
             data=candles["instruments"][key]
+            check_candles(data,c)
             fresh(data["as_of"],now,c["snapshot_max_age_seconds"],"candle snapshot")
             # Fetch time alone is not evidence that the latest completed bar arrived.
             result=setup_hit(data["bars"],now,c,i,data.get("prior_close"),data.get("daily_reference"))
@@ -167,6 +173,8 @@ def main(argv=None):
                     write(w/"watchlist.json",result)
                 else:
                     data=read(w/"candles.json")["instruments"][i["exchange"]+":"+i["symbol"]]
+                    from entry_policy import check_candles
+                    check_candles(data,c)
                     fresh(data["as_of"],now,c["snapshot_max_age_seconds"],"candles")
                     hit=setup_hit(data["bars"],now,c,i,data.get("prior_close"),data.get("daily_reference"))
                     if hit["state"]=="triggered" and (now-instant(hit["trigger_at"])).total_seconds()>c["plan_max_age_seconds"]: hit["state"]="expired"

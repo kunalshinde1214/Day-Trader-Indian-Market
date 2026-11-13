@@ -3,7 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
-from core import Block, instant, integer, number, fingerprint, size, payload, check_order, cost_metrics
+from core import Block, instant, integer, number, fingerprint, size, payload, check_order, execution_metrics
 from trader import read,write,runtime_context
 
 
@@ -17,7 +17,7 @@ def propose(client,plan,instrument,config,context,card,clock=instant,max_queries
     # Descending exact lots: do not assume broker margins scale linearly or monotonically.
     for q in range(upper,max(0,upper-max_queries*lot),-lot):
         now=clock()
-        candidate={**candidate,"quantity":q,"lots":q//lot,"metrics":cost_metrics(plan,instrument,card,q,now.date().isoformat())}
+        candidate={**candidate,"quantity":q,"lots":q//lot,"metrics":execution_metrics(plan,instrument,config,context,card,q,now)}
         p=payload(candidate);margin=client.margin(p)
         if margin.get("payload_hash")!=fingerprint(p) or margin.get("account_id")!=config["account_id"] or margin.get("source")!=config["broker"]:
             raise Block("MARGIN_SIZE: broker evidence mismatch")

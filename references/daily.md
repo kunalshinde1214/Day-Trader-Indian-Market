@@ -14,11 +14,11 @@ These are interpreted within this skill; installing a skill does not register ar
 ## Simple commands
 
 ```text
-python scripts/daily.py /india-daily --demo
-python scripts/daily.py /nifty --demo --phase preopen --brief
-python scripts/daily.py /sensex --demo --phase close
-python scripts/daily.py /banknifty --input trader/daily.json
-python scripts/daily.py /india-daily --input trader/daily.json --format json --out reports/daily.json
+python scripts/daily.py india-daily --demo
+python scripts/daily.py nifty --demo --phase preopen --brief
+python scripts/daily.py sensex --demo --phase close
+python scripts/daily.py banknifty --input trader/daily.json
+python scripts/daily.py india-daily --input trader/daily.json --format json --out reports/daily.json
 ```
 
 The demo uses fictional levels and a fixed 6 November 2026 clock. Every report marks it synthetic, including when a fixture source label is present but its top-level flag is missing. It is not a market scan. Real inputs use the current clock; `--now` is an explicit dated-analysis override for local inputs only. New output paths are required; files are not silently overwritten.
@@ -26,8 +26,8 @@ The demo uses fictional levels and a fixed 6 November 2026 clock. Every report m
 For a current report using the user's locally configured Kite data access:
 
 ```text
-python scripts/daily.py /india-daily --collect-kite --calendar trader/daily-calendar.json
-python scripts/daily.py /nifty --collect-kite --calendar trader/daily-calendar.json --brief
+python scripts/daily.py india-daily --collect-kite --calendar trader/daily-calendar.json
+python scripts/daily.py nifty --collect-kite --calendar trader/daily-calendar.json --brief
 ```
 
 `--collect-kite` makes only read-only instrument-master and historical-data requests. It does not connect an account ledger or submit orders. History entitlement and valid local Kite credentials are required. It discovers **spot index** tokens from unique `INDICES` master rows for `NSE:NIFTY 50`, `NSE:NIFTY BANK` and `BSE:SENSEX`; it never substitutes an equity, ETF, future or option. Index tokens are not hardcoded. A failed index stays visibly missing in a combined report.
@@ -43,8 +43,8 @@ Automatic index collection is currently implemented for **Kite only**. Normalize
 ### Automatic context collection
 
 ```text
-python scripts/daily.py /india-daily --collect-kite --calendar trader/daily-calendar.json --with-context
-python scripts/daily.py /nifty --collect-kite --calendar trader/daily-calendar.json --with-context --membership trader/daily-membership.json
+python scripts/daily.py india-daily --collect-kite --calendar trader/daily-calendar.json --with-context
+python scripts/daily.py nifty --collect-kite --calendar trader/daily-calendar.json --with-context --membership trader/daily-membership.json
 ```
 
 `--with-context` adds intraday constituent quotes and today's available NSE announcement-feed headlines. It also works on `daily_collect.py`. Membership comes from the public Nifty 50/Bank Nifty constituent CSVs or the supplied reviewed file. Public files do not establish an effective date: their membership basis is displayed as unverified and breadth remains partial even when every quote arrives. Public probes on 7 November 2026 did not pass; collection failures remain coverage gaps without substituting demo data. Sensex needs supplied reviewed BSE membership; it is not inferred from an NSE index.

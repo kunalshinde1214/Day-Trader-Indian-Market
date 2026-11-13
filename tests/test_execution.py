@@ -221,6 +221,11 @@ class ExecutionTests(unittest.TestCase):
         now, i, ctx, history, _, candles = inputs(c)
         i["freeze_quantity"] = 10000
         for section in ("session", "restrictions", "event", "account", "quote"): ctx[section]["source"] = "kite"
+        # Fictional evidence for contract tests, never a fetched or approved session.
+        ctx["instrument_session"]={**{k:i[k] for k in ("broker","exchange","symbol","token")},
+            "account_id":c["account_id"],"date":now.date().isoformat(),"as_of":now.isoformat(),
+            "source":"https://www.nseindia.com/market-data/closing-auction-session", "is_open_day":True,"halted":False,
+            "continuous_open":"09:15","continuous_close":"15:15","broker_squareoff":"15:10","auction_included":False}
         p = plan_from_hit(orb(candles["instruments"]["NSE:DEMO-EQ"]["bars"], now), i, c, now)
         ctx["replay"] = replay(p, i, history, c, card)
         order = size(p, i, c, ctx, card, now)
@@ -303,6 +308,11 @@ class ExecutionTests(unittest.TestCase):
         self.p["enabled"] = True; self.p["acceptance"]["as_of"] = (NOW - timedelta(days=2)).isoformat()
         with self.assertRaises(Block): self.refresh()
 
+    def test_live_entry_requires_exact_instrument_session_even_when_paper_optional(self):
+        self.b['context'].pop('instrument_session')
+        with self.assertRaisesRegex(Block,'SESSION_POLICY'):self.run_entry()
+        self.transport.send.assert_not_called()
+
     def test_synthetic_sources_cannot_unlock_live(self):
         self.b["context"]["session"]["source"] = "synthetic_demo"
         with self.assertRaisesRegex(Block, "DEMO_INPUT"): self.refresh()
@@ -343,7 +353,8 @@ class ExecutionTests(unittest.TestCase):
         self.run_entry(); self.store.observe(s, NOW)
         self.assertEqual(self.records()[0]["state"], "PARTIAL")
         self.assertEqual(self.records()[0]["filled_quantity"], 3)
-        self.assertEqual(protection(s)[0]["state"], "UNPROTECTED_OR_UNVERIFIED")
+        self.assertEqual(protection(s)[0]["state"], "POSITION_CAN_INCREASE")
+        self.assertGreater(protection(s)[0]["working_entry_quantity"], 0)
 
     def test_reservations_rebuild_from_observed_intents(self):
         s = self.filled_snapshot(); self.run_entry()

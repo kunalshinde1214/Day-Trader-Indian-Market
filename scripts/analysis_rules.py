@@ -81,6 +81,8 @@ def exit_policy(config):
 
 
 def check_policy(plan, config):
+    from entry_policy import check
+    check(plan, config)
     expected = exit_policy(config)
     recorded = plan.get("exit_policy")
     if recorded is not None and recorded != expected or recorded is None and ("exit_stop" in config or "exit_target" in config):

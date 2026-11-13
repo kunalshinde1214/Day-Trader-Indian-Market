@@ -23,10 +23,10 @@ Run these from the repository root, using a new output path each time:
 python scripts/public_market.py universe --out reports/nse-equities.json
 python scripts/public_market.py scan --symbols RELIANCE.NS TCS.NS INFY.NS --out reports/public-scan.json
 python scripts/public_market.py chart --symbol RELIANCE.NS --interval 5m --out reports/public-chart.json
-python scripts/daily.py /india-daily --collect-public
-python scripts/daily.py /nifty --collect-public
-python scripts/daily.py /sensex --collect-public
-python scripts/daily.py /banknifty --collect-public
+python scripts/daily.py india-daily --collect-public
+python scripts/daily.py nifty --collect-public
+python scripts/daily.py sensex --collect-public
+python scripts/daily.py banknifty --collect-public
 ```
 
 The NSE EQ listing is not F&O eligibility, index membership or a surveillance clearance. A scan accepts 1–500 explicit symbols and pauses between requests; it does not silently choose 500 from the full listing. Symbols must be exact Indian `.NS` or `.BO` provider symbols. Index history supports Nifty, Bank Nifty, Sensex and India VIX, but equities alone are eligible for public entry research. Yahoo's public chart endpoint is unofficial and has no availability guarantee. Failed requests are reported without authentication, access-control bypass or automatic retries.
@@ -48,7 +48,7 @@ The example level is a placeholder chosen by the user, not a current quote or re
 
 Exit rules: `or-mid`, `or-low` (range high for SELL), `price:NUMBER`, `pct:NUMBER` and `atr:MULTIPLIER`; targets accept `2R` or `price:NUMBER`. ATR is the simple mean of up to fourteen intraday true ranges through the trigger, with partial periods labelled. It is not a daily Wilder ATR. Stops must be on the loss side and at least 0.05% away. Rounding defaults to research precision 0.01, **not a verified exchange tick**. Public plans cannot pass broker/account execution checks.
 
-Broker-bound plans additionally support `config.exit_stop` and `config.exit_target`, for example `"exit_stop": "pct:1", "exit_target": "2R"`. `setup` retains the selected rule's structural reference. The same policies are used in historical rule replay. Changing policies requires a new plan, replay, sizing and risk evaluation. Broker-bound entries remain the six existing five-minute rules; custom-level and one-minute entries are public research only. A planned stop does not install a protective order.
+Broker-bound plans additionally support `config.exit_stop` and `config.exit_target`, for example `"exit_stop": "pct:1", "exit_target": "2R"`. `setup` retains the selected rule's structural reference. The same policies are used in historical rule replay. Changing policies requires a new plan, replay, sizing and risk evaluation. The development broker-bound route additionally supports one-minute ORB and one-/five-minute custom levels; see [Indian-market expansion](india-expansion.md). Public plans still cannot replace that broker-bound evidence. A planned stop does not install a protective order.
 
 ## Public replay
 

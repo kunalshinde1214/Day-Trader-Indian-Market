@@ -25,8 +25,8 @@ class KiteReadOnly:
         self.opener=opener
 
     def request(self, method, path, query=None, body=None, csv_result=False):
-        allowed = method == "GET" and (path in {"/instruments","/quote","/user/profile","/user/margins","/portfolio/holdings","/portfolio/positions","/orders","/trades"} or re.fullmatch(r"/instruments/historical/[0-9]+/(5minute|day)",path))
-        allowed = allowed or (method == "POST" and path == "/margins/orders")
+        allowed = method == "GET" and (path in {"/instruments","/quote","/user/profile","/user/margins","/portfolio/holdings","/portfolio/positions","/orders","/trades"} or re.fullmatch(r"/instruments/historical/[0-9]+/(minute|5minute|day)",path))
+        allowed = allowed or (method == "POST" and path in {"/margins/orders", "/margins/basket"})
         if not allowed:
             raise Block("READ_ONLY: endpoint/method not allowed; live execution unavailable")
         api_key=os.environ.get("KITE_API_KEY")
@@ -77,7 +77,7 @@ class KiteReadOnly:
     def candles(self, token, symbol, exchange, start, end, interval="5minute"):
         token=integer(token,"instrument token")
         a,b=instant(start),instant(end)
-        if a>=b or interval not in {"5minute","day"}:
+        if a>=b or interval not in {"minute","5minute","day"}:
             raise Block("HISTORY_RANGE: invalid interval/date range")
         data=self.request("GET",f"/instruments/historical/{token}/{interval}",query={"from":a.strftime("%Y-%m-%d %H:%M:%S"),"to":b.strftime("%Y-%m-%d %H:%M:%S"),"oi":1})
         bars=[]
@@ -127,7 +127,7 @@ def main(argv=None):
     p.add_argument("--symbols",nargs="+")
     p.add_argument("--token");p.add_argument("--symbol");p.add_argument("--exchange")
     p.add_argument("--from",dest="start");p.add_argument("--to",dest="end")
-    p.add_argument("--interval",choices=["5minute","day"],default="5minute")
+    p.add_argument("--interval",choices=["minute","5minute","day"],default="5minute")
     p.add_argument("--payload")
     a=p.parse_args(argv)
     try:

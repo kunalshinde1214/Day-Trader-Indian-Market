@@ -6,7 +6,7 @@ Created and maintained by **Kunal Shinde**. This repository contains the reusabl
 
 [![Offline validation](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml/badge.svg)](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml)
 
-**Release: 0.9.6-dependent-replay-alpha.** Includes a fifteen-skill Claude plugin, credential-free public-market research and the broker-bound paper workflows. Live execution starts disabled. The full production specification is unfinished, and no authenticated broker acceptance or real-trade validation is claimed. See [release status](references/release-status.md) and [remaining requirements](references/requirements.md).
+**Release: 0.9.7-india-expansion-alpha.** Includes a fifteen-skill Claude plugin, credential-free public-market research and the broker-bound paper workflows. Live execution starts disabled. The full production specification is unfinished, and no authenticated broker acceptance or real-trade validation is claimed. See [release status](references/release-status.md) and [remaining requirements](references/requirements.md).
 
 > **Use this skill at your own risk.** Trading can lose money; derivatives and leverage can cause losses beyond the amount you expected to risk. Outputs are informational tools, not investment advice, a recommendation, a promise of returns or a suitability assessment. Verify every data point, instrument, quantity, price and order yourself. Start with the synthetic demos and paper mode. Read the [risk disclosure](RISK_DISCLOSURE.md) before connecting an account.
 
@@ -17,7 +17,7 @@ Use Python **3.10 or newer**. Core analysis uses the Python standard library. Cl
 ```bash
 git clone https://github.com/kunalshinde1214/Day-Trader-Indian-Market.git india-day-trader
 cd india-day-trader
-python scripts/daily.py /india-daily --demo
+python scripts/daily.py india-daily --demo
 python scripts/trader.py demo --broker kite --workdir demo-kite-first
 ```
 
@@ -41,7 +41,7 @@ Market-wide news now has a [collect-and-display workflow](references/india-news.
 ```bash
 python scripts/public_market.py universe --out reports/nse-equities.json
 python scripts/public_market.py scan --symbols RELIANCE.NS TCS.NS INFY.NS --out reports/public-scan.json
-python scripts/daily.py /india-daily --collect-public
+python scripts/daily.py india-daily --collect-public
 python scripts/research.py news --symbols RELIANCE.NS TCS.NS --state reports/news-seen.sqlite
 ```
 
@@ -59,10 +59,10 @@ These fetch real public data when available; they do not use the synthetic demo.
 Each supports pre-open, intraday and close reports, previous-session levels, completed-candle scenarios, optional constituent breadth and event coverage. Missing or stale data stays visible. Spot-index levels do not imply an executable futures/options contract.
 
 ```bash
-python scripts/daily.py /nifty --demo --phase preopen
-python scripts/daily.py /sensex --demo --phase close
-python scripts/daily.py /banknifty --demo --format json
-python scripts/daily.py /india-daily --input trader/daily-input.json --out reports/india-daily-new.md
+python scripts/daily.py nifty --demo --phase preopen
+python scripts/daily.py sensex --demo --phase close
+python scripts/daily.py banknifty --demo --format json
+python scripts/daily.py india-daily --input trader/daily-input.json --out reports/india-daily-new.md
 ```
 
 The last command needs your sourced input file. For automatic Kite index reads, configure your local credentials and a verified session calendar, then follow [daily report setup](references/daily.md). `--with-context` adds constituent quotes and partial NSE announcement coverage; it does not establish complete market-news or event clearance. Do not use `--demo` as a substitute for unavailable real data.
@@ -119,7 +119,7 @@ Upstox/FYERS use a separate SDK environment; follow [streaming setup](references
 
 ```bash
 python scripts/release.py --check
-python scripts/release.py --out dist/india-day-trader-0.9.6-dependent-replay-alpha.zip
+python scripts/release.py --out dist/india-day-trader-0.9.7-india-expansion-alpha.zip
 ```
 
 The release command runs the offline suite and checks Python syntax, JSON and packaged documentation links. It builds an allowlisted ZIP with file hashes and refuses to overwrite an existing archive. Research documents, account files, journals, dependencies, logs and generated demos are excluded. GitHub Actions runs the same checks on Python 3.10, 3.12 and 3.13; inspect the linked run for its actual result. Passing synthetic tests does not prove broker connectivity, live reliability or profitability.
