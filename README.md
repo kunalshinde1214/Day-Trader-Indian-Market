@@ -30,7 +30,28 @@ Historical ranges are **observed outcomes, not forecasts**. A rule match is not 
 
 ### Claude Code plugin
 
-Requires **Python 3.10+**. In Claude Code:
+Requires **Claude Code**, **Git** and **Python 3.10+** installed. For a first-time install, paste this single line into your **terminal** (macOS/Linux Bash or Zsh, Windows PowerShell 7+, or Command Prompt):
+
+```bash
+claude plugin marketplace add kunalshinde1214/Day-Trader-Indian-Market && claude plugin install india-day-trader@kunal-india-trading
+```
+
+This registers the marketplace and installs all 16 plugin skills for your user account. The install step runs only if marketplace registration succeeds. Open a new Claude Code session after installation. It does not configure brokerage credentials or enable live trading.
+
+<details>
+<summary>Windows PowerShell 5.1, or marketplace already added?</summary>
+
+Windows PowerShell 5.1 does not support `&&`. Use this one-line equivalent:
+
+```powershell
+claude plugin marketplace add kunalshinde1214/Day-Trader-Indian-Market; if ($LASTEXITCODE -eq 0) { claude plugin install india-day-trader@kunal-india-trading }
+```
+
+If you already added this marketplace, run only `claude plugin install india-day-trader@kunal-india-trading`.
+
+</details>
+
+Alternatively, inside an existing Claude Code session, run these two commands separately:
 
 ```text
 /plugin marketplace add kunalshinde1214/Day-Trader-Indian-Market
