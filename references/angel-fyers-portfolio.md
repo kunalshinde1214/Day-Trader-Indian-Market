@@ -1,5 +1,7 @@
 # Angel One and FYERS carry-account collection
 
+Development after 0.9.9: the collector now includes detailed `execution_orders` for the separate [human-operated reducing-order workflow](angel-fyers-execution.md). Collection itself remains read-only and does not authorize orders. Inventory restrictions below still apply.
+
 `scripts/broker_portfolio.py` provides read-only collectors for the two brokers. Both require a complete same-day master and a reviewed [opening statement](portfolio.md). They produce accounting evidence, not execution authorization. Authenticated acceptance has not been performed.
 
 ```text

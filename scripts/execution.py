@@ -238,7 +238,9 @@ class ExecutionStore:
         if action.get("product", "MIS") != row["product"]:
             return False
         if action["kind"] == "cancel":
-            return action["order_id"] == row["order_id"]
+            return action["order_id"] == row["order_id"] and action.get("variety") == row.get("variety")
+        if action["broker"] == "angel" and row.get("variety") != ("STOPLOSS" if action["kind"] == "stop" else "NORMAL"):
+            return False
         return (action["side"] == row["side"] and action["quantity"] == row["quantity"] and
                 number(action["price"]) == number(row["price"]) and
                 number(action.get("trigger_price", 0)) == number(row["trigger_price"]) and

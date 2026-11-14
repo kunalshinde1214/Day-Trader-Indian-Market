@@ -1,5 +1,7 @@
 # Kite reducing exits from mixed inventory
 
+Development after 0.9.9: [Angel One/FYERS reducing actions](angel-fyers-execution.md) now use this workflow with broker-specific products, continuous-session evidence and unchanged collector restrictions.
+
 Added in 0.9.9: [Dhan reducing actions](dhan-execution.md) are also available through the shared workflow. They preserve CNC/MARGIN/INTRADAY wire products, use Dhan's reconciled collector and require exact placement-session evidence.
 
 Added in 0.9.9: [Upstox reducing actions](upstox-execution.md) now use this workflow with broker-specific product mapping, the Upstox reconciled collector and a required placement-session gate. The Kite instructions below retain their existing behavior.
@@ -16,7 +18,7 @@ The [Kite portfolio collector](kite-portfolio.md) rereads holdings, net/day posi
 
 Identity includes **exchange, symbol, token and product**. Ten CNC shares and five MIS shares of the same stock are separate positions; a CNC sale cannot use the MIS quantity. Any working order in the selected product must be cancelled and observed terminal before a replacement exit. Orders in another product do not reserve the selected product's units, but unknown order states anywhere in the account block reconciliation. Quantity cannot exceed the reconciled position, must be a whole lot, and must respect the supplied same-day freeze limit. Prices must align to the instrument tick.
 
-The workflow supports reducing LIMIT orders and individual cancellations only. No MARKET order, batch flatten, slicing, reversal or carry-entry transport is enabled. Broker RMS remains authoritative, and local reconciliation cannot prevent an external actor from changing the account after the final read. Use one controlled account work directory and avoid concurrent manual or other-system trading during approval/submission.
+The workflow supports reducing LIMIT orders, stop-limit orders and individual cancellations only. No MARKET order, batch flatten, slicing, reversal or carry-entry transport is enabled. Broker RMS remains authoritative, and local reconciliation cannot prevent an external actor from changing the account after the final read. Use one controlled account work directory and avoid concurrent manual or other-system trading during approval/submission.
 
 ## Setup
 

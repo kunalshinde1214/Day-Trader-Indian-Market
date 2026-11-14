@@ -44,8 +44,8 @@ def wire_payload(action):
     if i["broker"] != broker:
         raise Block("BROKER: instrument mismatch")
     product = action.get("product", "MIS")
-    if product != "MIS" and (broker not in {"kite","upstox","dhan"} or action["kind"] not in {"exit","stop"} or product not in {"CNC","NRML"}):
-        raise Block("PRODUCT: carry transport supports Kite/Upstox/Dhan reducing limit exits and stops only")
+    if product != "MIS" and (action["kind"] not in {"exit","stop"} or product not in {"CNC","NRML"}):
+        raise Block("PRODUCT: carry transport supports reducing limit exits and stops only")
     if product == "CNC" and i["kind"] != "equity" or product == "NRML" and i["kind"] == "equity":
         raise Block("PRODUCT: instrument/product mismatch")
     p = {**i, "account_id": action["account_id"], "product": product, "side": action["side"], "entry": action["price"]}
@@ -53,6 +53,10 @@ def wire_payload(action):
     if broker == 'upstox' and product in {'CNC','NRML'}:
         result['product'] = 'D'
     if broker == 'dhan' and product in {'CNC','NRML'}:
+        result['productType'] = 'CNC' if product == 'CNC' else 'MARGIN'
+    if broker == 'angel' and product in {'CNC','NRML'}:
+        result['producttype'] = 'DELIVERY' if product == 'CNC' else 'CARRYFORWARD'
+    if broker == 'fyers' and product in {'CNC','NRML'}:
         result['productType'] = 'CNC' if product == 'CNC' else 'MARGIN'
     if action["kind"] == "stop":
         trigger, limit = positive(action["trigger_price"]), positive(action["price"])

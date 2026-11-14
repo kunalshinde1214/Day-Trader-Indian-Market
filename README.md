@@ -86,6 +86,8 @@ For a ZIP install, download both release assets into the same folder. Before ext
 
 ## What is implemented
 
+**Development after the 0.9.9 ZIP:** Angel One and FYERS reducing carry exits, stops and cancellation are now implemented and offline-tested on the main development line. See [their execution guide](references/angel-fyers-execution.md). The versioned release matrix below describes the published ZIP.
+
 **0.9.9 public alpha** includes the following. “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
 
 | Capability | Available now | Boundary |

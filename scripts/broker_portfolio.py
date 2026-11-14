@@ -1,5 +1,6 @@
 """Angel One/FYERS read-only carry collectors; accounting only, no execution."""
 import argparse
+import copy
 from collections import defaultdict
 import json
 from pathlib import Path
@@ -123,6 +124,7 @@ def normalize(raw,opening,instruments,now):
     finally:j.close()
     if not report['inventory_reconciled']:raise Block('CARRY: inventory did not reconcile')
     return {'schema':'portfolio_collection_v1','opening':opening,'snapshot':snapshot,'fills':batch,'report':report,
+            'execution_orders':copy.deepcopy(orders),
             'raw_hash':fingerprint(raw),'opening_hash':fingerprint(opening),'execution_eligible':False,'submitted':False,'authenticated_acceptance':False}
 
 

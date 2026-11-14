@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — sequential completion work
+
+- Add Angel One/FYERS reducing carry exits, stop-limits and cancellation, preserving native products, exact session/delivery evidence and complete account reconciliation. Add sixteen simulated regression cases; the full suite passes 797 tests.
+- Tighten recovery to match cancellation variety and Angel placement variety.
+
 ## 0.9.9-broker-workflows-alpha — 14 November 2026
 
 - Redesign the repository README with original self-contained SVG artwork, a research-workflow illustration, install paths and a current feature matrix. Include the visuals in validated release archives.
