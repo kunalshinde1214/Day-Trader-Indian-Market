@@ -8,11 +8,12 @@ import re
 import subprocess
 import sys
 import zipfile
+import xml.etree.ElementTree as ET
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION="0.9.8-stock-analysis-alpha"
+VERSION="0.9.9-broker-workflows-alpha"
 ROOT_FILES={"SKILL.md","README.md","LICENSE","THIRD_PARTY_NOTICES.md","RISK_DISCLOSURE.md","SECURITY.md","CONTRIBUTING.md","CHANGELOG.md",".gitignore",".gitattributes","requirements-dev.txt","requirements-streaming.txt","requirements-streaming-sdk.txt"}
-DIR_TYPES={"scripts":{'.py'},"tests":{'.py'},"references":{'.md'},"assets":{'.json'},"agents":{'.yaml'},"third-party":{'.LICENSE'},".github":{'.yml'},".claude-plugin":{'.json'},"skills":{'.md'}}
+DIR_TYPES={"scripts":{'.py'},"tests":{'.py'},"references":{'.md'},"assets":{'.json','.svg'},"agents":{'.yaml'},"third-party":{'.LICENSE'},".github":{'.yml'},".claude-plugin":{'.json'},"skills":{'.md'}}
 DENY={"__pycache__","research","test-output","trader",".git",".env",".venv","node_modules"}
 
 
@@ -49,6 +50,12 @@ def static_checks(root=ROOT):
     for path in files:
         content=path.read_text(encoding="utf-8-sig")
         if path.suffix==".py":ast.parse(content,filename=str(path))
+        if path.suffix=='.svg':
+            svg=ET.fromstring(content)
+            if svg.tag!='{http://www.w3.org/2000/svg}svg' or not svg.get('viewBox'):raise ValueError('SVG root/viewBox missing')
+            for element in svg.iter():
+                if element.tag.rsplit('}',1)[-1] in {'script','foreignObject','image','use'}:raise ValueError('SVG must be self-contained static vector artwork')
+                if any(k.lower().startswith('on') or k.rsplit('}',1)[-1]=='href' for k in element.attrib):raise ValueError('SVG active/external attributes refused')
         if path.suffix==".json":json.loads(content,parse_constant=lambda x:(_ for _ in ()).throw(ValueError("Nonfinite JSON")))
         if path.suffix==".md":
             for href in re.findall(r"\[[^\]]*\]\(([^)]+)\)",content):

@@ -1,4 +1,4 @@
-"""Human-operated Kite reducing exits from reconciled mixed inventory. Disabled by default."""
+"""Human-operated Kite/Upstox/Dhan reducing actions from reconciled mixed inventory. Disabled by default."""
 import argparse
 import copy
 import json
@@ -18,7 +18,7 @@ from trader import read
 def reconcile(collection, instruments, now):
     if collection.get('schema')!='portfolio_collection_v1':raise Block('MIXED_EXIT: collector bundle required')
     source=collection['snapshot']
-    if source.get('broker')!='kite' or source.get('source')!='kite':raise Block('MIXED_EXIT: Kite collector required')
+    if source.get('broker') not in ('kite','upstox','dhan') or source.get('source')!=source['broker']:raise Block('MIXED_EXIT: supported broker collector required')
     for part in ('opening','fills'):
         if any(collection[part].get(k)!=source.get(k) for k in ('broker','account_id')):
             raise Block('MIXED_EXIT: opening/fill account mismatch')
@@ -50,10 +50,10 @@ def reconcile(collection, instruments, now):
     return snapshot, report
 
 
-def prepare(collection, instruments, instrument, config, profile, now, *, product, kind='exit', quantity=None, price=None, order_id=None, delivery=None, trigger=None, quote=None):
+def prepare(collection, instruments, instrument, config, profile, now, *, product, kind='exit', quantity=None, price=None, order_id=None, delivery=None, trigger=None, quote=None, session=None):
     broker,account=config['broker'],config['account_id']
-    if broker!='kite' or product not in ('MIS','CNC','NRML') or kind not in ('exit','stop','cancel'):
-        raise Block('MIXED_EXIT: Kite reducing limit/stop/cancel only')
+    if broker not in ('kite','upstox','dhan') or product not in ('MIS','CNC','NRML') or kind not in ('exit','stop','cancel'):
+        raise Block('MIXED_EXIT: supported broker reducing limit/stop/cancel only')
     profile_check(profile,broker,account,now)
     if profile.get('mixed_inventory_reducing_exits') is not True:
         raise Block('MIXED_EXIT: separate explicit live-profile opt-in required')
@@ -71,7 +71,7 @@ def prepare(collection, instruments, instrument, config, profile, now, *, produc
     if any(word in str(source).lower() for source in opening_sources for word in ('synthetic','fictional','demo')):
         raise Block('MIXED_EXIT: synthetic opening evidence cannot authorize execution')
     snapshot,report=reconcile(collection,instruments,now)
-    if snapshot['account_id']!=account:raise Block('MIXED_EXIT: account mismatch')
+    if snapshot['account_id']!=account or snapshot['broker']!=broker:raise Block('MIXED_EXIT: account/broker mismatch')
     fresh(snapshot['as_of'],now,30,'mixed account snapshot')
     key=tuple(instrument[k] for k in FIELDS[:3])+(product,)
     action={'kind':kind,'broker':broker,'account_id':account,'instrument':copy.deepcopy(instrument),'product':product}
@@ -80,6 +80,10 @@ def prepare(collection, instruments, instrument, config, profile, now, *, produc
         if len(found)!=1 or found[0]['status'] not in ('OPEN','PARTIAL'):raise Block('MIXED_EXIT: exact working product/order required')
         action.update(order_id=order_id,variety=found[0]['variety'],expected_order=copy.deepcopy(found[0]))
     else:
+        if broker in ('upstox','dhan'):
+            # Upstox can infer AMO from session time; require current continuous-session evidence.
+            from session_policy import validate
+            validate(session,instrument,config,now)
         matches=[r for r in snapshot['positions'] if tuple(r[k] for k in FIELDS)==key and r['quantity']]
         if len(matches)!=1:raise Block('MIXED_EXIT: exact nonzero product position required')
         position=matches[0]
@@ -109,7 +113,7 @@ def prepare(collection, instruments, instrument, config, profile, now, *, produc
     economics={'config':config,'opening':collection['opening'],'fills':collection['fills'],
                'positions':[{k:v for k,v in r.items() if k!='mark_as_of'} for r in collection['snapshot']['positions']],
                'delivery':delivery if product=='CNC' and kind in ('exit','stop') else None,
-               'stop_quote':quote if kind=='stop' else None}
+               'stop_quote':quote if kind=='stop' else None,'instrument_session':session if broker in ('upstox','dhan') else None}
     review={'action':action,'payload':wire_payload(action),'state_hash':snapshot['state_hash'],
             'baseline_order_ids':[r['order_id'] for r in snapshot['orders']],
             'bundle_hash':fingerprint(review_data(economics)),'profile_hash':fingerprint(profile)}
@@ -124,17 +128,25 @@ def main(argv=None):
     p.add_argument('--kind',choices=('exit','stop'),default='exit');p.add_argument('--trigger')
     p.add_argument('--workdir',required=True);p.add_argument('--opening',required=True);p.add_argument('--master',required=True)
     p.add_argument('--product',choices=('MIS','CNC','NRML'),required=True);p.add_argument('--quantity',type=int);p.add_argument('--price')
-    p.add_argument('--order-id');p.add_argument('--intent-id');p.add_argument('--delivery-authorization')
+    p.add_argument('--order-id');p.add_argument('--intent-id');p.add_argument('--delivery-authorization');p.add_argument('--session')
     a=p.parse_args(argv);store=None
     try:
         from kite_readonly import KiteReadOnly
         w=Path(a.workdir);initial=read(w/'config.json')
-        if initial['broker']!='kite':raise Block('MIXED_EXIT: currently Kite only')
-        client=KiteReadOnly();store=ExecutionStore(w/'state/execution.sqlite');approval=TerminalApproval()
+        if initial['broker'] not in ('kite','upstox','dhan'):raise Block('MIXED_EXIT: currently Kite/Upstox/Dhan only')
+        from broker import adapter
+        client=KiteReadOnly() if initial['broker']=='kite' else adapter(initial['broker'])
+        store=ExecutionStore(w/'state/execution.sqlite');approval=TerminalApproval()
         def current():
             config=read(w/'config.json');instrument=read(w/'instrument.json');instruments=read(a.master)['instruments']
             if (config['broker'],config['account_id'])!=(initial['broker'],initial['account_id']):raise Block('MIXED_EXIT: selected account changed')
-            collection=fetch(client,config['account_id'],read(a.opening),instruments,execution_details=True)
+            if config['broker']=='kite':collection=fetch(client,config['account_id'],read(a.opening),instruments,execution_details=True)
+            elif config['broker']=='upstox':
+                from upstox_portfolio import fetch as fetch_upstox
+                collection=fetch_upstox(client,config['account_id'],read(a.opening),instruments)
+            else:
+                from dhan_portfolio import fetch as fetch_dhan
+                collection=fetch_dhan(client,config['account_id'],read(a.opening),instruments)
             return config,instrument,instruments,collection
         def refresh():
             config,instrument,instruments,collection=current()
@@ -145,12 +157,13 @@ def main(argv=None):
                 quote=normalize_quote(client.quotes([quote_key(instrument)]),instrument,instant(),30)
             return prepare(collection,instruments,instrument,config,read(w/'live-profile.json'),instant(),product=a.product,
                            kind=kind,quantity=a.quantity,price=a.price,order_id=a.order_id,trigger=a.trigger,quote=quote,
-                           delivery=read(a.delivery_authorization) if a.delivery_authorization else None)
+                           delivery=read(a.delivery_authorization) if a.delivery_authorization else None,
+                           session=read(a.session) if a.session else None)
         if a.command in ('status','bind'):
             config,instrument,instruments,collection=current();snapshot,report=reconcile(collection,instruments,instant())
             result=store.bind(a.intent_id,a.order_id,snapshot,approval) if a.command=='bind' else {'intents':store.observe(snapshot,instant()),'portfolio':report,'submitted':False}
         elif a.command=='preview':result,_=refresh();result['submitted']=False
-        else:result=execute(store,LiveBroker('kite',client),approval,refresh)
+        else:result=execute(store,LiveBroker(initial['broker'],client),approval,refresh)
         print(json.dumps(result,indent=2,allow_nan=False));return 0
     except (Block,ValueError,KeyError,TypeError,OSError,sqlite3.Error,KeyboardInterrupt):
         print(json.dumps({'status':'BLOCK_OR_UNKNOWN','reason':'Mixed-inventory check or action failed. Inspect the shared execution log and broker book; never retry an ambiguous submission.'}));return 2

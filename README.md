@@ -1,97 +1,123 @@
+![Day Trader — Indian Market. Read the market. Question the setup. Plan the risk.](assets/repo-hero.svg)
+
 # Day Trader — Indian Market
 
-**An AI assistant skill for the Indian stock market.** Ask Claude about any NSE/BSE stock, get daily Nifty, Sensex and Bank Nifty reports, read market news, scan for trade setups and plan paper trades with proper risk and cost checks.
-
-Created and maintained by **Kunal Shinde**. Free for personal use.
+**An Indian-market research desk inside your AI assistant.** Analyse stocks, prepare Nifty / Sensex / Bank Nifty briefings, follow linked news and test paper-trade plans—with dated sources and missing evidence made visible.
 
 [![Offline validation](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml/badge.svg)](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml)
+![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-244b3f)
+![Public alpha](https://img.shields.io/badge/Release-public_alpha-bb702b)
 
-> **Important:** this is research software, not investment advice. Research commands do not trade. Separate live tools include human-approved orders and an experimental, explicitly human-armed [bounded protection runner](references/protection-controller.md). Live use is disabled by default and has not passed authenticated production acceptance. Markets can move against any analysis, and trading can lose money. Read the [risk disclosure](RISK_DISCLOSURE.md).
+[Install](#install) · [See the workflow](#from-question-to-research) · [Feature matrix](#what-is-implemented) · [Download 0.9.9](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.9.9-broker-workflows-alpha) · [Documentation](#go-deeper)
 
-## Install (Claude Code)
+Created by **Kunal Shinde**. Source-available and free for personal use. Public research needs **no brokerage account or API key**. Broker workflows use **your own account**, with credentials kept locally.
+
+## From question to research
+
+![Illustrative workflow: ask for Reliance analysis; review price context, company figures, linked news and historical ranges; receive a dated brief with missing evidence identified. Not a live report.](assets/repo-workflow.svg)
+
+| Ask the skill | What it prepares |
+| --- | --- |
+| “Analyse Reliance. What data is missing?” | Trend, relative returns, available financial ratios, linked news and historical return ranges |
+| “Give me today’s Nifty, Sensex and Bank Nifty briefing.” | Completed-bar context, reference levels and conditional scenarios |
+| “What changed in Indian-market news?” | Source-linked headlines, timestamps and disclosure candidates |
+| “Scan these stocks for opening-range breakouts.” | Deterministic rule matches with explicit input requirements |
+| “Size this paper plan for my ₹2,000 risk budget.” | Whole-unit / whole-lot sizing with configured costs and risk checks |
+
+Historical ranges are **observed outcomes, not forecasts**. A rule match is not a buy/sell recommendation. Reports depend on available history and source coverage; missing data is flagged rather than replaced with demo figures.
+
+## Install
+
+### Claude Code plugin
+
+Requires **Python 3.10+**. In Claude Code:
 
 ```text
 /plugin marketplace add kunalshinde1214/Day-Trader-Indian-Market
 /plugin install india-day-trader@kunal-india-trading
 ```
 
-You need **Python 3.10 or newer** on your computer. No broker account, API key or subscription is needed for the research features.
+Then ask naturally, or use a namespaced command:
 
-## What you can ask
+```text
+/india-day-trader:stock-analysis RELIANCE
+/india-day-trader:india-daily
+/india-day-trader:nifty
+```
 
-Just talk to Claude normally. Some examples:
+There are **16 plugin skills**: eleven trading-workflow roles, four daily aliases and one-stock analysis. See the [command reference](references/commands.md). For other skill-compatible hosts, download the release ZIP, unpack `india-day-trader`, and follow that host’s skill installation process. Claude plugin installation is not a universal installer for other hosts.
 
-| You say | You get |
-| --- | --- |
-| "Analyse Reliance" | Full report: price vs Nifty, trend, P/E, ROE, debt, growth, recent news and likely price ranges |
-| "Is TCS expensive right now?" | Valuation ratios explained against growth and returns |
-| "Where is HDFC Bank heading?" | Trend, support/resistance and the range the stock usually moves in over a week, month and quarter |
-| "How is the market today?" | Nifty 50, Sensex and Bank Nifty side by side |
-| "Nifty levels for today" | Previous-day high/low/close, opening range and bullish/bearish trigger levels |
-| "Latest market news" | NSE announcements and market headlines with timestamps |
-| "Scan INFY, TCS and WIPRO for breakouts" | Which stocks match opening-range, gap, breakout, flag or oversold patterns |
-| "Any insider or promoter activity in Adani Ports?" | Recent promoter, insider, pledge and bulk/block deal disclosures |
-| "How many shares can I buy risking ₹2,000?" | Position size in shares or lots, with brokerage and taxes included |
+### Python CLI
 
-You can also type a command directly: `/india-day-trader:stock-analysis`, `/india-day-trader:nifty`, `/india-day-trader:india-daily` and so on. There are [16 commands](references/public-workflows.md) in total.
-
-## Stock analysis
-
-The `stock-analysis` command builds a one-page report for any Indian stock:
-
-- **Market:** latest price, 1-month / 3-month / 1-year returns against the Nifty 50, 52-week range
-- **Condition:** trend from the 20/50/200-day averages, RSI, volatility, volume, support and resistance
-- **Ratios:** market cap, P/E, P/B, ROE, margins, debt/equity, current ratio, interest cover, free-cash-flow and dividend yield, revenue and EPS growth
-- **News:** headlines from the last 7 days (Google News, Yahoo and NSE)
-- **Outlook:** where the price has typically been after 1 week, 1 month and 3 months, based on the stock's own last two years, plus the levels that would confirm a bullish or bearish move
-
-The outlook is a range of historical outcomes, not a prediction or a price target. Every figure shows its date, and anything missing or out of date is flagged instead of guessed.
-
-## Use it without Claude
-
-All features are plain Python scripts. Clone the repository and run them from the folder:
+Clone the repository, or open the folder from the [release ZIP](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.9.9-broker-workflows-alpha):
 
 ```bash
 git clone https://github.com/kunalshinde1214/Day-Trader-Indian-Market.git india-day-trader
 cd india-day-trader
+python scripts/daily.py nifty --demo
 python scripts/stock_analysis.py RELIANCE
 python scripts/daily.py india-daily --collect-public
-python scripts/india_news.py
-python scripts/public_market.py scan --symbols RELIANCE.NS TCS.NS INFY.NS --out reports/scan.json
 ```
 
-If `python` is not found, use `python3` (macOS/Linux) or `py` (Windows). To try everything with made-up data first, run `python scripts/daily.py nifty --demo` or `python scripts/trader.py demo --broker kite --workdir demo-first`.
+The `--demo` command uses **fictional demo data**. The last two fetch public data and need internet access. Use `python3` on macOS/Linux or `py` on Windows if `python` is unavailable. Core CLI workflows use the Python standard library; optional streaming and document-extraction paths have [additional requirements](references/operations.md).
 
-## Where the data comes from
+For a ZIP install, download both release assets into the same folder. Before extracting, run `sha256sum -c india-day-trader-0.9.9-broker-workflows-alpha.zip.sha256` on Linux, or `shasum -a 256 -c india-day-trader-0.9.9-broker-workflows-alpha.zip.sha256` on macOS. In Windows PowerShell, run `Get-FileHash .\india-day-trader-0.9.9-broker-workflows-alpha.zip -Algorithm SHA256` and compare the hash with the `.sha256` file. Extract the ZIP, open its `india-day-trader` folder, then run the Python commands above.
 
-Free public sources: Yahoo Finance for prices and company financials, NSE for announcements, and Google News for headlines. Prices can be about 15 minutes delayed, and free feeds sometimes fail or change. When that happens the report says so rather than inventing numbers.
+## What is implemented
 
-## Trading workflows (advanced)
+**0.9.9 public alpha** includes the following. “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
 
-For active traders there is a full paper-trading pipeline: **scan → entry → plan → replay → size → risk → ticket**. It covers six intraday setups and calculates Indian brokerage, STT, GST and stamp duty. It sizes in whole lots, replays the plan against past sessions, and checks it against your own daily loss limits.
+| Capability | Available now | Boundary |
+| --- | --- | --- |
+| Stock research | Price context, Nifty comparison, technicals, available ratios and news | Source availability and financial-statement coverage vary |
+| Daily briefings | India daily, Nifty, Sensex, Bank Nifty; pre-open / intraday / close modes | Public feeds can be delayed; membership and breadth are partial |
+| Scanning & paper plans | Six scanners; one-/five-minute ORB and custom levels; replay, sizing and risk checks | Other scanner rules remain five-minute; results are research |
+| News & filings | RSS discovery, deduplication, attachment extraction, supported XBRL and filing backlog | Not comprehensive exchange or historical coverage |
+| Repeated collection | Bounded foreground runs, saved reports, shared backlog and stop latch | No automatic service installation; partial sources stay partial |
+| Broker data | Kite, Upstox, Dhan, Angel One and FYERS adapters | User login, entitlements and account-specific checks required |
+| Carry accounting | Supported subsets across five broker collectors | T1, pledged, MTF and unresolved adjustments block |
+| Carry reducing orders | **Kite, Upstox and Dhan** exits, stop-limits and cancellation | Human-operated; no new mixed-inventory entries; Angel/FYERS execution pending |
+| Risk models | Depth stress; Kite cash-equity depth sampling; basket prefixes, scenarios and quantity grids | Other-broker basket margin and queue/market-impact models pending |
+| Protection | Experimental single-instrument intraday runner, explicitly human-armed and bounded | Disabled by default; not production-accepted or guaranteed to flatten |
+| User setup | Disabled profiles, read-only probes and acceptance-evidence inventory | Each user supplies and verifies their own environment |
 
-It can also read data from your own **Kite, Upstox, Dhan, Angel One or FYERS** account using your API keys, which stay on your computer. Start with [broker setup](references/user-setup.md).
+The paper workflow is **scan → plan → replay → size → risk → ticket**. Replay supports independent, contiguous-block and whole-session sampling; quantity grids explore explicit partial-fill combinations rather than assuming every basket fills together.
 
-A separate live-order tool exists but is **switched off by default**. You must enable it yourself and type two confirmations for every order; the AI is never allowed to type them for you. It has not yet been tested against a real broker account, and API trading in India must follow SEBI's retail algo rules (see the [risk disclosure](RISK_DISCLOSURE.md)).
+## Your account. Your controls.
 
-## Documentation
+The publisher does not supply a trading account. Public research works without one. To prepare your own broker workflow:
 
-- [Skill instructions](SKILL.md) and [all commands](references/commands.md)
-- [Public research workflows](references/public-workflows.md), [daily reports](references/daily.md), [news](references/india-news.md)
-- [Setup definitions](references/setups.md), [broker setup](references/brokers.md), [live execution](references/execution.md)
-- [What's finished and what isn't](references/release-status.md), [changelog](CHANGELOG.md), [roadmap](references/requirements.md)
-- [Security](SECURITY.md), [contributing](CONTRIBUTING.md)
+```bash
+python scripts/user_setup.py --broker upstox --account-id YOUR_NONSECRET_ACCOUNT_ID --out trader/live-profile.json
+```
 
-## For developers
+This creates a **disabled** profile and refuses overwrite. It does not log in, save credentials or mark acceptance passed. Follow [user setup](references/user-setup.md) and [acceptance evidence](references/acceptance-evidence.md); keep keys and tokens out of chat, Git and reports.
+
+Ordinary execution requires two human confirmations and fresh checks. The separate [protection runner](references/protection-controller.md) uses a human-armed, expiring authorization with action caps. Never enable it merely to try a demo. Ambiguous requests stay locked without automatic resubmission. Stop-limits and cutoff exits may not fill.
+
+## Release evidence, not performance claims
+
+This checkpoint has **781 passing offline tests**, including simulated broker responses and failure cases. Release validation checks Python syntax, JSON, local links and an explicit packaging allowlist. GitHub CI tests Python **3.10, 3.12 and 3.13**; the [release](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.9.9-broker-workflows-alpha) includes a ZIP and SHA-256 checksum.
 
 ```bash
 python scripts/release.py --check
 ```
 
-This runs the full offline test suite and checks syntax, JSON and documentation links. CI runs it on Python 3.10, 3.12 and 3.13. Tests use simulated data only, so passing them does not prove broker connectivity or trading profitability.
+Offline tests do **not** prove live broker acceptance, profitability or production reliability. No publisher brokerage account, real acceptance trade or production service was used. See [release status](references/release-status.md) for the exact scope.
 
-## License
+## Go deeper
 
-**Free for personal use; source-available, not open source.** You can download, run and modify it for your own learning, research and trading. You can't resell it, redistribute it, or run it as a service for other people without permission. See the [license](LICENSE) for the exact terms.
+| Explore | Documentation |
+| --- | --- |
+| Research | [Daily reports](references/daily.md) · [News](references/india-news.md) · [Public workflows](references/public-workflows.md) |
+| Trading logic | [Setup definitions](references/setups.md) · [Execution](references/execution.md) · [Risk/data expansion](references/india-expansion.md) |
+| Carry execution | [Kite](references/mixed-inventory-exits.md) · [Upstox](references/upstox-execution.md) · [Dhan](references/dhan-execution.md) |
+| Project | [Changelog](CHANGELOG.md) · [Requirements](references/requirements.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) |
 
-This project builds on Jake Schincariol's MIT-licensed [day-trader-skill](third-party/day-trader-skill.LICENSE); see [third-party notices](THIRD_PARTY_NOTICES.md). Not affiliated with or endorsed by NSE, BSE, SEBI or any broker.
+**Still on the roadmap:** Angel/FYERS carry execution; unsupported inventory and settlement/corporate-action automation; new mixed-inventory entries; comprehensive BSE/calendar/surveillance/filing coverage; deeper execution-cost and other-broker margin models; broader protection coordination. User account acceptance is separate from this engineering roadmap.
+
+## License & responsible use
+
+**Source-available, not open source.** Original contributions are free for personal use under the [personal-use license](LICENSE). Redistribution, resale and hosted services require permission under those terms. Third-party MIT rights remain intact; this project builds on Jake Schincariol’s [day-trader-skill](third-party/day-trader-skill.LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md).
+
+Use at your own risk. This is research software, not investment advice; trading can lose money. Follow your broker’s permissions and applicable requirements. Read the [risk disclosure](RISK_DISCLOSURE.md). Not affiliated with or endorsed by NSE, BSE, SEBI or any broker.

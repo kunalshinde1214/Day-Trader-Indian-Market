@@ -1,5 +1,7 @@
 # End-user acceptance evidence
 
+Generate a disabled local profile with `python scripts/user_setup.py --broker BROKER --account-id NONSECRET_ACCOUNT_ID --out trader/live-profile.json`. This writes no credentials, refuses overwrite, and leaves all execution/automation flags false with acceptance `NOT_TESTED`. Users complete their own broker login and observed checks before enabling any live workflow.
+
 The publisher does not need a broker account to distribute the package. Each user must test their own account, entitlements, host and operating environment. Never publish their evidence files or credentials in the release archive.
 
 Use `scripts/acceptance.py --broker BROKER --authenticated-readonly --instrument trader/instrument.json --account-id ACCOUNT --out private/broker-readonly.json` for the supported account and quote/history probe. This reads data and does not place an acceptance trade. Public-master probes cannot substitute for authenticated acceptance.

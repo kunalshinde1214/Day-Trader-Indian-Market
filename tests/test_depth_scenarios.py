@@ -82,5 +82,18 @@ class ScenarioTests(unittest.TestCase):
                 quote(self.client,self.bundle,clock=lambda:self.now)
         self.client.account.assert_not_called()
 
+    def test_grid_enumerates_all_nonempty_partial_fill_combinations(self):
+        self.bundle['fill_grid']=[[0,5,10],[0,5,10]]
+        result=quote(self.client,self.bundle,clock=lambda:self.now)
+        actual={tuple(r['quantities']) for r in result['fill_scenario_estimates']}
+        self.assertEqual(actual,{(a,b) for a in (0,5,10) for b in (0,5,10) if a or b})
+        self.assertEqual(self.client.request.call_count,10)
+
+    def test_oversized_or_empty_grid_blocks_before_reads(self):
+        for grid in ([[0],[0]],[list(range(10)),list(range(10))],[[0,0],[0,5]],[[0],[11]]):
+            self.bundle['fill_grid']=grid
+            with self.subTest(grid=grid),self.assertRaises(Block):quote(self.client,self.bundle,clock=lambda:self.now)
+        self.client.account.assert_not_called()
+
 
 if __name__=='__main__':unittest.main()

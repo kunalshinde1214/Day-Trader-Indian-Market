@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 720" role="img" aria-labelledby="t d">
+<title id="t">From a question to a research brief</title><desc id="d">Illustrative workflow, not a live report. Ask for Reliance analysis. Review price context, company figures, linked news and historical ranges. Receive a dated brief with missing evidence identified. Public research does not submit orders.</desc>
+<rect width="960" height="720" fill="#f7f2e7"/>
+<text x="48" y="76" font-family="Georgia,serif" font-size="38" fill="#142923">One question. A clearer research brief.</text>
+<text x="48" y="114" font-family="Arial,sans-serif" font-size="18" fill="#5c6357">ILLUSTRATIVE WORKFLOW · NO LIVE PRICES OR PERFORMANCE CLAIMS</text>
+<rect x="48" y="151" width="864" height="92" rx="6" fill="#142923"/>
+<text x="76" y="190" font-family="Arial,sans-serif" font-size="19" fill="#f2a65a">YOU ASK</text><text x="76" y="224" font-family="Georgia,serif" font-size="27" fill="#fff8e9">“Analyse Reliance. Show me what is missing, too.”</text>
+<path d="M78 243V280" stroke="#947347" stroke-width="2"/>
+<g font-family="Arial,sans-serif" fill="#142923"><text x="48" y="316" font-size="26">Price context</text><text x="440" y="316" font-size="22">Trend, volatility and returns vs Nifty</text><path d="M48 338H912" stroke="#c7c9b9"/><text x="48" y="377" font-size="26">Company figures</text><text x="440" y="377" font-size="22">Ratios, growth and reporting dates</text><path d="M48 399H912" stroke="#c7c9b9"/><text x="48" y="438" font-size="26">Market news</text><text x="440" y="438" font-size="22">Linked headlines and source timestamps</text><path d="M48 460H912" stroke="#c7c9b9"/><text x="48" y="499" font-size="26">Historical ranges</text><text x="440" y="499" font-size="22">Observed outcomes, not forecasts</text></g>
+<path d="M78 521V557" stroke="#947347" stroke-width="2"/><rect x="48" y="557" width="864" height="106" rx="6" fill="#e5e9dc"/>
+<text x="76" y="599" fill="#142923" font-family="Georgia,serif" font-size="29">A dated brief. Missing evidence stays visible.</text><text x="76" y="634" fill="#42594b" font-family="Arial,sans-serif" font-size="21">Research does not submit orders. You decide what to investigate next.</text>
+<text x="48" y="700" fill="#5c6357" font-family="Arial,sans-serif" font-size="18">INDIA DAY TRADER / PUBLIC RESEARCH WORKFLOW</text>
+</svg>

@@ -1,0 +1,11 @@
+# Dhan mixed-inventory reducing actions
+
+The 0.9.9 `portfolio_exit.py` workflow now accepts a Dhan work directory for reducing limit exits, stop-limits and cancellation. It uses the existing repeated-read [Dhan collector](dhan-portfolio.md), reviewed opening evidence and exact current instrument master. Canonical CNC maps to Dhan `CNC`, NRML to `MARGIN`, and MIS to `INTRADAY`. Products and accounts are never netted. New carry entries, MTF, T1, pledged inventory, linked/bracket orders and product conversion remain unsupported.
+
+Use the same user-owned setup and command structure as [Upstox execution](upstox-execution.md), selecting `--broker dhan` when generating the disabled profile. Credentials remain in the user's local environment and login happens through the broker. No publisher account is required. Dhan placement/cancellation requires the user's applicable API permissions and static-IP configuration; the software does not grant these permissions.
+
+Supply `--session` for any new exit or stop placement and `--delivery-authorization` for CNC reductions. Cancellation does not need placement-session evidence. Set the exact account-specific mixed-inventory acceptance record only after the user actually performs their checks. Preview sends no order; the human-operated terminal asks twice and recollects before submission. Stops require a fresh exact quote, tick-aligned trigger and strictly worse limit. Same-product working orders block replacements until terminal cancellation; partial fills reduce remaining units. The shared execution log preserves ambiguous submissions without retries.
+
+The six offline Dhan execution tests cover delivery/derivative mapping, partial sales, same-symbol product separation, stop/session/delivery gates, cancellation and product-aware recovery, and a simulated CLI submission. Existing Dhan collector tests continue to cover unsupported inventory and read consistency. No authenticated account or real order was used.
+
+Source checked 14 November 2026: [Dhan order contracts](https://dhanhq.co/docs/v2/orders/). End users perform their own [acceptance checks](acceptance-evidence.md); documentation and simulated responses do not establish live broker acceptance.

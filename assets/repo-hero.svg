@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-labelledby="t d">
+<title id="t">Day Trader — Indian Market</title><desc id="d">Read the market. Question the setup. Plan the risk. Research, daily briefings and paper workflows for NSE and BSE. Sixteen commands and five broker adapters.</desc>
+<rect width="1200" height="600" fill="#142923"/><path d="M0 0H1200" stroke="#f2a65a" stroke-width="10"/>
+<g fill="none" stroke="#345047"><path d="M824 0V600M900 0V600M976 0V600M1052 0V600M1128 0V600M824 100H1200M824 200H1200M824 300H1200M824 400H1200M824 500H1200"/></g>
+<text x="64" y="112" fill="#f7f0df" font-family="Georgia,serif" font-size="72">Day Trader</text>
+<text x="66" y="164" fill="#f2a65a" font-family="Arial,sans-serif" font-size="30" letter-spacing="5">INDIAN MARKET</text>
+<g fill="#f7f0df" font-family="Georgia,serif" font-size="45"><text x="64" y="270">Read the market.</text><text x="64" y="327">Question the setup.</text><text x="64" y="384">Plan the risk.</text></g>
+<g font-family="Arial,sans-serif" fill="#c6d6cb" font-size="22"><text x="66" y="448">Research · Daily briefings · Paper workflows</text><text x="66" y="482">Built for NSE / BSE. Designed for your own account.</text></g>
+<g transform="translate(876 102)" fill="none" stroke="#f2a65a" stroke-width="4"><path d="M0 0H238V300H0Z"/><path d="M38 62H193M38 107H159M38 152H193M38 197H129M38 242H171" stroke="#c6d6cb" stroke-width="3"/><circle cx="197" cy="297" r="53" fill="#142923"/><path d="m174 296 17 18 31-39" stroke-width="5"/></g>
+<path d="M64 528H1136" stroke="#5b7264"/><g font-family="Arial,sans-serif" font-size="20" fill="#f7f0df"><text x="66" y="568">16 COMMANDS</text><text x="344" y="568">5 BROKER ADAPTERS</text><text x="734" y="568">RESEARCH FIRST. LIVE OPT-IN.</text></g>
+</svg>

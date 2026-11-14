@@ -124,6 +124,7 @@ def normalize(raw,opening,instruments,now):
     finally:journal.close()
     if not report['inventory_reconciled']:raise Block('DHAN_PORTFOLIO: inventory did not reconcile')
     return {'schema':'portfolio_collection_v1','opening':opening,'snapshot':snapshot,'fills':batch,'report':report,
+            'execution_orders':[dict(row) for row in orders],
             'raw_hash':fingerprint(raw),'opening_hash':fingerprint(opening),'execution_eligible':False,
             'submitted':False,'authenticated_acceptance':False}
 

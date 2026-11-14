@@ -1,8 +1,12 @@
 # Kite reducing exits from mixed inventory
 
+Added in 0.9.9: [Dhan reducing actions](dhan-execution.md) are also available through the shared workflow. They preserve CNC/MARGIN/INTRADAY wire products, use Dhan's reconciled collector and require exact placement-session evidence.
+
+Added in 0.9.9: [Upstox reducing actions](upstox-execution.md) now use this workflow with broker-specific product mapping, the Upstox reconciled collector and a required placement-session gate. The Kite instructions below retain their existing behavior.
+
 The 0.9.8 implementation also supports reducing stop-limits. Use `preview --kind stop --trigger PRICE` with the ordinary product, quantity, limit and delivery-evidence arguments, then the human-operated `stop --trigger PRICE` command. Each review fetches a fresh exact broker quote. A sell trigger must be below the quote with a strictly lower limit; a buy trigger must be above the quote with a strictly higher limit. A reached/off-tick trigger, insufficient delivery authorization or any same-product working order blocks. Stop-limits may remain unfilled after triggering and do not create exchange OCO protection. Other brokers and unsupported inventory states remain blocked.
 
-Unreleased development capability. This separate human-operated workflow can reduce a supported Kite CNC, NRML or MIS position while the same account contains other supported holdings or positions. It cannot open new trades, net different accounts, convert products, automate confirmations or guarantee fills. It is disabled without explicit profile opt-in and account-specific acceptance evidence. No authenticated acceptance has been performed by the publisher.
+Supported alpha capability. This separate human-operated workflow can reduce a supported Kite CNC, NRML or MIS position while the same account contains other supported holdings or positions. It cannot open new trades, net different accounts, convert products, automate confirmations or guarantee fills. It is disabled without explicit profile opt-in and account-specific acceptance evidence. No authenticated acceptance has been performed by the publisher.
 
 ## Evidence and controls
 

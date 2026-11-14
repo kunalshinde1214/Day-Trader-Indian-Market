@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.9-broker-workflows-alpha — 14 November 2026
+
+- Redesign the repository README with original self-contained SVG artwork, a research-workflow illustration, install paths and a current feature matrix. Include the visuals in validated release archives.
+
+- Extend reducing carry execution to Dhan with CNC/MARGIN product mapping, session checks and product-aware recovery; unsupported inventory remains blocked.
+
+- Add Upstox mixed-inventory reducing exits/stops/cancellation with product-aware recovery and explicit placement-session evidence.
+- Add bounded repeat public collection with immutable cycle reports and persistent filing backlog.
+- Add bounded partial-fill quantity grids for exact Kite basket-margin scenario queries.
+- Add a disabled-profile generator for all five brokers; publisher brokerage credentials are not required.
+
 ## 0.9.8 — protection operations
 
 - Record terminal runner health after completion, exhaustion or failure; test revocation between cycles and flat observations.

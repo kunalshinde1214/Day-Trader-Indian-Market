@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+from itertools import product as combinations
 from core import Block, instant, fingerprint, integer, positive, number, validate_instrument, on_tick
 
 
@@ -28,6 +29,20 @@ def quote(client, bundle, clock=instant):
         orders.append({"exchange":i["exchange"],"tradingsymbol":i["symbol"],"transaction_type":leg["side"],
                        "variety":"regular","product":leg["product"],"order_type":"LIMIT","quantity":qty,"price":float(price),"trigger_price":0})
     scenarios=bundle.get('fill_scenarios',[])
+    grid=bundle.get('fill_grid')
+    if grid is not None:
+        if scenarios or not isinstance(grid,list) or len(grid)!=len(orders):raise Block('BASKET: choose explicit scenarios or one grid axis per leg')
+        combinations_count=1;axes=[]
+        for axis,order,leg in zip(grid,orders,legs):
+            if not isinstance(axis,list) or not 1<=len(axis)<=41:raise Block('BASKET: bounded nonempty grid axis required')
+            axis=[integer(q,minimum=0) for q in axis]
+            if len(set(axis))!=len(axis) or any(q>order['quantity'] or q%integer(leg['instrument']['lot_size']) for q in axis):
+                raise Block('BASKET: invalid grid quantity/duplicate/lot')
+            axes.append(axis);combinations_count*=len(axis)
+        # Bound before materializing Cartesian products; the empty basket is omitted.
+        if combinations_count-int(all(0 in axis for axis in axes))>40:raise Block('BASKET: grid exceeds forty nonempty scenarios')
+        scenarios=[list(row) for row in combinations(*axes) if any(row)]
+        if not scenarios:raise Block('BASKET: grid contains no exposure')
     if not isinstance(scenarios,list) or len(scenarios)>40:raise Block('BASKET: at most forty explicit fill scenarios')
     scenario_orders=[];scenario_keys=set()
     for quantities in scenarios:
