@@ -1,19 +1,12 @@
 INDIA DAY TRADER PERSONAL USE LICENSE
-Version 1.2 — 8 November 2026
+Version 1.3 — 13 November 2026
 
-Skill creator and maintainer: Kunal Shinde.
-
-Creator attribution is not a declaration of copyright ownership, a waiver
-of any existing rights, or a transfer of rights from another author.
+Copyright (c) 2026 Kunal Shinde. All rights reserved except as granted below.
 
 1. Scope and third-party materials
 
-This license applies only to India Day Trader code, documentation and other
-project contributions that Kunal Shinde is legally authorized to license
-under these terms (the "Covered Materials"). It does not establish that
-authority merely by naming the skill's creator. Material for which such
-authority is absent is not brought under this license by its inclusion in
-the project. Verify licensing authority before distributing the release.
+This license covers the India Day Trader code, documentation and other
+original contributions by Kunal Shinde (the "Covered Materials").
 
 This license does not claim ownership of third-party materials or replace
 their licenses. Materials originating from Jake Schincariol's
@@ -28,7 +21,7 @@ research is transferred or claimed.
 
 2. Free personal-use permission
 
-To the extent of that licensing authority, Kunal Shinde grants you, as an
+Kunal Shinde grants you, as an
 individual, a worldwide, royalty-free,
 non-exclusive license to download, make private copies of, install, run,
 inspect and privately modify the Covered Materials solely for your own
@@ -80,12 +73,9 @@ personal-use permission.
 5. Attribution, retained rights and access credentials
 
 This license grants permission to use within its stated scope; it does not
-transfer copyright or other ownership. Rights remain with their respective
-holders. Kunal Shinde is credited as the creator and maintainer of this
-skill, without asserting ownership of every included component.
-No activation or license key
-is required for the personal-use permission granted by this version. API
-credentials for a user's broker account are separate and must not be shared.
+transfer copyright or other ownership. No activation or license key is
+required. API credentials for a user's broker account are separate and must
+not be shared.
 
 6. Termination
 
@@ -121,7 +111,6 @@ lawfully be excluded or restricted.
 8. Separate permissions
 
 Uses outside the personal-use permission require separate written
-permission from the relevant rights holder or an authorized licensor.
-Kunal Shinde may grant such permission only within his licensing authority.
-No permission is implied merely because a
+permission from Kunal Shinde (or, for third-party material, its rights
+holder). No permission is implied merely because a
 repository is publicly readable or a copy can be downloaded.

@@ -2,6 +2,18 @@
 
 Daily briefings now support `/india-daily`, `/nifty`, `/sensex` and `/banknifty` through `scripts/daily.py`. See [daily reports](daily.md) for one-command Kite collection and offline examples. For broker trade imports, provisional-fee reserves, supervised polling and opt-in webhook delivery, see [account/service operations](account-service.md).
 
+## One-stock analysis
+
+```text
+python scripts/stock_analysis.py RELIANCE
+python scripts/stock_analysis.py RELIANCE --format json --out reports/reliance.json
+python scripts/stock_analysis.py TCS --news-hours 72
+```
+
+Accepts an NSE symbol (`.NS` is added) or a Yahoo `.NS`/`.BO` ticker. Public BSE history is often under the 60-session minimum, so prefer the NSE symbol. It reads two years of daily prices for the stock and the Nifty 50, plus company financials from the Yahoo fundamentals timeseries, Google News search RSS, and the Yahoo/NSE feeds used by `research.py news`. The report covers the snapshot, relative returns, technical condition, ratios, news and outlook. The outlook gives the 10th/50th/90th percentiles of the stock's own overlapping 1-week, 1-month and 3-month returns applied to the current price, plus 20/60-day and 52-week reference levels. It is not a forecast. The newest EPS (trailing or annual) is used, and splits or bonuses after that date are flagged. Missing benchmark, financials or news become `errors`/`failures` entries; missing price history blocks with exit code 2. Output has `execution_eligible: false`.
+
+## Broker paper pipeline
+
 Run from the skill directory with Python 3.10+. The analysis CLI remains offline. Broker adapters, explicitly enabled watcher polling, public collectors, acceptance probes and margin proposals can make bounded read-only network requests. All filenames below are relative to `--workdir`. `init` writes example config and a broker-matching charge card/template and refuses to replace either. `demo` requires an empty/new output directory. Analysis output files are atomically replaced on rerun; inputs are preserved. See [broker setup and schema-v2 migration](brokers.md).
 
 ```powershell

@@ -10,7 +10,7 @@ import sys
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION="0.9.7-india-expansion-alpha"
+VERSION="0.9.8-stock-analysis-alpha"
 ROOT_FILES={"SKILL.md","README.md","LICENSE","THIRD_PARTY_NOTICES.md","RISK_DISCLOSURE.md","SECURITY.md","CONTRIBUTING.md","CHANGELOG.md",".gitignore",".gitattributes","requirements-dev.txt","requirements-streaming.txt","requirements-streaming-sdk.txt"}
 DIR_TYPES={"scripts":{'.py'},"tests":{'.py'},"references":{'.md'},"assets":{'.json'},"agents":{'.yaml'},"third-party":{'.LICENSE'},".github":{'.yml'},".claude-plugin":{'.json'},"skills":{'.md'}}
 DENY={"__pycache__","research","test-output","trader",".git",".env",".venv","node_modules"}
@@ -38,12 +38,13 @@ def static_checks(root=ROOT):
         raise ValueError("Plugin identity/version/skills mismatch")
     if marketplace.get("name")!="kunal-india-trading" or marketplace["plugins"][0].get("source")!="./" or marketplace["plugins"][0].get("name")!=plugin["name"]:
         raise ValueError("Marketplace identity/source mismatch")
-    expected={"trader-"+n for n in ("scanner","news","entry","exit","timemachine","budget","risk","broker","alerts","analyst","whales")}|{"india-daily","nifty","sensex","banknifty"}
+    expected={"trader-"+n for n in ("scanner","news","entry","exit","timemachine","budget","risk","broker","alerts","analyst","whales")}|{"india-daily","nifty","sensex","banknifty","stock-analysis"}
     actual={p.parent.name for p in (root/"skills").glob("*/SKILL.md")}
     if actual!=expected:raise ValueError("Plugin command inventory mismatch")
     for name in expected:
         body=(root/"skills"/name/"SKILL.md").read_text(encoding="utf-8")
         if not body.startswith("---\nname: "+name+"\n") or not re.search(r"^description: .+",body,re.M):raise ValueError("Plugin skill frontmatter invalid")
+        if ": " in re.search(r"^description: (.+)$",body,re.M).group(1):raise ValueError("Plugin skill description contains ': ', which breaks unquoted YAML: "+name)
     links=0
     for path in files:
         content=path.read_text(encoding="utf-8-sig")
@@ -69,10 +70,11 @@ def static_checks(root=ROOT):
 def package(out,root=ROOT):
     checks=static_checks(root)
     files=release_files(root)
-    manifest={"version":VERSION,"mode":"paper-and-human-operated-execution-alpha","full_specification_complete":False,
+    manifest={"version":VERSION,"mode":"paper-human-execution-and-opt-in-bounded-protection-alpha","full_specification_complete":False,
+              "unattended_protection":"experimental single-instrument intraday runner; explicit human arming and account acceptance required; not production tested",
               "daily_commands":["/india-daily","/nifty","/sensex","/banknifty"],"portfolio_accounting":"canonical plus five limited broker collectors; reviewed opening and supported provider conventions required",
               "streaming":"five broker tradable quote adapters; authenticated acceptance pending","deployment":"render only; not installed",
-              "claude_plugin_commands":15,"public_research":True,
+              "claude_plugin_commands":checks["claude_plugin_commands"],"public_research":True,
               "live_enabled_by_default":False,"authenticated_execution_tested":False,
               "authenticated_broker_acceptance":False,"files":{p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in files}}
     out=Path(out);out.parent.mkdir(parents=True,exist_ok=True)

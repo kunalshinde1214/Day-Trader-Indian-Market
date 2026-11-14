@@ -50,10 +50,10 @@ def reconcile(collection, instruments, now):
     return snapshot, report
 
 
-def prepare(collection, instruments, instrument, config, profile, now, *, product, kind='exit', quantity=None, price=None, order_id=None, delivery=None):
+def prepare(collection, instruments, instrument, config, profile, now, *, product, kind='exit', quantity=None, price=None, order_id=None, delivery=None, trigger=None, quote=None):
     broker,account=config['broker'],config['account_id']
-    if broker!='kite' or product not in ('MIS','CNC','NRML') or kind not in ('exit','cancel'):
-        raise Block('MIXED_EXIT: Kite reducing limit exit/cancel only')
+    if broker!='kite' or product not in ('MIS','CNC','NRML') or kind not in ('exit','stop','cancel'):
+        raise Block('MIXED_EXIT: Kite reducing limit/stop/cancel only')
     profile_check(profile,broker,account,now)
     if profile.get('mixed_inventory_reducing_exits') is not True:
         raise Block('MIXED_EXIT: separate explicit live-profile opt-in required')
@@ -98,20 +98,30 @@ def prepare(collection, instruments, instrument, config, profile, now, *, produc
                 raise Block('DELIVERY_AUTH: current account/quantity authorization required')
             fresh(delivery.get('as_of'),now,30,'delivery authorization evidence')
         action.update(side=side,quantity=q,price=float(limit))
+        if kind=='stop':
+            if not isinstance(quote,dict) or quote.get('source')!=broker or any(str(quote.get(k))!=str(instrument[k]) for k in ('exchange','symbol','token')):
+                raise Block('MIXED_STOP: exact broker quote required')
+            fresh(quote.get('as_of'),now,30,'mixed stop quote')
+            trigger=positive(trigger)
+            if not on_tick(trigger,instrument['tick_size']) or not (trigger<positive(quote['price']) if side=='SELL' else trigger>positive(quote['price'])):
+                raise Block('MIXED_STOP: trigger reached or off tick')
+            action['trigger_price']=float(trigger)
     economics={'config':config,'opening':collection['opening'],'fills':collection['fills'],
                'positions':[{k:v for k,v in r.items() if k!='mark_as_of'} for r in collection['snapshot']['positions']],
-               'delivery':delivery if product=='CNC' and kind=='exit' else None}
+               'delivery':delivery if product=='CNC' and kind in ('exit','stop') else None,
+               'stop_quote':quote if kind=='stop' else None}
     review={'action':action,'payload':wire_payload(action),'state_hash':snapshot['state_hash'],
             'baseline_order_ids':[r['order_id'] for r in snapshot['orders']],
             'bundle_hash':fingerprint(review_data(economics)),'profile_hash':fingerprint(profile)}
     return {**review,'review_hash':fingerprint(review),'as_of':now.isoformat(),
             'inventory_reconciled':True,'fees_final':report['fees_final'],
-            'warning':'Real reducing LIMIT order for the selected product only. Broker acknowledgement is not a fill; delivery authorization and broker RMS can still reject it.'},snapshot
+            'warning':'Real reducing order for the selected product only. Stop-limits may not fill. Broker acknowledgement is not a fill; delivery authorization and broker RMS can still reject it.'},snapshot
 
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('command',choices=('preview','exit','cancel','status','bind'))
+    p.add_argument('command',choices=('preview','exit','stop','cancel','status','bind'))
+    p.add_argument('--kind',choices=('exit','stop'),default='exit');p.add_argument('--trigger')
     p.add_argument('--workdir',required=True);p.add_argument('--opening',required=True);p.add_argument('--master',required=True)
     p.add_argument('--product',choices=('MIS','CNC','NRML'),required=True);p.add_argument('--quantity',type=int);p.add_argument('--price')
     p.add_argument('--order-id');p.add_argument('--intent-id');p.add_argument('--delivery-authorization')
@@ -128,8 +138,13 @@ def main(argv=None):
             return config,instrument,instruments,collection
         def refresh():
             config,instrument,instruments,collection=current()
+            kind='cancel' if a.command=='cancel' else 'stop' if a.command=='stop' else a.kind if a.command=='preview' else 'exit'
+            quote=None
+            if kind=='stop':
+                from broker_data import normalize_quote,quote_key
+                quote=normalize_quote(client.quotes([quote_key(instrument)]),instrument,instant(),30)
             return prepare(collection,instruments,instrument,config,read(w/'live-profile.json'),instant(),product=a.product,
-                           kind='cancel' if a.command=='cancel' else 'exit',quantity=a.quantity,price=a.price,order_id=a.order_id,
+                           kind=kind,quantity=a.quantity,price=a.price,order_id=a.order_id,trigger=a.trigger,quote=quote,
                            delivery=read(a.delivery_authorization) if a.delivery_authorization else None)
         if a.command in ('status','bind'):
             config,instrument,instruments,collection=current();snapshot,report=reconcile(collection,instruments,instant())

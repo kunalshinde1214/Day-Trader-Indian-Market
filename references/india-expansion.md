@@ -57,6 +57,14 @@ Set `require_instrument_session: true` to require `context.instrument_session` i
 
 ## Rules checked on 11 November 2026
 
+### Additional implementation
+
+`python scripts/depth_collect.py --instrument trader/instrument.json --out depth-new.json --interval 2` collects two read-only Kite cash-equity observations and derives traded units from the cumulative-volume difference. It validates instrument identity, depth timestamps, ordering, tick sizes, uncrossed prices and a same-session 1–300 second window. Save the resulting object as `context.liquidity` when using the optional stress model. Derivative-volume conventions and other broker depth collectors remain unsupported; displayed liquidity is not a fill guarantee.
+
+Basket input can include `fill_scenarios`, a list of up to forty quantity vectors in leg order, such as `[[0, 5], [5, 10]]` for two legs. Each vector must contain valid whole-lot units no larger than the proposed leg. The read-only Kite basket estimator quotes those exact partial baskets as well as ordered prefixes and retains the largest observed requirement. Unenumerated scenarios remain unknown. Sources: [Kite market quotes](https://kite.trade/docs/connect/v3/market-quotes/) and [Kite margins](https://kite.trade/docs/connect/v3/margins/).
+
+See the [protection controller and bounded runner](protection-controller.md) and [end-user acceptance inventory](acceptance-evidence.md) for operating workflows and unresolved acceptance requirements.
+
 - [NSE retail-algo framework](https://www.nseindia.com/static/trade/platform-services-non-neat-decision-support-tools-algorithm-trading) and [NSE retail API FAQ](https://nsearchives.nseindia.com/web/sites/default/files/inline-files/FAQ_Retail%20Algo_03112025_NSE.pdf): API orders require the applicable broker/exchange handling. This skill does not grant registration, tagging or static-IP approval. Existing live transports remain human-operated and disabled by default.
 - [SEBI implementation timeline](https://www.sebi.gov.in/sebi_data/attachdocs/sep-2025/1759232056254.pdf): the retail-algo framework became applicable to all stock brokers from April 2026; a historical implementation exemption cannot be presumed.
 - [NSE CAS](https://www.nseindia.com/market-data/closing-auction-session) and [market timings](https://www.nseindia.com/static/market-data/market-timings): current cash CAS, ordinary cash and derivative windows differ. General pages are not interchangeable with dated, instrument-specific circulars. Do not infer all instruments close at 15:30 or treat an auction as continuous trading. Existing research code still has regular-session assumptions outside the optional risk session gate; special-session/full-close modelling remains incomplete.
@@ -67,7 +75,7 @@ Set `require_instrument_session: true` to require `context.instrument_session` i
 ## Still required for the requested complete scope
 
 1. Comprehensive permitted data sources, BSE-specific feeds, surveillance and automatic effective-date/session reconstruction.
-2. Deeper execution-cost/queue models, automatic normalized depth collection and other-broker portfolio-margin integration.
+2. Deeper execution-cost/queue models, depth collection beyond the implemented Kite cash-equity subset and other-broker portfolio-margin integration. Explicit Kite partial-fill basket scenarios are implemented; unenumerated fill sequences remain unknown.
 3. Broader settlement/T1/pledged/MTF and corporate-action handling, new mixed-inventory entries and other brokers' carry execution. A separate [Kite mixed-inventory reducing-exit workflow](mixed-inventory-exits.md) is now implemented with per-action human review; existing conservative collectors still block unsupported inventory states.
-4. A separately authorized, accepted unattended protection/auto-flatten execution design. This increment does not bypass the existing per-action human approvals or install an automatic service.
+4. Production acceptance and broader coordination of unattended protection/auto-flatten. The separate [bounded runner](protection-controller.md) implements one-instrument intraday operation under explicit human arming, expiry and action caps. It does not install a service or guarantee flatness.
 5. End-user authenticated broker, installed-host invocation and production-service acceptance. The publisher has no broker account; offline tests cannot supply this evidence.

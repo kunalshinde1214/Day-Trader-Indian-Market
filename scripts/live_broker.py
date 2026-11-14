@@ -44,8 +44,8 @@ def wire_payload(action):
     if i["broker"] != broker:
         raise Block("BROKER: instrument mismatch")
     product = action.get("product", "MIS")
-    if product != "MIS" and (broker != "kite" or action["kind"] != "exit" or product not in {"CNC","NRML"}):
-        raise Block("PRODUCT: carry transport supports Kite reducing limit exits only")
+    if product != "MIS" and (broker != "kite" or action["kind"] not in {"exit","stop"} or product not in {"CNC","NRML"}):
+        raise Block("PRODUCT: carry transport supports Kite reducing limit exits and stops only")
     if product == "CNC" and i["kind"] != "equity" or product == "NRML" and i["kind"] == "equity":
         raise Block("PRODUCT: instrument/product mismatch")
     p = {**i, "account_id": action["account_id"], "product": product, "side": action["side"], "entry": action["price"]}

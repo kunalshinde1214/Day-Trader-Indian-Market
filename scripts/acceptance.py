@@ -43,6 +43,7 @@ def main(argv=None):
                 margin=client.margin(read(a.payload))
                 if margin.get("account_id")!=a.account_id:raise Block("PROBE: margin account mismatch")
                 checks["exact_payload_margin_hash"]=margin["payload_hash"]
+            result["account_id"]=a.account_id
             result["scope"]="Selected instrument/session reads only; not execution or full-broker certification"
         result.update(status="PASS",checks=checks)
         encoded=json.dumps(result,indent=2);out.parent.mkdir(parents=True,exist_ok=True)

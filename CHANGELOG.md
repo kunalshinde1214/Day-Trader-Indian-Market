@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.9.8 — protection operations
+
+- Record terminal runner health after completion, exhaustion or failure; test revocation between cycles and flat observations.
+- Add a local acceptance-evidence inventory with account, hash and freshness checks. Missing end-user broker, installed-host and production evidence remains explicit; reports never authorize execution.
+- Document the existing opt-in bounded runner, depth collector and partial-fill margin scenarios, including their acceptance limits.
+- Extend supported Kite mixed-inventory reducing actions with stop-limits, exact fresh broker quotes and delivery checks. Other-broker carry execution, comprehensive data coverage and real-account acceptance remain unfinished.
+
+## 0.9.8-stock-analysis-alpha
+
+- Add `stock-analysis`: a one-stock report with price vs Nifty 50, trend/RSI/volatility/support/resistance, financial ratios (P/E, P/B, ROE, margins, debt/equity, current ratio, interest cover, FCF and dividend yield, growth), 7-day news from Google News, Yahoo and NSE, and an outlook built from the stock's own historical 1-week/1-month/3-month return ranges with bull/bear levels. Uses the newest EPS and flags later splits/bonuses, stale figures and bank-style statements. 11 offline tests.
+- Rewrite the README in plain language with example prompts and install steps; consolidate the skill's repeated caveats into one safety section.
+- Rewrite all plugin skill descriptions with the phrases users actually type; add a `python3`/`py` fallback to every skill; release checks now reject `: ` in skill descriptions, which breaks YAML.
+- License 1.3: plain copyright line for original contributions; third-party MIT rights unchanged.
+- Risk disclosure: add SEBI's retail algo-trading framework and what it requires of API orders.
+
 ## 0.9.7-india-expansion-alpha
 
 - Fix daily plugin routes on Windows: call `daily.py nifty` (no leading slash), since Git Bash rewrites `/nifty` into a filesystem path.

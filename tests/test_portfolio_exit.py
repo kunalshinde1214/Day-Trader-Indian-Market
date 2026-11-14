@@ -36,6 +36,27 @@ class MixedExitTests(unittest.TestCase):
         self.raw['verification']=copy.deepcopy({k:self.raw[k] for k in ROUTES})
         return normalize(self.raw,self.opening,self.master,NOW,execution_details=True)
 
+    def test_carry_stop_uses_delivery_product_and_trigger(self):
+        quote={**{k:self.i[k] for k in ('exchange','symbol','token')},'source':'kite','as_of':NOW.isoformat(),'price':130}
+        review,_=self.review(kind='stop',trigger=125,quote=quote)
+        self.assertEqual(review['payload']['product'],'CNC')
+        self.assertEqual(review['payload']['order_type'],'SL')
+        self.assertEqual(review['payload']['trigger_price'],125)
+        self.assertEqual(review['action']['quantity'],4)
+
+    def test_carry_stop_rejects_stale_wrong_and_reached_quotes(self):
+        quote={**{k:self.i[k] for k in ('exchange','symbol','token')},'source':'kite','as_of':NOW.isoformat(),'price':130}
+        for changed in ({'token':'wrong'},{'as_of':(NOW-timedelta(seconds=31)).isoformat()},{'price':125}):
+            with self.subTest(changed=changed),self.assertRaises(Block):self.review(kind='stop',trigger=125,quote={**quote,**changed})
+
+    def test_carry_stop_does_not_bypass_delivery_or_working_orders(self):
+        quote={**{k:self.i[k] for k in ('exchange','symbol','token')},'source':'kite','as_of':NOW.isoformat(),'price':130}
+        self.delivery['authorized_quantity']=1
+        with self.assertRaises(Block):self.review(kind='stop',trigger=125,quote=quote)
+        self.delivery['authorized_quantity']=10
+        collection=self.collection();self.working(collection)
+        with self.assertRaises(Block):self.review(collection,kind='stop',trigger=125,quote=quote)
+
     def review(self,collection=None,product='CNC',quantity=4,**kwargs):
         return prepare(collection or self.collection(),self.master,self.i,self.c,self.profile,NOW,
                        product=product,quantity=quantity,price=120,delivery=self.delivery,**kwargs)

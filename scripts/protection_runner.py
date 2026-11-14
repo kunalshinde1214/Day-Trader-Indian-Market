@@ -101,7 +101,7 @@ def run(w, *, cycles=12, interval=5, clock=instant, sleep=time.sleep):
     w=Path(w);cycles=integer(cycles);interval=integer(interval)
     if cycles>8640 or not 5<=interval<=60:raise Block('AUTOMATION: bounded cycles and 5..60 second interval required')
     mandate=read(w/'state/protection-mandate.json');scope_hash,values=scope(w);c=values['config']
-    store=ExecutionStore(w/'state/execution.sqlite');submitted=0;status='CYCLE_LIMIT'
+    store=ExecutionStore(w/'state/execution.sqlite');submitted=0;status='STARTING';completed=0;reason='cycle_limit'
     def check():
         current_hash,current_values=scope(w)
         if read(w/'state/protection-mandate.json')!=mandate:raise Block('MANDATE: arming changed while running')
@@ -119,16 +119,22 @@ def run(w, *, cycles=12, interval=5, clock=instant, sleep=time.sleep):
         for cycle in range(cycles):
             check();decision,_=observe(w,client,store,clock());check()
             status=decision['status']
-            if status=='FLAT_OBSERVED':break
+            completed=cycle+1
+            if status=='FLAT_OBSERVED':reason='flat_observed';break
             if decision['review'] is not None:
                 execute(store,transport,MandateApproval(check),refresh,clock=clock);submitted+=1
             write(w/'state/protection-health.json',{'as_of':clock().isoformat(),'status':status,'submitted_this_run':submitted,'cycle':cycle+1})
             if cycle+1<cycles:sleep(interval)
-        return {'status':status,'submitted_this_run':submitted,'unattended_execution':True,'flat_guaranteed':False}
+        return {'status':status,'reason':reason,'completed_cycles':completed,'submitted_this_run':submitted,'unattended_execution':True,'flat_guaranteed':False}
     except BaseException:
+        reason='failure_or_interruption'
         write(w/'state/protection-revoked.json',{'as_of':clock().isoformat(),'reason':'Runner stopped on failure/interruption; reconcile before rearming'})
         raise
-    finally:store.close()
+    finally:
+        try:
+            write(w/'state/protection-health.json',{'as_of':clock().isoformat(),'state':'stopped','last_decision':status,
+                  'reason':reason,'completed_cycles':completed,'submitted_this_run':submitted,'flat_guaranteed':False})
+        finally:store.close()
 
 
 def main(argv=None):

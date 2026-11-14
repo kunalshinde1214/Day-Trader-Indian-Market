@@ -8,6 +8,16 @@ Trading can cause substantial losses. Leverage, derivatives, gaps, illiquidity, 
 
 Check the exact broker account, exchange, instrument, expiry, product, side, quantity, price, trigger, fees and margin before every action. Remain able to use your broker's own controls if this software, your network or a data source fails. Monitoring requires an active process and working connection; a stopped process cannot protect a position. Current live actions require individual human confirmation and do not provide unattended protection or automatic flattening.
 
+## SEBI rules for API and algo trading
+
+Orders sent through a broker API in India fall under SEBI's retail algorithmic trading framework (circular of 4 February 2025), which [SEBI's implementation timeline](https://www.sebi.gov.in/sebi_data/attachdocs/sep-2025/1759232056254.pdf) applies to all stock brokers from April 2026. In short:
+
+- Your broker is responsible for every API order and must identify it with an exchange-issued algo ID. A free-form order tag is not an algo ID.
+- Brokers may require a registered static IP, a personal API key, two-factor login and daily session expiry before accepting API orders.
+- Strategies that send orders above the exchange's orders-per-second threshold must be registered with the exchange through your broker.
+
+This software does not register algos, obtain an algo ID, or confirm that your setup complies. The live tool needs a human to confirm each order, but you are still responsible for checking with your broker how its API orders are classified and what they require. See the [NSE retail-algo page](https://www.nseindia.com/static/trade/platform-services-non-neat-decision-support-tools-algorithm-trading). Research, reports and paper trading place no orders and are outside this framework.
+
 ## Data, models and AI
 
 Exchange/broker data can be unavailable, delayed, incomplete or revised. Instrument tokens, lot sizes, restrictions, sessions, fees and broker requirements can change. Missing evidence must not be treated as clearance. Verify current source evidence and permissions independently.

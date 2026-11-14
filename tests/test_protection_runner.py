@@ -69,6 +69,8 @@ class RunnerTests(unittest.TestCase):
              patch('protection_runner.LiveBroker',return_value=transport):
             result=run(self.w,cycles=1,clock=lambda:NOW,sleep=Mock())
         self.assertEqual(result['submitted_this_run'],1);transport.send.assert_called_once()
+        health=json.loads((self.w/'state/protection-health.json').read_text())
+        self.assertEqual(health['state'],'stopped');self.assertEqual(health['reason'],'cycle_limit')
         store=ExecutionStore(self.w/'state/execution.sqlite')
         try:
             records=store.records('kite','123456')
@@ -86,6 +88,7 @@ class RunnerTests(unittest.TestCase):
             with self.assertRaises(Block):run(self.w,cycles=3,clock=lambda:NOW,sleep=Mock())
         transport.send.assert_called_once()
         self.assertTrue((self.w/'state/protection-revoked.json').exists())
+        self.assertEqual(json.loads((self.w/'state/protection-health.json').read_text())['reason'],'failure_or_interruption')
         store=ExecutionStore(self.w/'state/execution.sqlite')
         try:self.assertEqual(store.records('kite','123456')[0]['state'],'UNKNOWN')
         finally:store.close()
@@ -104,6 +107,24 @@ class RunnerTests(unittest.TestCase):
             result=arm(self.w,(NOW+timedelta(hours=1)).isoformat(),2,approval=approval,clock=lambda:NOW)
         approval.approve.assert_called_once();transport.assert_not_called()
         self.assertEqual(result['status'],'ARMED');self.assertFalse(result['submitted'])
+
+    def test_flat_observation_writes_terminal_health_without_submission(self):
+        decision={'status':'FLAT_OBSERVED','review':None}
+        with patch('protection_runner.observe',return_value=(decision,self.fixture.s)),patch('protection_runner.adapter'), \
+             patch('protection_runner.LiveBroker') as transport:
+            result=run(self.w,cycles=3,clock=lambda:NOW,sleep=Mock())
+        transport.return_value.send.assert_not_called()
+        self.assertEqual(result['reason'],'flat_observed')
+        health=json.loads((self.w/'state/protection-health.json').read_text())
+        self.assertEqual(health['completed_cycles'],1);self.assertEqual(health['last_decision'],'FLAT_OBSERVED')
+
+    def test_revocation_during_sleep_blocks_next_action(self):
+        transport=Mock();transport.send.return_value={'order_id':'S1'}
+        def revoke(seconds):(self.w/'state/protection-revoked.json').write_text('{}')
+        with patch('protection_runner.observe',side_effect=self.observation),patch('protection_runner.adapter'), \
+             patch('protection_runner.LiveBroker',return_value=transport):
+            with self.assertRaises(Block):run(self.w,cycles=3,clock=lambda:NOW,sleep=revoke)
+        transport.send.assert_called_once()
 
 
 if __name__=='__main__':unittest.main()
