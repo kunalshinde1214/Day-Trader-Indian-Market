@@ -13,9 +13,10 @@ class SetupTests(unittest.TestCase):
     def test_every_broker_starts_disabled_and_unaccepted(self):
         for broker in BROKERS:
             result=profile(broker,'LOCAL-ID')
-            for flag in ('enabled','new_entries','mixed_inventory_reducing_exits','unattended_protection'):self.assertFalse(result[flag])
-            for key in ('acceptance','mixed_inventory_acceptance','automation_acceptance'):
+            for flag in ('enabled','new_entries','mixed_inventory_reducing_exits','mixed_inventory_entries','unattended_protection'):self.assertFalse(result[flag])
+            for key in ('acceptance','mixed_inventory_acceptance','mixed_entry_acceptance','automation_acceptance'):
                 self.assertEqual(result[key]['status'],'NOT_TESTED');self.assertEqual(result[key]['broker'],broker)
+            self.assertEqual(result['max_portfolio_gross_inr'],0)
 
     def test_existing_profile_is_never_overwritten(self):
         with tempfile.TemporaryDirectory() as directory,patch('sys.stdout',new_callable=io.StringIO):

@@ -26,6 +26,7 @@ Research and paper-trading tools for Indian markets, adapted from Jake Schincari
 | Streaming quotes, monitoring deployment | `scripts/streaming.py`, `scripts/market_stream.py`, `scripts/deployment.py` | [streaming and deployment](references/streaming-deployment.md) |
 | One-minute/custom-level broker entries, liquidity, basket margin, sessions | see guide | [India expansion](references/india-expansion.md) |
 | Live order previews, protection, mixed-inventory exits | `scripts/live.py`, `scripts/portfolio_exit.py` | [execution](references/execution.md), [protection](references/protection-controller.md), [mixed-inventory exits](references/mixed-inventory-exits.md) — mandatory |
+| Long MIS cash-equity entry alongside supported long CNC/MIS inventory | `scripts/mixed_entry.py` | [mixed-inventory entries](references/mixed-inventory-entries.md) — separate opt-in, complete portfolio risk and human confirmations; broader inventory remains blocked |
 | What is finished, roadmap, licensing | — | [release status](references/release-status.md), [requirements](references/requirements.md), [product spec](references/product-spec.md), [license](LICENSE), [notices](THIRD_PARTY_NOTICES.md) |
 
 Pass daily commands without the leading slash (`daily.py nifty`): Git Bash on Windows rewrites `/nifty` into a file path. These slash names are aliases inside this skill, not global commands.

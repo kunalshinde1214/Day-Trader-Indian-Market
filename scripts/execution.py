@@ -179,7 +179,7 @@ class ExecutionStore:
     def revision(self, broker, account):
         return self.db.execute("SELECT count(*) FROM intents WHERE broker=? AND account=?", (broker, account)).fetchone()[0]
 
-    def reservations(self, snapshot):
+    def reservations(self, snapshot, *, intraday_partition=False):
         """Reconstruct risk groups from observed, serialized local execution intents.
 
         Manual/foreign orders are deliberately left unmapped for journal review.
@@ -190,6 +190,7 @@ class ExecutionStore:
             if r["state"] in UNRESOLVED: raise Block("RESERVATIONS: reconcile unresolved execution first")
             a = r["review"]["action"]
             if a.get("product", "MIS") != "MIS":
+                if intraday_partition is True: continue  # Caller must independently reconcile the complete carry portfolio.
                 raise Block("RESERVATIONS: carry exits need portfolio reconciliation; never merge with intraday risk groups")
             if a["kind"] == "cancel": continue
             oid = r["order_id"]

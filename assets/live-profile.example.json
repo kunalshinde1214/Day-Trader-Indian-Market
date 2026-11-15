@@ -3,6 +3,15 @@
   "account_id": "REPLACE_WITH_LOCAL_ACCOUNT_ID",
   "enabled": false,
   "new_entries": false,
+  "mixed_inventory_entries": false,
+  "max_portfolio_gross_inr": 0,
+  "mixed_entry_acceptance": {
+    "broker": "kite",
+    "account_id": "REPLACE_WITH_LOCAL_ACCOUNT_ID",
+    "status": "NOT_TESTED",
+    "source": "",
+    "as_of": ""
+  },
   "approval_mode": "human_terminal_two_stage",
   "max_entry_notional_inr": 10000,
   "max_entry_loss_inr": 100,

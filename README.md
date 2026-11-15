@@ -90,6 +90,8 @@ For a ZIP install, download both release assets into the same folder. Before ext
 
 Development also includes [sourced inventory reconciliation](references/inventory-book.md) for T1, pledged, funded and corporate-action lots. This is accounting support, not live trading permission for those holdings. Track the remaining areas in the [ordered completion checklist](references/completion-tracker.md).
 
+A separate opt-in [mixed cash-entry workflow](references/mixed-inventory-entries.md) supports long MIS entries alongside supported long CNC/MIS exposure, with combined risk and exact margin checks. Broader mixed-entry variants remain unfinished.
+
 **0.9.9 public alpha** includes the following. “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
 
 | Capability | Available now | Boundary |

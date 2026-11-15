@@ -15,6 +15,21 @@ from portfolio_collect import fetch
 from trader import read
 
 
+def collect(client, broker, account, opening, instruments):
+    if broker == 'kite':
+        return fetch(client, account, opening, instruments, execution_details=True)
+    if broker == 'upstox':
+        from upstox_portfolio import fetch as provider
+        return provider(client, account, opening, instruments)
+    if broker == 'dhan':
+        from dhan_portfolio import fetch as provider
+        return provider(client, account, opening, instruments)
+    if broker in ('angel', 'fyers'):
+        from broker_portfolio import fetch as provider
+        return provider(client, broker, account, opening, instruments)
+    raise Block('MIXED_EXIT: unsupported broker')
+
+
 def reconcile(collection, instruments, now):
     if collection.get('schema')!='portfolio_collection_v1':raise Block('MIXED_EXIT: collector bundle required')
     source=collection['snapshot']
@@ -140,16 +155,7 @@ def main(argv=None):
         def current():
             config=read(w/'config.json');instrument=read(w/'instrument.json');instruments=read(a.master)['instruments']
             if (config['broker'],config['account_id'])!=(initial['broker'],initial['account_id']):raise Block('MIXED_EXIT: selected account changed')
-            if config['broker']=='kite':collection=fetch(client,config['account_id'],read(a.opening),instruments,execution_details=True)
-            elif config['broker']=='upstox':
-                from upstox_portfolio import fetch as fetch_upstox
-                collection=fetch_upstox(client,config['account_id'],read(a.opening),instruments)
-            elif config['broker']=='dhan':
-                from dhan_portfolio import fetch as fetch_dhan
-                collection=fetch_dhan(client,config['account_id'],read(a.opening),instruments)
-            else:
-                from broker_portfolio import fetch as fetch_other
-                collection=fetch_other(client,config['broker'],config['account_id'],read(a.opening),instruments)
+            collection=collect(client,config['broker'],config['account_id'],read(a.opening),instruments)
             return config,instrument,instruments,collection
         def refresh():
             config,instrument,instruments,collection=current()

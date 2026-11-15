@@ -130,7 +130,19 @@ def normalize(raw, instruments, now):
         result_positions.append({**ident, "product": product, "quantity": signed(row[qkey])})
     if len({(r["exchange"], r["token"]) for r in result_positions}) != len(result_positions):
         raise Block("POSITION: duplicate instrument")
-    funds = raw["margins"]
+    available = available_funds(raw)
+    # Negative funds must not prevent a reducing exit; new entries check funds separately.
+    result = {"broker": broker, "account_id": account, "source": broker, "as_of": raw["as_of"],
+              "date": instant(raw["as_of"]).date().isoformat(), "available_inr": available,
+              "orders": sorted(result_orders, key=lambda r: r["order_id"]),
+              "positions": sorted(result_positions, key=lambda r: (r["exchange"], r["token"]))}
+    result["state_hash"] = state_hash(result)
+    return result
+
+
+def available_funds(raw):
+    """Extract only broker-observed availability; this does not reconcile inventory."""
+    broker, funds = raw['broker'], raw['margins']
     if broker == "kite":
         available = funds["equity"]["available"]["live_balance"]
     elif broker == "upstox":
@@ -139,18 +151,14 @@ def normalize(raw, instruments, now):
         available = funds["availabelBalance"]
     elif broker == "angel":
         available = funds["availablecash"]
-    else:
+    elif broker == 'fyers':
         available_rows = [r for r in funds if r.get("title") == "Available Balance"]
         if len(available_rows) != 1:
             raise Block("FUNDS: unique Available Balance row required")
         available = available_rows[0]["equityAmount"]
-    # Negative funds must not prevent a reducing exit; new entries check funds separately.
-    result = {"broker": broker, "account_id": account, "source": broker, "as_of": raw["as_of"],
-              "date": instant(raw["as_of"]).date().isoformat(), "available_inr": float(number(available, minimum="-1e30")),
-              "orders": sorted(result_orders, key=lambda r: r["order_id"]),
-              "positions": sorted(result_positions, key=lambda r: (r["exchange"], r["token"]))}
-    result["state_hash"] = state_hash(result)
-    return result
+    else:
+        raise Block('FUNDS: unsupported broker')
+    return float(number(available, minimum="-1e30"))
 
 
 def consistent(snapshot):

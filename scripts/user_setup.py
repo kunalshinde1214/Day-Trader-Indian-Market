@@ -12,6 +12,7 @@ def profile(broker, account):
     return {'broker':broker,'account_id':account,'enabled':False,'new_entries':False,
             'approval_mode':'human_terminal_two_stage','max_entry_notional_inr':10000,'max_entry_loss_inr':100,
             'acceptance':evidence(),'mixed_inventory_reducing_exits':False,'mixed_inventory_acceptance':evidence(),
+            'mixed_inventory_entries':False,'mixed_entry_acceptance':evidence(),'max_portfolio_gross_inr':0,
             'unattended_protection':False,'automation_acceptance':{**evidence(),'broker_api_automation_permitted':False}}
 
 
