@@ -22,6 +22,7 @@ Research and paper-trading tools for Indian markets, adapted from Jake Schincari
 | Journal, fills, margin proposals, acceptance | `scripts/journal.py`, `scripts/margin_size.py`, `scripts/acceptance.py` | [operations](references/operations.md) |
 | Fill imports, fee reserve, polling service, notifications | `scripts/trade_import.py`, `scripts/service.py`, `scripts/delivery.py` | [account and service](references/account-service.md) |
 | Carry positions and portfolio accounting | `scripts/portfolio.py` and the broker collectors | [portfolio](references/portfolio.md) and the per-broker pages linked there |
+| T1, pledged/MTF lots and sourced non-trade inventory adjustments | `scripts/inventory_book.py` | [inventory event reconciliation](references/inventory-book.md); accounting evidence only, never sellability or order authorization |
 | Streaming quotes, monitoring deployment | `scripts/streaming.py`, `scripts/market_stream.py`, `scripts/deployment.py` | [streaming and deployment](references/streaming-deployment.md) |
 | One-minute/custom-level broker entries, liquidity, basket margin, sessions | see guide | [India expansion](references/india-expansion.md) |
 | Live order previews, protection, mixed-inventory exits | `scripts/live.py`, `scripts/portfolio_exit.py` | [execution](references/execution.md), [protection](references/protection-controller.md), [mixed-inventory exits](references/mixed-inventory-exits.md) — mandatory |

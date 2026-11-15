@@ -2,6 +2,8 @@
 
 ## Unreleased — sequential completion work
 
+- Add sourced non-trade inventory reconciliation for settled, T1, pledged, MTF and entitlement lots, with explicit settlement/pledge transfers, funded principal repayment, whole-unit split/bonus events and audited corrections. Requires local evidence hashes and exact closing-statement agreement; never authorizes orders or guesses provider conventions. Fifteen new tests; the full development suite passes 812 tests.
+
 - Add Angel One/FYERS reducing carry exits, stop-limits and cancellation, preserving native products, exact session/delivery evidence and complete account reconciliation. Add sixteen simulated regression cases; the full suite passes 797 tests.
 - Tighten recovery to match cancellation variety and Angel placement variety.
 

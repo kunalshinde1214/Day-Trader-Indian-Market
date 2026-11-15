@@ -2,6 +2,8 @@
 
 Version: **0.9.9-broker-workflows-alpha**. This is a public alpha, not the completed production specification. See the [README feature matrix](../README.md#what-is-implemented) for the maintained capability summary.
 
+For work after this immutable release, see the [sequential development checklist](completion-tracker.md). The sections below describe the 0.9.9 ZIP, not subsequent local changes.
+
 ## Included in this release
 
 - Redesigned README with original self-contained SVG cover and illustrative research workflow, accessible descriptions and clear install paths.

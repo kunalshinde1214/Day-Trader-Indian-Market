@@ -88,6 +88,8 @@ For a ZIP install, download both release assets into the same folder. Before ext
 
 **Development after the 0.9.9 ZIP:** Angel One and FYERS reducing carry exits, stops and cancellation are now implemented and offline-tested on the main development line. See [their execution guide](references/angel-fyers-execution.md). The versioned release matrix below describes the published ZIP.
 
+Development also includes [sourced inventory reconciliation](references/inventory-book.md) for T1, pledged, funded and corporate-action lots. This is accounting support, not live trading permission for those holdings. Track the remaining areas in the [ordered completion checklist](references/completion-tracker.md).
+
 **0.9.9 public alpha** includes the following. “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
 
 | Capability | Available now | Boundary |
