@@ -7,7 +7,7 @@ Development status after the published 0.9.9 ZIP. Updated 15 November 2026. Loca
 | 1 | Other-broker carry execution | Implemented for supported Angel/FYERS inventory; [guide](angel-fyers-execution.md) | End users validate their own accounts; ambiguous/restricted inventory still blocks. |
 | 2 | Broader inventory | Partial: [sourced lot/event reconciliation](inventory-book.md) | Provider adapters, live T1/pledged/MTF execution, trade-inclusive settlement roll-forward and more corporate-action types. |
 | 3 | Mixed-inventory entries | Partial: [long cash-equity MIS entry](mixed-inventory-entries.md) alongside supported long CNC/MIS holdings, with combined risk, margin and shared reservations | New CNC/NRML entries, short/derivative/restricted portfolios, carry-fee evidence integration and end-user acceptance. |
-| 4 | Automatic exchange coverage | Pending expansion | BSE, instrument-specific sessions/auctions/notices, ASM/GSM/T2T, bans and effective updates. |
+| 4 | Automatic exchange coverage | Partial: [automatic dated NSE surveillance and F&O ban observations](exchange-coverage.md), integrated into repeated collection; public smoke test passed | BSE, instrument-specific sessions/auctions/emergency notices, verified effective dates, complete membership and remaining indicator semantics. |
 | 5 | Constituents/history | Pending expansion | Verified effective-date and historical membership; sourced corporate-action reconstruction across history. |
 | 6 | News/filings | Pending expansion | Historical backfill, attachments, issuer matching, XBRL formats and extracted-number verification. |
 | 7 | Daily context | Pending expansion | Closing breadth, released FII/DII, GIFT/macro context and additional index providers. |

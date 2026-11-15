@@ -43,6 +43,8 @@ This is not a local SPAN implementation, a guarantee for every partial-fill perm
 
 ## Automatic collection and dated sessions
 
+Development after 0.9.9 also adds [dated NSE surveillance and F&O ban observations](exchange-coverage.md) to this collector. The coverage limits below still apply; this does not create execution clearance.
+
 ```text
 python scripts/india_collect.py --symbols RELIANCE.NS TCS.NS --filing-limit 5 --out india-collection-new.json
 ```

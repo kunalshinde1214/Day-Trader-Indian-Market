@@ -2,6 +2,8 @@
 
 ## Unreleased — sequential completion work
 
+- Add automatic NSE surveillance-catalogue discovery, dated GSM/ASM/ESM/T2T observations and separate F&O ban collection. Preserve unknown BSE/effective-session status, reject malformed or conflicting reports, retain source hashes and integrate component failures into repeated collection. Verify current NSE calendar/status endpoints and the observed `Close` spelling. Public source smoke tests do not establish comprehensive exchange coverage.
+
 - Add a separate opt-in mixed cash-entry workflow for long MIS orders alongside supported long CNC/MIS equity exposure across the five broker adapters. Reconcile carry accounting and intraday risk reservations, count outstanding buys and carry losses, enforce exact margin and gross caps, and preserve two-stage approval/shared durable recovery. Short/derivative/restricted portfolios, new carry entries and carry-fee evidence integration remain unsupported.
 
 - Add sourced non-trade inventory reconciliation for settled, T1, pledged, MTF and entitlement lots, with explicit settlement/pledge transfers, funded principal repayment, whole-unit split/bonus events and audited corrections. Requires local evidence hashes and exact closing-statement agreement; never authorizes orders or guesses provider conventions. Fifteen new tests; the full development suite passes 812 tests.

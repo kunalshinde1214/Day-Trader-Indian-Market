@@ -14,12 +14,14 @@ from data import NoRedirect, MAX_BYTES
 from india_news import collect as news_collect, FEEDS
 from filing_workflow import collect as filing_collect, match
 from public_market import collect_chart, symbol
+from exchange_coverage import collect as exchange_collect, allowed_url as exchange_url, fetch as exchange_fetch
 
-NSE_HOLIDAYS='https://www.nseindia.com/api/holiday-master?type=trading'
-NSE_STATUS='https://www.nseindia.com/api/marketStatus'
+NSE_HOLIDAYS='https://www.nseindia.in/api/holiday-master?type=trading'
+NSE_STATUS='https://www.nseindia.in/api/marketStatus'
 
 
 def official_fetch(url):
+    if exchange_url(url):return exchange_fetch(url)
     if url not in (NSE_HOLIDAYS,NSE_STATUS):raise Block('CALENDAR: unsupported endpoint')
     request=urllib.request.Request(url,headers={'User-Agent':'IndiaDayTrader personal research','Accept':'application/json'})
     with urllib.request.build_opener(NoRedirect()).open(request,timeout=20) as response:
@@ -57,8 +59,9 @@ def status_observation(raw,now):
     at=datetime.strptime(row['tradeDate'],'%d-%b-%Y %H:%M').replace(tzinfo=IST)
     if at.date()!=now.date() or not 0<=(now-at).total_seconds()<=180:
         raise Block('STATUS: stale or future market-state observation')
-    if row.get('marketStatus') not in ('Open','Closed'):raise Block('STATUS: unrecognized market phase')
-    return {'source':NSE_STATUS,'as_of':at.isoformat(),'retrieved_at':now.isoformat(),'market_status':row['marketStatus'],
+    if row.get('marketStatus') not in ('Open','Close','Closed'):raise Block('STATUS: unrecognized market phase')
+    return {'source':NSE_STATUS,'as_of':at.isoformat(),'retrieved_at':now.isoformat(),'market_status':'Closed' if row['marketStatus']=='Close' else row['marketStatus'],
+            'source_market_status':row['marketStatus'],
             'message':row.get('marketStatusMessage'),'sha256':hashlib.sha256(raw).hexdigest(),
             'execution_eligible':False,'coverage':'Aggregate NSE cash-market observation; not instrument-level halt or CAS clearance.'}
 
@@ -79,6 +82,11 @@ def collect(symbols, *, sources=None, hours=24, filing_limit=5, universe=None, a
             result[name]=parser(fetcher(url));coverage.append({'component':name,'status':'COLLECTED'})
         except (Block,ValueError,KeyError,TypeError,OSError):
             coverage.append({'component':name,'status':'FAILED','reason':'Unavailable, stale or unsupported official response'})
+    securities=[s for s in symbols if s.endswith(('.NS','.BO'))]
+    if securities:
+        result['exchange_observations']=exchange_collect(securities,fetcher=fetcher,clock=lambda:now)
+        coverage.extend(result['exchange_observations']['coverage'])
+    else:coverage.append({'component':'exchange_observations','status':'SKIPPED','reason':'Security symbols required; index proxies are not security identities'})
     for selected in symbols:
         try:
             result['charts'][selected]=charts(selected,'5m')
