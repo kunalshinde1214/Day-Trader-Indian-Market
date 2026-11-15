@@ -14,6 +14,7 @@ Research and paper-trading tools for Indian markets, adapted from Jake Schincari
 | One stock: analysis, ratios, valuation, news, trend, "where is it going" | `scripts/stock_analysis.py SYMBOL` | the answering rules in [stock analysis](skills/stock-analysis/SKILL.md) |
 | Market today, Nifty, Sensex, Bank Nifty (`/india-daily`, `/nifty`, `/sensex`, `/banknifty`) | `scripts/daily.py india-daily\|nifty\|sensex\|banknifty --collect-public` | [daily reports](references/daily.md) |
 | Market-wide news (`/india-news`) | `scripts/india_news.py` | [news workflow](references/india-news.md) |
+| Historical NSE announcements and filing backfill | `scripts/announcement_history.py`, then `scripts/filing_archive.py` | [announcement history](references/announcement-history.md); bounded source coverage, no inference of verified financial facts |
 | Charts, pattern scans, ORB/level entries, exits, public replay, filings/XBRL | `scripts/public_market.py`, `scripts/research.py` | [public workflows](references/public-workflows.md) |
 | Paper pipeline: scan → entry → plan → replay → size → risk → ticket | `scripts/trader.py` | [commands](references/commands.md), [setups](references/setups.md) |
 | Broker data (Kite, Upstox, Dhan, Angel One, FYERS) | `scripts/broker.py` | [user setup](references/user-setup.md), [brokers](references/brokers.md) |

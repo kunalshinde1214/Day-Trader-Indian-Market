@@ -2,6 +2,9 @@
 
 ## Unreleased — sequential completion work
 
+- Add bounded daily NSE announcement backfill with source hashes, explicit partial coverage and JSON/Markdown output. Retain structured issuer identities and description attachment links through matching and the durable filing backlog.
+- Add namespace-aware inline-XBRL numeric transforms, including Indian digit grouping, and reject unsupported continuations/exclusions instead of silently concatenating their text. Unstructured numerical fact verification remains outstanding.
+
 - Add reviewed historical membership intervals with publication cutoffs, no fallback across gaps, ISIN-based additions/removals/renames and hash-bound daily-report imports that retain partial verification status.
 - Add sourced split/bonus reconstruction for explicitly raw daily equity prices, preserving ISIN chains and synthetic volume factors. Block double-adjustment, unavailable information, unsupported actions and conflicting identities; broader corporate-action/provider coverage remains incomplete.
 

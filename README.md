@@ -96,6 +96,8 @@ A separate opt-in [mixed cash-entry workflow](references/mixed-inventory-entries
 
 [Historical evidence workflows](references/historical-evidence.md) now support sourced constituent intervals, ISIN-based changes and split/bonus reconstruction of explicitly raw daily prices. They enforce information cutoffs and retain source hashes; complete automatic history and independent source verification remain unfinished.
 
+[Announcement backfill](references/announcement-history.md) adds bounded NSE historical discovery, readable headline reports, multiple official attachments, symbol-plus-ISIN matching and Indian inline-XBRL number formats. It does not claim complete filing coverage or independently verified financial figures.
+
 **0.9.9 public alpha** includes the following. “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
 
 | Capability | Available now | Boundary |

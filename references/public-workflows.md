@@ -64,6 +64,8 @@ All modes handle adverse opening gaps and count stop first when both levels occu
 
 ## News, filings and company analysis
 
+Development after 0.9.9 includes [NSE announcement backfill and broader attachment discovery](announcement-history.md), plus additional namespace-checked inline-XBRL number formats. Complete coverage and independent fact verification remain separate requirements.
+
 ```bash
 python scripts/research.py news --symbols RELIANCE.NS TCS.NS --hours 24 --state reports/news-seen.sqlite --out reports/news.json
 python scripts/research.py disclosures --symbols RELIANCE.NS --hours 168 --out reports/discovery.json

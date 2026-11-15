@@ -2,6 +2,7 @@
 import argparse
 from datetime import date, timedelta
 import hashlib
+import io
 import json
 from pathlib import Path
 import re
@@ -23,7 +24,7 @@ CATEGORIES={"earnings":("financial result","earnings","quarter","profit"),"deal"
             "PIT":("insider","pit disclosure","regulation 7(2)"),"SAST":("sast","takeover","regulation 29"),
             "pledge":("pledge","encumbrance"),"bulk":("bulk deal",),"block":("block deal",),
             "capital":("dividend","bonus","split","buyback"),"regulatory":("sebi","penalty","suspension")}
-ATTACHMENT_HOSTS={"nsearchives.nseindia.com","archives.nseindia.com","www.nseindia.com","www.bseindia.com","www.bseindia.com"}
+ATTACHMENT_HOSTS={"nsearchives.nseindia.com","nsearchives.nseindia.in","archives.nseindia.com","www.nseindia.com","www.nseindia.in","www.bseindia.com"}
 METRICS={"revenue":{"RevenueFromOperations","RevenueFromOperationsNet","Revenue"},
          "net_profit":{"ProfitLossForPeriod","ProfitLoss","ProfitLossForThePeriod"},
          "diluted_eps":{"DilutedEarningsLossPerShare","DilutedEarningsLossPerShareFromContinuingOperations","DilutedEarningsPerShare"},
@@ -101,10 +102,42 @@ def attachment(url):
 def local(tag):return tag.rsplit("}",1)[-1].rsplit(":",1)[-1]
 
 
+def xbrl_tree(body):
+    # QName-valued format attributes need the namespace in scope at that fact,
+    # including nested prefix rebindings. ElementTree does not retain these.
+    stack=[];pending=[];formats={}
+    parser=ET.iterparse(io.BytesIO(body),events=('start-ns','start','end'))
+    for event,value in parser:
+        if event=='start-ns':pending.append(value)
+        elif event=='start':
+            scope=dict(stack[-1]) if stack else {}
+            scope.update(pending);pending=[];stack.append(scope)
+            if 'format' in value.attrib:formats[value]=scope
+        else:stack.pop()
+    return parser.root,formats
+
+
+def xbrl_number(value,format_name,scope):
+    if not format_name:
+        if not re.fullmatch(r'[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)',value):raise ValueError('numeric format')
+        return number(value,minimum='-1e30')
+    parts=format_name.split(':')
+    if len(parts)>2:raise ValueError('format QName')
+    prefix,name=parts if len(parts)==2 else ('',parts[0])
+    namespace=scope.get(prefix)
+    registries={'numdotdecimal':{'2011-07-31','2015-02-26'},'numdotdecimalin':{'2015-02-26'},
+                'num-dot-decimal':{'2020-02-12','2022-02-16'}}
+    if name not in registries or namespace not in {'http://www.xbrl.org/inlineXBRL/transformation/'+d for d in registries[name]}:
+        raise ValueError('unsupported transform namespace/name')
+    grouped=r'[0-9]{1,2}(?:[, \u00a0][0-9]{2})*[, \u00a0][0-9]{3}' if name=='numdotdecimalin' else r'[0-9]{1,3}(?:[, \u00a0][0-9]{3})+'
+    if not re.fullmatch(r'(?:[0-9]+|'+grouped+r')(?:\.[0-9]+)?',value):raise ValueError('unsupported transformed number')
+    return number(re.sub(r'[, \u00a0]','',value))
+
+
 def xbrl(body, source, now):
     link(source)
     if not isinstance(body,bytes) or len(body)>LIMIT or b"<!DOCTYPE" in body.upper() or b"<!ENTITY" in body.upper():raise Block("XBRL: oversized/entity-bearing XML refused")
-    root=ET.fromstring(body)
+    root,format_scopes=xbrl_tree(body)
     if local(root.tag) not in {"xbrl","html"}:raise Block("XBRL: expected XBRL instance or inline XBRL XHTML")
     contexts={};units={};facts={};unsupported=0
     for element in root.iter():
@@ -139,11 +172,9 @@ def xbrl(body, source, now):
         try:
             context=contexts[e.attrib["contextRef"]];unit=units[e.attrib["unitRef"]]
             if context.get("unsupported_typed_dimensions") or unit not in ({"INR/shares","INR/share"} if metric=="diluted_eps" else {"INR"}):raise ValueError("unsupported basis")
-            if e.attrib.get("format") and local(e.attrib["format"]) not in {"num-dot-decimal","numdotdecimal"}:raise ValueError("unsupported inline format")
+            if e.attrib.get('continuedAt') or any(local(child.tag)=='exclude' for child in e.iter()):raise ValueError('unsupported inline continuation/exclusion')
             raw_value="".join(e.itertext()).strip()
-            if not re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)",raw_value):
-                if not e.attrib.get("format") or not re.fullmatch(r"[+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?",raw_value):raise ValueError("numeric format")
-            value=number(raw_value.replace(",",""),minimum="-1e30")
+            value=xbrl_number(raw_value,e.attrib.get('format'),format_scopes.get(e,{}))
             if e.attrib.get("sign") not in {None,"-"}:raise ValueError("sign")
             if e.attrib.get("sign") and raw_value.startswith(("-","+")):raise ValueError("ambiguous sign")
             if e.attrib.get("sign")=="-":value=-value

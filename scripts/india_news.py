@@ -13,6 +13,7 @@ from core import Block, instant, integer, fingerprint
 from data import rss, SOURCES
 from public_market import NoRedirect, LIMIT
 from research import CATEGORIES, unseen
+from filing_workflow import discover_links
 
 FEEDS={"nse-announcements":SOURCES["announcements"],"nse-actions":SOURCES["corporate_actions"],
        "et-markets":"https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms"}
@@ -44,7 +45,8 @@ def collect(sources, hours=24, *, fetcher=fetch, clock=instant):
                 else:records[key]={'id':key,'headline':row['headline'],'url':row['url'],'published_at':row['published_at'],
                                   'sources':[name],'categories':categories or ['market'],'classification_basis':'headline keywords; unverified',
                                   'timezone_basis':row.get('timezone_basis','Explicit feed offset'),'publication_time_raw':row.get('publication_time_raw'),
-                                  'timezone_verified':row.get('timezone_verified',True)}
+                                  'timezone_verified':row.get('timezone_verified',True),
+                                  'attachments':discover_links(row.get('description',''),row['url'])}
         except (Block,OSError,ValueError,TypeError,KeyError,ET.ParseError):coverage.append({'source':name,'status':'FAILED','reason':'Unavailable or invalid feed; no bypass/retry'})
     successful=sum(s['status']=='OK' for s in coverage)
     return {'schema':'india_news_v1','as_of':clock().isoformat(),'hours':hours,
@@ -62,7 +64,8 @@ def markdown(report,limit=30):
     limit=integer(limit)
     if limit>200:raise Block('Maximum 200 displayed headlines')
     rows=report['records'][:limit]
-    lines=['# Indian market news','',f"{report['as_of']} | {report['status']} | Last {report['hours']} hours",'',report['coverage'],
+    window=(report['requested_from']+' through '+report['requested_through']) if report.get('requested_from') else f"Last {report['hours']} hours"
+    lines=['# Indian market news','',f"{report['as_of']} | {report['status']} | {window}",'',report['coverage'],
            'Personal reading only. Headlines are source claims, not verified trading signals.','',
            f"Showing {len(rows)} of {len(report['records'])} items; previously seen filtered: {report.get('seen_filtered',0)}.",'']
     for row in rows:

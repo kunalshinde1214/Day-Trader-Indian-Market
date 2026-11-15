@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import sqlite3
 from core import Block, fingerprint, instant, integer
-from filing_workflow import eligible_url, collect
+from filing_workflow import attachment_rows, collect
 from service import ProcessLock
 
 
@@ -20,8 +20,7 @@ def run(report, database, *, limit=5, retry_failed=False, collector=collect, clo
             db.execute('CREATE TABLE IF NOT EXISTS filing_backlog (id TEXT PRIMARY KEY, row_json TEXT NOT NULL, status TEXT NOT NULL, result_json TEXT, discovered_at TEXT NOT NULL, updated_at TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0)')
             added=0
             with db:
-                for row in report['records']:
-                    if not eligible_url(row['url']):continue
+                for row in attachment_rows(report):
                     instant(row['published_at'])
                     key=fingerprint({'url':row['url'],'published_at':row['published_at']})
                     body=json.dumps(row,allow_nan=False)
@@ -44,7 +43,7 @@ def run(report, database, *, limit=5, retry_failed=False, collector=collect, clo
             counts=dict(db.execute('SELECT status,count(*) FROM filing_backlog GROUP BY status').fetchall())
             return {'schema':'filing_archive_batch_v1','as_of':clock().isoformat(),'discovered_new':added,'attempted':len(completed),
                     'deferred':counts.get('PENDING',0),'filings':completed,'backlog_counts':counts,'submitted':False,
-                    'full_filing_coverage':False,'coverage':'Personal archive of direct official links observed in supplied news; historical backfill and unobserved revisions are not complete. Parsed facts and issuer candidates still require review.'}
+                    'full_filing_coverage':False,'coverage':'Personal archive of official links observed in supplied news/backfill, including discovered description attachments; historical coverage and unobserved revisions are not complete. Parsed facts and issuer candidates still require review.'}
         finally:db.close()
 
 
