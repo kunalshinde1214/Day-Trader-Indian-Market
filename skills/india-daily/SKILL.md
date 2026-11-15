@@ -9,6 +9,8 @@ Read the [shared skill](../../SKILL.md) for safety rules. Resolve scripts relati
 
 Primary route: `python "${CLAUDE_PLUGIN_ROOT}/scripts/daily.py" india-daily --collect-public`.
 
+For a specified closing-report date, use `--collect-close --session YYYY-MM-DD` instead. Read [closing context](../../references/closing-context.md); this NSE route marks Sensex unavailable and retains separate flow/GIFT dates.
+
 Use --collect-kite or --input for configured sourced inputs. Show feed age, calendar basis and missing coverage. Never substitute --demo for unavailable real data or infer an executable contract from index levels.
 
 Research and paper workflows only. Missing data is a gap, not an all-clear. Nothing here places an order.

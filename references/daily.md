@@ -13,6 +13,8 @@ These are interpreted within this skill; installing a skill does not register ar
 
 ## Simple commands
 
+Development after 0.9.9 also supports [dated public NSE closing reports](closing-context.md): `python scripts/daily.py nifty --collect-close --session YYYY-MM-DD`. This credential-free route includes observed closing breadth and separately dated FII/DII and GIFT context. It does not provide Sensex from NSE or infer a current open session.
+
 ```text
 python scripts/daily.py india-daily --demo
 python scripts/daily.py nifty --demo --phase preopen --brief
@@ -38,7 +40,7 @@ The collector can also save the normalized snapshot for inspection:
 python scripts/daily_collect.py --broker kite --calendar trader/daily-calendar.json --out trader/daily-new.json
 ```
 
-Automatic index collection is currently implemented for **Kite only**. Normalized inputs from other authorized sources can feed the same report engine. The five existing broker trading adapters do not imply five automatic spot-index collectors. Constituent breadth and reviewed event coverage require their own sourced inputs; the basic collector deliberately reports these gaps. `--events` accepts a reviewed event file in collection mode.
+Authenticated automatic index collection is currently implemented for **Kite only**. Public Yahoo and dated NSE closing observations use separate routes. Normalized inputs from other authorized sources can feed the same report engine. The five existing broker trading adapters do not imply five automatic spot-index collectors. Constituent breadth and reviewed event coverage require their own sourced inputs; the basic collector reports these gaps. `--events` accepts a reviewed event file in Kite collection mode.
 
 ### Automatic context collection
 

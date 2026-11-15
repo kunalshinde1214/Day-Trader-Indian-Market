@@ -286,16 +286,26 @@ def main(argv=None):
     p.add_argument("--input"); p.add_argument("--demo", action="store_true"); p.add_argument("--now")
     p.add_argument("--collect-kite", action="store_true", help="Opt-in read-only collection using local Kite credentials")
     p.add_argument("--collect-public", action="store_true", help="Credential-free public Yahoo index observations; research only")
+    p.add_argument("--collect-close", action="store_true", help="Dated public NSE closing reports with separately dated flow/GIFT context")
+    p.add_argument("--session", help="Exact YYYY-MM-DD report date for --collect-close")
     p.add_argument("--calendar"); p.add_argument("--events")
     p.add_argument("--with-context", action="store_true"); p.add_argument("--membership")
     p.add_argument("--phase", choices=["auto", "preopen", "intraday", "close"], default="auto")
     p.add_argument("--format", choices=["markdown", "json"], default="markdown"); p.add_argument("--brief", action="store_true"); p.add_argument("--out")
     a = p.parse_args(argv)
     try:
-        if sum((bool(a.input), a.demo, a.collect_kite, a.collect_public)) != 1: raise Block("INPUT: choose exactly one input mode")
+        if sum((bool(a.input), a.demo, a.collect_kite, a.collect_public, a.collect_close)) != 1: raise Block("INPUT: choose exactly one input mode")
+        if a.out and Path(a.out).exists(): raise Block('OUTPUT: choose a new file')
         if a.demo and a.now: raise Block("DEMO: use its labelled fixed clock")
-        if (a.with_context or a.membership) and not a.collect_kite or a.membership and not a.with_context: raise Block("INPUT: context flags require Kite collection")
-        if a.collect_public:
+        if a.with_context and not a.collect_kite or a.membership and not (a.collect_close or a.collect_kite and a.with_context): raise Block("INPUT: invalid context/membership mode")
+        if a.session and not a.collect_close: raise Block('INPUT: explicit session belongs to closing-report mode')
+        if a.collect_close:
+            if not a.session or a.now or a.calendar or a.events or a.phase not in ('auto','close'):
+                raise Block('CLOSING: explicit session and actual collection clock required')
+            from closing_context import collect as collect_close, markdown as close_markdown
+            selected = list(INDICES) if a.command.removeprefix('/') == 'india-daily' else [a.command.removeprefix('/')]
+            result = collect_close(a.session, selected=selected, membership=read(a.membership) if a.membership else None)
+        elif a.collect_public:
             if a.now or a.calendar or a.events: raise Block("PUBLIC: use actual provider session; explicit inputs belong to --input mode")
             from public_market import collect_daily
             selected = list(INDICES) if a.command.removeprefix("/") == "india-daily" else [a.command.removeprefix("/")]
@@ -313,13 +323,13 @@ def main(argv=None):
         else:
             if a.calendar or a.events: raise Block("INPUT: calendar/events flags belong to collection mode")
             bundle, now = demo(a.phase) if a.demo else (read(a.input), instant(a.now))
-        result = report(a.command, bundle, now, a.phase)
-        body = json.dumps(result, indent=2, allow_nan=False) if a.format == "json" else markdown(result, a.brief)
+        if not a.collect_close: result = report(a.command, bundle, now, a.phase)
+        body = json.dumps(result, indent=2, allow_nan=False) if a.format == "json" else close_markdown(result) if a.collect_close else markdown(result, a.brief)
         if a.out:
             path = Path(a.out); path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("x", encoding="utf-8") as stream: stream.write(body)
         else: print(body)
-        return 2 if result["status"] == "BLOCKED" else 0
+        return (0 if any(i['status']=='OBSERVED' for i in result['indices'].values()) else 2) if a.collect_close else (2 if result["status"] == "BLOCKED" else 0)
     except (Block, ValueError, KeyError, TypeError, OSError, OverflowError):
         print(json.dumps({"status": "BLOCKED", "reason": "Daily report input, calendar or output validation failed", "submitted": False})); return 2
 

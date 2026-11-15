@@ -98,6 +98,8 @@ A separate opt-in [mixed cash-entry workflow](references/mixed-inventory-entries
 
 [Announcement backfill](references/announcement-history.md) adds bounded NSE historical discovery, readable headline reports, multiple official attachments, symbol-plus-ISIN matching and Indian inline-XBRL number formats. It does not claim complete filing coverage or independently verified financial figures.
 
+[Dated closing reports](references/closing-context.md) add public NSE Nifty/Bank Nifty closes, EQ breadth and separately dated FII/DII and GIFT context to the daily commands. BSE closing coverage, macro feeds and independent publication/finality verification remain unfinished.
+
 **0.9.9 public alpha** includes the following. “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
 
 | Capability | Available now | Boundary |
