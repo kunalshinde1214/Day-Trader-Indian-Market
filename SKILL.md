@@ -20,6 +20,7 @@ Research and paper-trading tools for Indian markets, adapted from Jake Schincari
 | Charges, expiry, events, alerts | `scripts/market.py`, `scripts/watch.py` | [operations](references/operations.md) |
 | News/results/disclosure inputs, research interpretation | `scripts/data.py` | [operations](references/operations.md), [research workflow](references/research-workflow.md) |
 | Automatic exchange surveillance and F&O ban observations | `scripts/exchange_coverage.py` or `scripts/india_collect.py` | [exchange coverage](references/exchange-coverage.md); dated NSE observations only, never general trading clearance |
+| Historical constituents or split/bonus price reconstruction | `scripts/membership_history.py`, `scripts/corporate_history.py` | [historical evidence](references/historical-evidence.md); source-reviewed history only, never independently verified by a hash |
 | Journal, fills, margin proposals, acceptance | `scripts/journal.py`, `scripts/margin_size.py`, `scripts/acceptance.py` | [operations](references/operations.md) |
 | Fill imports, fee reserve, polling service, notifications | `scripts/trade_import.py`, `scripts/service.py`, `scripts/delivery.py` | [account and service](references/account-service.md) |
 | Carry positions and portfolio accounting | `scripts/portfolio.py` and the broker collectors | [portfolio](references/portfolio.md) and the per-broker pages linked there |

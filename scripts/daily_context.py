@@ -3,7 +3,7 @@ import csv
 from datetime import datetime
 import io
 
-from core import Block, IST, fresh, instant, integer, positive
+from core import Block, IST, fresh, instant, integer, positive, fingerprint
 from data import SOURCES, fetch, members_csv, rss
 from daily import session_bounds
 
@@ -11,14 +11,24 @@ MEMBERSHIP_SOURCES = {"nifty": "nifty50", "banknifty": "niftybank"}
 
 
 def membership(index, now, supplied=None, fetcher=fetch):
+    basis = None
     if supplied is not None:
         item = supplied[index]
         if item["index_id"] != index or item["membership_date"] != now.date().isoformat() or not item.get("source"):
             raise Block("MEMBERSHIP: sourced exact index/date required")
         fresh(item["as_of"], now, 86400, "membership")
-        if item.get("membership_verified") is not True: raise Block("MEMBERSHIP: explicit reviewed membership required")
+        if item.get('schema') == 'reviewed_index_membership_v1':
+            # Generated chronology remains partial: a local hash is not authentication.
+            if item.get('membership_reviewed') is not True or item.get('membership_verified') is not False or item.get('independently_verified') is not False:
+                raise Block('MEMBERSHIP: source-history verification status changed')
+            if item.get('membership_hash') != fingerprint({k:v for k,v in item.items() if k!='membership_hash'}):
+                raise Block('MEMBERSHIP: source-history output changed')
+            if not item['effective_from'] <= now.date().isoformat() <= item['effective_through'] or instant(item['published_at']) > now:
+                raise Block('MEMBERSHIP: source interval or publication time mismatch')
+            basis = item['membership_basis']
+        elif item.get("membership_verified") is not True: raise Block("MEMBERSHIP: explicit reviewed membership required")
         symbols = item["members"]
-        source = item["source"]; verified = True
+        source = item["source"]; verified = item['membership_verified']
     else:
         if index not in MEMBERSHIP_SOURCES: raise Block("MEMBERSHIP: explicit Sensex membership source required")
         named = MEMBERSHIP_SOURCES[index]
@@ -28,7 +38,7 @@ def membership(index, now, supplied=None, fetcher=fetch):
     if not isinstance(symbols, list) or not 1 <= len(symbols) <= 500 or len(set(symbols)) != len(symbols) or any(not isinstance(s, str) or not s.strip() or ":" in s for s in symbols):
         raise Block("MEMBERSHIP: unique symbol list required")
     return {"members": symbols, "membership_source": source, "membership_date": now.date().isoformat(), "membership_verified": verified,
-            "membership_basis": "reviewed current-session list" if verified else "current public list fetched today; effective date unverified"}
+            "membership_basis": basis or ("reviewed current-session list" if verified else "current public list fetched today; effective date unverified")}
 
 
 def collect_breadth(client, raw_master, index, calendar, now, *, supplied=None, fetcher=fetch, clock=None):

@@ -2,6 +2,9 @@
 
 ## Unreleased — sequential completion work
 
+- Add reviewed historical membership intervals with publication cutoffs, no fallback across gaps, ISIN-based additions/removals/renames and hash-bound daily-report imports that retain partial verification status.
+- Add sourced split/bonus reconstruction for explicitly raw daily equity prices, preserving ISIN chains and synthetic volume factors. Block double-adjustment, unavailable information, unsupported actions and conflicting identities; broader corporate-action/provider coverage remains incomplete.
+
 - Add automatic NSE surveillance-catalogue discovery, dated GSM/ASM/ESM/T2T observations and separate F&O ban collection. Preserve unknown BSE/effective-session status, reject malformed or conflicting reports, retain source hashes and integrate component failures into repeated collection. Verify current NSE calendar/status endpoints and the observed `Close` spelling. Public source smoke tests do not establish comprehensive exchange coverage.
 
 - Add a separate opt-in mixed cash-entry workflow for long MIS orders alongside supported long CNC/MIS equity exposure across the five broker adapters. Reconcile carry accounting and intraday risk reservations, count outstanding buys and carry losses, enforce exact margin and gross caps, and preserve two-stage approval/shared durable recovery. Short/derivative/restricted portfolios, new carry entries and carry-fee evidence integration remain unsupported.
