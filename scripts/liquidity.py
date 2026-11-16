@@ -17,6 +17,8 @@ def evidence(plan, instrument, config, context, now):
     book = context.get("liquidity_books", {}).get(instrument["exchange"]+":"+instrument["symbol"]) or context.get("liquidity")
     if not isinstance(book, dict) or book.get("source") != config["broker"] or book.get("quantity_unit") != "units":
         raise Block("LIQUIDITY: broker-sourced depth in units required")
+    if book.get('liquidity_model_eligible') is False or book.get('depth_timestamp_available') is False:
+        raise Block('LIQUIDITY: last-trade time cannot establish depth freshness; research observation only')
     if any(str(book.get(k)) != str(instrument[k]) for k in ("broker", "exchange", "symbol", "token")):
         raise Block("LIQUIDITY: instrument mismatch")
     fresh(book.get("as_of"), now, maximum_age, "depth")

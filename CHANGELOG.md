@@ -2,6 +2,8 @@
 
 ## Unreleased — sequential completion work
 
+- Extend cash-equity depth collection to Upstox, Dhan, Angel and FYERS; preserve source timestamp semantics and block last-trade-only books from liquidity sizing. Add quantity-dependent replay fees with brokerage caps and optional explicit latency/linear-impact cost sensitivity, binding changed policies to regenerated replay evidence. Queue/fill simulation and authenticated acceptance remain outstanding.
+
 - Add credential-free dated NSE closing reports through daily commands, with exact index/CSV dates, observed EQ breadth, optional reviewed constituent breadth and separately dated FII/DII/GIFT context. Keep missing Sensex coverage, stale GIFT observations and unknown release/finality explicit; do not invent intraday candles or calendar clearance.
 
 - Add bounded daily NSE announcement backfill with source hashes, explicit partial coverage and JSON/Markdown output. Retain structured issuer identities and description attachment links through matching and the durable filing backlog.

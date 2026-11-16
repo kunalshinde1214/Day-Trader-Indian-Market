@@ -259,7 +259,8 @@ class DhanReadOnly:
                     raise Block("DHAN_QUOTES: unexpected instrument or malformed quote")
                 quotes[key] = {"token": token, "exchange": EXCHANGES[segment], "price": float(positive(row.get("last_price"))),
                     "source": "dhan", "as_of": trade_time(row.get("last_trade_time")).isoformat(),
-                    "timestamp_basis": "last_trade_time interpreted in IST", "last_trade_time": row.get("last_trade_time")}
+                    "timestamp_basis": "last_trade_time interpreted in IST", "last_trade_time": row.get("last_trade_time"),
+                    "depth_snapshot": {"depth": row.get("depth"), "volume": row.get("volume")}}
         return {"source": "dhan", "fetched_at": instant().isoformat(), "requested": symbols,
                 "missing": [key for key in symbols if key not in quotes], "quotes": quotes}
 

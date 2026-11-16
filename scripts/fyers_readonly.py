@@ -263,7 +263,8 @@ class FyersReadOnly:
                 q = depth[key]
                 quotes[key] = {"token": token, "symbol": symbol, "exchange": exchange, "source": "fyers",
                     "price": float(positive(q["ltp"])), "as_of": epoch(q["ltt"]).isoformat(),
-                    "timestamp_basis": "depth last-trade time", "quote_tt": v.get("tt")}
+                    "timestamp_basis": "depth last-trade time", "quote_tt": v.get("tt"),
+                    "depth_snapshot": {"bids": q.get("bids"), "ask": q.get("ask"), "volume": q.get("v")}}
         except (KeyError, TypeError):
             raise Block("FYERS_QUOTES: malformed quote/depth record") from None
         return {"source": "fyers", "fetched_at": instant().isoformat(), "requested": symbols, "quotes": quotes,

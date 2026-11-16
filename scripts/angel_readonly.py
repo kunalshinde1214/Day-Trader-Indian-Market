@@ -269,7 +269,8 @@ class AngelReadOnly:
                     raise Block("ANGEL_QUOTES: duplicate/unrequested instrument or missing symbol")
                 quotes[key] = {"token": token, "exchange": exchange, "symbol": row["tradingSymbol"],
                     "price": float(positive(row["ltp"])), "source": "angel", "as_of": trade_time(row["exchTradeTime"]).isoformat(),
-                    "exchange_feed_time": trade_time(row["exchFeedTime"]).isoformat(), "timestamp_basis": "exchange trade time in IST"}
+                    "exchange_feed_time": trade_time(row["exchFeedTime"]).isoformat(), "timestamp_basis": "exchange trade time in IST",
+                    "depth_snapshot": {"depth": row.get("depth"), "volume": row.get("tradeVolume")}}
             for row in data["unfetched"]:
                 key = exchange_name(row["exchange"]) + ":" + symbol_token(row["symbolToken"])
                 if key not in symbols or key in quotes or key in unavailable:

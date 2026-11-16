@@ -481,6 +481,11 @@ def entry_context(p, i, c, ctx, now):
     from replay_sampling import policy
     if replay_result.get("sampling") != policy(c) or replay_result.get("seed") != c["replay_seed"]:
         raise Block("REPLAY: sampling or seed changed; regenerate replay")
+    from replay_costs import policy as cost_policy
+    expected_costs = cost_policy(c, i)
+    observed_costs = replay_result.get('cost_sensitivity', {}).get('policy')
+    if observed_costs != expected_costs:
+        raise Block('REPLAY: cost sensitivity policy changed; regenerate replay')
     if replay_result["plan_hash"] != fingerprint(p) or replay_result["paths"] < c["replay_paths"] or replay_result["history_sessions"] < c["minimum_history_sessions"]:
         raise Block("REPLAY: run the configured replay for this exact plan first")
     quote = ctx.get("quotes", {}).get(i["exchange"]+":"+i["symbol"]) or ctx["quote"]

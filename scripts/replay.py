@@ -96,6 +96,9 @@ def replay(p, instrument, history, config, card):
     counts=Counter()
     all_costs=0.0
     lot=integer(instrument["lot_size"])
+    from replay_costs import policy as cost_policy, summarize as cost_summary
+    selected_costs = cost_policy(config, instrument)
+    terminal_prices = Counter()
     cached={}
     for _ in range(n):
         price=float(p["entry"])
@@ -106,6 +109,7 @@ def replay(p, instrument, history, config, card):
             if state:
                 break
         counts[state or "still_open"]+=1
+        if selected_costs is not None: terminal_prices[price] += 1
         if price not in cached:
             cached[price]=charges(p["entry"],price,lot,p["side"],instrument,card,day)["total"]
         all_costs+=cached[price]
@@ -162,4 +166,6 @@ def replay(p, instrument, history, config, card):
     elif p["setup"] in DAILY_SETUPS:
         result["historical_daily_reference_sessions"] = len(complete)
         result["limitations"].append("Daily-context matching uses supplied point-in-time calendar and corporate-action assertions, not an independently reconstructed survivorship-free universe.")
+    if selected_costs is not None:
+        result['cost_sensitivity'] = cost_summary(p, instrument, card, selected_costs, terminal_prices)
     return result

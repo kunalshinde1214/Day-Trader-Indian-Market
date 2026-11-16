@@ -205,7 +205,8 @@ class UpstoxReadOnly:
                     raise Block("UPSTOX_QUOTES: unexpected or duplicate instrument")
                 quotes[key] = {"token": key, "exchange": SEGMENTS[key.split("|")[0]],
                     "price": float(positive(row["last_price"])), "source": "upstox",
-                    "as_of": source_time(row["timestamp"]).isoformat(), "last_trade_time": row.get("last_trade_time")}
+                    "as_of": source_time(row["timestamp"]).isoformat(), "last_trade_time": row.get("last_trade_time"),
+                    "depth_snapshot": {"depth": row.get("depth"), "volume": row.get("volume")}}
         except (KeyError, TypeError):
             raise Block("UPSTOX_QUOTES: incomplete quote; fetch time cannot replace quote time") from None
         return {"source": "upstox", "fetched_at": instant().isoformat(), "requested": symbols,

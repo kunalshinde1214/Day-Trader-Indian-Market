@@ -112,7 +112,7 @@ A separate opt-in [mixed cash-entry workflow](references/mixed-inventory-entries
 | Broker data | Kite, Upstox, Dhan, Angel One and FYERS adapters | User login, entitlements and account-specific checks required |
 | Carry accounting | Supported subsets across five broker collectors | T1, pledged, MTF and unresolved adjustments block |
 | Carry reducing orders | **Kite, Upstox and Dhan** exits, stop-limits and cancellation | Human-operated; no new mixed-inventory entries; Angel/FYERS execution pending |
-| Risk models | Depth stress; Kite cash-equity depth sampling; basket prefixes, scenarios and quantity grids | Other-broker basket margin and queue/market-impact models pending |
+| Risk models | Depth stress; five-broker cash depth; quantity-dependent replay fees and cost sensitivity; Kite basket prefixes/scenarios/grids | Dhan/FYERS depth research-only; other-broker baskets, calibrated impact and queue/fill simulation pending |
 | Protection | Experimental single-instrument intraday runner, explicitly human-armed and bounded | Disabled by default; not production-accepted or guaranteed to flatten |
 | User setup | Disabled profiles, read-only probes and acceptance-evidence inventory | Each user supplies and verifies their own environment |
 
