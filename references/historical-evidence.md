@@ -1,6 +1,6 @@
 # Historical constituents and corporate actions
 
-Development after the published 0.9.9 ZIP. These are local source-review workflows. They do not supply a complete licensed history, independently authenticate a document, or certify survivorship-free research.
+Included in 0.10.0. These are local source-review workflows. They do not supply a complete licensed history, independently authenticate a document, or certify survivorship-free research.
 
 ## Membership at a date and information cutoff
 

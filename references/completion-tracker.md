@@ -1,6 +1,6 @@
 # Sequential development checklist
 
-Development status after the published 0.9.9 ZIP. Updated 16 November 2026. Local implementation and offline tests do not establish broker or production acceptance. Items are maintained in the user's requested order; partial items are not counted as complete.
+Implementation status for 0.10.0. Updated 16 November 2026. Local implementation and offline tests do not establish broker or production acceptance. Items are maintained in the user's requested order; partial items are not counted as complete.
 
 | # | Area | Current status | Remaining acceptance boundary |
 | --- | --- | --- | --- |
@@ -17,4 +17,4 @@ Development status after the published 0.9.9 ZIP. Updated 16 November 2026. Loca
 | 11 | Protection operations | Pending expansion | Multi-instrument/account and carry protection, deployment/runtime acceptance. |
 | 12 | Compatibility/charges | Pending expansion | Ambiguous Angel/FYERS fields, master compatibility and account-specific tariffs/exemptions/rounding. |
 
-No publisher trading account is required. Do not change an unsupported field to a convenient value, treat operator declarations as independent verification, or use a research/accounting PASS as permission to submit orders. New code remains separate from the immutable 0.9.9 release archive until explicitly versioned and packaged.
+No publisher trading account is required. Do not change an unsupported field to a convenient value, treat operator declarations as independent verification, or use a research/accounting PASS as permission to submit orders. The 0.10.0 archive includes these implementations with their stated limits; the older 0.9.9 archive is unchanged.

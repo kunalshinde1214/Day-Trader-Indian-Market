@@ -1,6 +1,6 @@
 # Depth collection and quantity-dependent replay costs
 
-Development after 0.9.9; updated 16 November 2026. Synthetic contract tests pass; authenticated broker acceptance is still performed by each end user with their own credentials.
+Included in 0.10.0; updated 16 November 2026. Synthetic contract tests pass; authenticated broker acceptance is still performed by each end user with their own credentials.
 
 ## Cash-equity depth
 

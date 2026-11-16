@@ -37,7 +37,7 @@ Sizing caps quantity by haircut visible depth executable at the entry limit, ava
 
 ## Exact basket-margin research
 
-Development after 0.9.9 extends this command to [Upstox, Angel One and FYERS](basket-margin-providers.md), preserving their different response semantics. The original Kite contract below remains supported.
+Version 0.10.0 extends this command to [Upstox, Angel One and FYERS](basket-margin-providers.md), preserving their different response semantics. The original Kite contract below remains supported.
 
 `python scripts/portfolio_margin.py --input basket.json --out basket-margin-new.json` queries Kite's read-only basket margin endpoint for each ordered prefix, considering existing positions. Input contains `broker: "kite"`, `account_id` and 1–20 `legs`; each leg contains the exact dated `instrument`, same `account_id`, `product`, `side`, whole-lot `quantity` and tick-aligned limit `price`. CNC applies to equity, NRML to derivatives and MIS to intraday. Account books are read before and after; changes invalidate the estimate. Peak prefix and final requirements are reported separately.
 
@@ -45,7 +45,7 @@ This is not a local SPAN implementation, a guarantee for every partial-fill perm
 
 ## Automatic collection and dated sessions
 
-Development after 0.9.9 also adds [dated NSE surveillance and F&O ban observations](exchange-coverage.md) to this collector. The coverage limits below still apply; this does not create execution clearance.
+Version 0.10.0 also adds [dated NSE surveillance and F&O ban observations](exchange-coverage.md) to this collector. The coverage limits below still apply; this does not create execution clearance.
 
 ```text
 python scripts/india_collect.py --symbols RELIANCE.NS TCS.NS --filing-limit 5 --out india-collection-new.json

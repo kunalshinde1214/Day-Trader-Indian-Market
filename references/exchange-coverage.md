@@ -1,6 +1,6 @@
 # Automatic exchange observations
 
-Development after the published 0.9.9 ZIP. No brokerage credentials are needed.
+Included in 0.10.0. No brokerage credentials are needed.
 
 ```text
 python scripts/exchange_coverage.py --symbols RELIANCE.NS SBIN.NS 500325.BO --out exchange-new.json

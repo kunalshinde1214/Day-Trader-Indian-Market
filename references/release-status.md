@@ -1,41 +1,44 @@
-# Release status — 14 November 2026
+# Release status — 16 November 2026
 
-Version: **0.9.9-broker-workflows-alpha**. This is a public alpha, not the completed production specification. See the [README feature matrix](../README.md#what-is-implemented) for the maintained capability summary.
-
-For work after this immutable release, see the [sequential development checklist](completion-tracker.md). The sections below describe the 0.9.9 ZIP, not subsequent local changes.
+Version: **0.10.0-market-workflows-alpha**. A public alpha with expanded Indian-market research and broker workflows. **The full specification is not complete.** See the [feature matrix](../README.md#what-is-implemented) and [ordered completion tracker](completion-tracker.md).
 
 ## Included in this release
 
-- Redesigned README with original self-contained SVG cover and illustrative research workflow, accessible descriptions and clear install paths.
-- Sixteen Claude plugin commands, including stock analysis and four daily aliases; six scanners, paper planning, replay, sizing and risk checks.
-- Five broker data/account/streaming adapters and limited carry collectors. Human-operated mixed-inventory reducing exits, stop-limits and cancellation for Kite, Upstox and Dhan.
-- Bounded repeated public collection, immutable cycle reports, stop latch, health records and a shared filing backlog. Source coverage stays explicitly partial.
-- Visible-depth stress, Kite cash-equity depth sampling and exact Kite basket prefixes, explicit fill scenarios and bounded quantity grids.
-- Disabled profile generator, read-only probes and end-user acceptance inventory. Publisher brokerage credentials are not required.
-- Separately human-armed, expiring, action-limited intraday protection runner. It is experimental, single-instrument and disabled by default; limits and stops do not guarantee flatness.
+- Sixteen Claude plugin skills, a one-line terminal installer, four daily aliases and one-stock public research. The README includes original SVG artwork and a workflow illustration.
+- Six scanners plus custom levels at one/five-minute intervals, interval-bound replay, INR sizing and risk checks. Gap and Go retains its full fifteen-minute opening window.
+- Dated public NSE Nifty/Bank Nifty closes, observed EQ breadth, separately dated FII/DII and GIFT context, surveillance indicators and F&O-ban observations. Missing or stale components remain explicit; none establishes trade clearance.
+- Bounded NSE announcement backfill, official attachment discovery, symbol-plus-ISIN matching, supported Indian inline-XBRL numeric formats and a durable filing backlog.
+- Reviewed historical membership intervals and split/bonus reconstruction, with information cutoffs and source hashes. Inventory accounting covers sourced settled, T1, pledged, funded and entitlement lots without granting trading eligibility.
+- Supported reducing carry exits, stop-limits and cancellation across Kite, Upstox, Dhan, Angel One and FYERS. Separate long MIS cash entries can coexist with supported long CNC/MIS exposure. These are disabled-by-default, human-operated workflows.
+- Five-broker cash-depth observations, quantity-dependent replay fees and explicit cost sensitivity, plus Kite/Upstox/Angel/FYERS basket prefixes and supplied fill scenarios. Dhan/FYERS depth is research-only where book timestamps are unavailable; margin providers retain their different response semantics.
+- Bounded repeated public collection; user-owned setup and acceptance workflows; the existing experimental single-instrument intraday protection runner. No service is installed automatically.
 
-## Validation
+## Validation and its limits
 
-The prior complete development check passed **781 offline tests**, Python/JSON checks and all packaged local links. Release packaging reruns the full suite on final files, validates SVG XML and excludes active/external SVG content. GitHub CI targets Python 3.10, 3.12 and 3.13; use the exact run for the published commit rather than assuming a badge establishes acceptance.
+The final development suite passes **936 offline tests**. Packaging reruns the full suite and checks Python syntax, JSON, local links, plugin manifests and self-contained SVGs. ZIP contents have a SHA-256 manifest; private outputs, credentials, local state and dependencies are excluded by an allowlist.
 
-The release process verifies manifest hashes, unpacked synthetic daily and portfolio/journal CLI workflows, both Claude plugin manifests, GitHub file hashes and uploaded ZIP/checksum assets. Visual inspection covers the SVG artwork and repository presentation. These checks do not establish authenticated host invocation, live broker behavior or profitability.
+Release verification checks the archive manifest, source-byte agreement, a clean unpack, synthetic daily commands, disabled-profile generation, new CLI entrypoints and portfolio/journal workflows. GitHub CI targets Python **3.10, 3.12 and 3.13**. Use the exact published commit's CI result; a generic badge does not prove account acceptance.
 
-No publisher broker account was connected, real trade submitted, webhook delivered or production service activated. End users own their account/host acceptance. A complete local evidence inventory verifies supplied hashes and declarations, not the truth of an operator claim or permission to trade.
+Public NSE source smoke tests succeeded during development, but do not establish future source availability or comprehensive coverage. Simulated broker tests do not establish authenticated broker behavior, installed-host invocation, production reliability or profitability.
+
+No publisher trading account was connected, trade submitted or production service activated. Each user supplies their own credentials and acceptance evidence. The publisher does not need a brokerage account to distribute the skill.
 
 ## Remaining engineering
 
-1. Angel One/FYERS carry execution, ambiguous provider inventory conventions, T1/pledged/MTF support, settlement and corporate-action adjustments, and new mixed-inventory entries.
-2. Comprehensive BSE/calendar/surveillance/filing coverage, historical membership and corporate actions, reliable issuer/fact resolution, complete closing breadth and macro/context collection.
-3. Other-broker depth and basket-margin adapters, queue/latency/market-impact models, size-specific replay costs, unenumerated margin scenarios and pre-open/regime modelling.
-4. One-minute variants of the other scanner rules and consistent special-session modelling across research/replay.
-5. Broader multi-instrument/carry protection coordination, production deployment/runtime evidence and any broker-required hosted approval integration.
+1. Provider-specific T1/pledged/MTF execution, broader settlement/corporate actions and more mixed-entry combinations.
+2. Comprehensive BSE/calendar/surveillance/filing coverage, complete licensed histories, independent effective-date/issuer/fact verification, BSE closing data and macro feeds.
+3. Derivative depth units, calibrated queue/latency/partial-fill/impact models, Dhan baskets, collateral/market stress and unenumerated margin scenarios.
+4. Pre-open/regime models and consistent special-session handling across research and replay.
+5. Multi-instrument/account and carry-aware unattended protection, runtime validation, remaining broker inventory/master ambiguities and account-specific tariffs/exemptions/rounding.
+
+The [completion tracker](completion-tracker.md) keeps all twelve requested areas visible. Partial implementations are not counted as complete.
 
 ## User-owned acceptance
 
-Each user supplies broker login, API permissions/entitlements, delivery authorization, current tariffs, account limits, and observed broker/host/service checks. See [user setup](user-setup.md), [acceptance evidence](acceptance-evidence.md), [Upstox execution](upstox-execution.md), [Dhan execution](dhan-execution.md) and [protection operations](protection-controller.md). These are not requirements for the publisher to supply an account.
+Users supply broker login, API permissions and entitlements, delivery authorization, current tariffs, approved limits and observed broker/host/service checks. See [user setup](user-setup.md), [acceptance evidence](acceptance-evidence.md), [carry execution](mixed-inventory-exits.md) and [protection operations](protection-controller.md). Operator-supplied declarations are not independent broker certification.
 
 ## Distribution
 
-Build with `python scripts/release.py --out dist/india-day-trader-0.9.9-broker-workflows-alpha.zip`. The command refuses overwrite and does not skip tests. The release manifest retains `full_specification_complete: false` and `authenticated_broker_acceptance: false`.
+Build with `python scripts/release.py --out dist/india-day-trader-0.10.0-market-workflows-alpha.zip`. The command refuses overwrite and does not skip tests. The manifest retains `full_specification_complete: false`, `authenticated_broker_acceptance: false` and `live_enabled_by_default: false`.
 
-The [0.9.9 release page](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.9.9-broker-workflows-alpha) supplies the archive, checksum and scope notes. Original contributions retain the source-available personal-use license; third-party MIT rights remain intact.
+The [0.10.0 release page](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.0-market-workflows-alpha) provides the ZIP, checksum and scope notes. Original contributions remain source-available for personal use; third-party MIT rights remain intact.

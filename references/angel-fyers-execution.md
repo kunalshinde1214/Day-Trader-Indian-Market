@@ -1,6 +1,6 @@
 # Angel One and FYERS reducing carry orders
 
-Development after 0.9.9, checked 15 November 2026. `scripts/portfolio_exit.py` supports reducing exits, stop-limits and cancellation for the supported [Angel/FYERS collector subsets](angel-fyers-portfolio.md). New carry entries, T1/pledged/MTF orders and unattended carry protection remain unsupported. Live acceptance is user-owned.
+Included in 0.10.0, checked 15 November 2026. `scripts/portfolio_exit.py` supports reducing exits, stop-limits and cancellation for the supported [Angel/FYERS collector subsets](angel-fyers-portfolio.md). New carry entries, T1/pledged/MTF orders and unattended carry protection remain unsupported. Live acceptance is user-owned.
 
 CNC maps to Angel `DELIVERY` / FYERS `CNC`; NRML maps to Angel `CARRYFORWARD` / FYERS `MARGIN`. MIS remains `INTRADAY`. Angel stops use `STOPLOSS` variety and `STOPLOSS_LIMIT`; FYERS uses type 4. Cancellation retains the observed order ID and Angel variety. Recovery distinguishes product, instrument, side, quantity, prices and Angel variety.
 

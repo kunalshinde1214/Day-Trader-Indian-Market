@@ -1,6 +1,6 @@
 # Basket margin provider coverage
 
-Development after 0.9.9, checked 16 November 2026. Read-only research for Kite, Upstox, Angel One and FYERS. End users configure their own local credentials; offline tests do not establish authenticated acceptance.
+Included in 0.10.0, checked 16 November 2026. Read-only research for Kite, Upstox, Angel One and FYERS. End users configure their own local credentials; offline tests do not establish authenticated acceptance.
 
 ```text
 python scripts/portfolio_margin.py --input basket.json --out basket-margin-new.json

@@ -1,6 +1,6 @@
 # Public closing reports and daily context
 
-Development after the published 0.9.9 ZIP. These commands need no broker account:
+Included in 0.10.0. These commands need no broker account:
 
 ```text
 python scripts/daily.py india-daily --collect-close --session 2026-11-13

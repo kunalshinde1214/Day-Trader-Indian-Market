@@ -1,6 +1,6 @@
 # Kite reducing exits from mixed inventory
 
-Development after 0.9.9: [Angel One/FYERS reducing actions](angel-fyers-execution.md) now use this workflow with broker-specific products, continuous-session evidence and unchanged collector restrictions.
+Added in 0.10.0: [Angel One/FYERS reducing actions](angel-fyers-execution.md) now use this workflow with broker-specific products, continuous-session evidence and unchanged collector restrictions.
 
 Added in 0.9.9: [Dhan reducing actions](dhan-execution.md) are also available through the shared workflow. They preserve CNC/MARGIN/INTRADAY wire products, use Dhan's reconciled collector and require exact placement-session evidence.
 

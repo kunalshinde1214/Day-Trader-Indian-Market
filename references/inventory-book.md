@@ -1,6 +1,6 @@
 # Sourced inventory adjustments
 
-Development after 0.9.9. `scripts/inventory_book.py` reconciles reviewed equity lots in settled, T1, pledged, funded (MTF) and pending-entitlement buckets. It applies explicit non-trade events and compares the exact result with a separately supplied closing statement. It does not change the existing broker collectors' eligibility rules or enable orders against restricted inventory.
+Included in 0.10.0. `scripts/inventory_book.py` reconciles reviewed equity lots in settled, T1, pledged, funded (MTF) and pending-entitlement buckets. It applies explicit non-trade events and compares the exact result with a separately supplied closing statement. It does not change the existing broker collectors' eligibility rules or enable orders against restricted inventory.
 
 ```text
 python scripts/inventory_book.py --input trader/inventory-review.json --db trader/state/inventory.sqlite --out reports/inventory-review-new.json

@@ -1,6 +1,6 @@
 # Announcement backfill and filing discovery
 
-Development after the published 0.9.9 ZIP. This workflow uses public NSE data without brokerage credentials.
+Included in 0.10.0. This workflow uses public NSE data without brokerage credentials.
 
 ```text
 python scripts/announcement_history.py --from-date 2026-11-12 --through-date 2026-11-13 --out announcements-new.json

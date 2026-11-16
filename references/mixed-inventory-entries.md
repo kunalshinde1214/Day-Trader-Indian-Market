@@ -1,6 +1,6 @@
 # Entries alongside supported carry inventory
 
-Development after 0.9.9. `scripts/mixed_entry.py` provides a separate, disabled-by-default human-operated path for **BUY MIS cash-equity entries alongside long CNC/MIS cash-equity exposure**. It uses all five broker collectors and existing single-order margin/transport adapters. It does not open new CNC/NRML positions or support short/derivative/MTF/pledged/T1 portfolios. These limits are enforced in code.
+Included in 0.10.0. `scripts/mixed_entry.py` provides a separate, disabled-by-default human-operated path for **BUY MIS cash-equity entries alongside long CNC/MIS cash-equity exposure**. It uses all five broker collectors and existing single-order margin/transport adapters. It does not open new CNC/NRML positions or support short/derivative/MTF/pledged/T1 portfolios. These limits are enforced in code.
 
 The regular `live.py entry` workflow still requires a flat account. Do not edit a snapshot to appear flat or hide positions to use it.
 

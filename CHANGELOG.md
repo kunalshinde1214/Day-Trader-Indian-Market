@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased — sequential completion work
+## 0.10.0-market-workflows-alpha — 16 November 2026
+
+This public alpha packages the sequential development work below. The full specification remains incomplete; account acceptance belongs to each end user. The final local suite passes 936 tests.
 
 - Extend configured one-minute evaluation to VWAP reclaim, Gap and Go, 20-day breakout, bull flag and oversold bounce. Preserve the fifteen-minute opening window, exact candle/history interval binding and point-in-time daily evidence. Verify 25 broker/rule paper combinations; pre-open/regime models and broader special sessions remain incomplete.
 
@@ -20,9 +22,9 @@
 
 - Add a separate opt-in mixed cash-entry workflow for long MIS orders alongside supported long CNC/MIS equity exposure across the five broker adapters. Reconcile carry accounting and intraday risk reservations, count outstanding buys and carry losses, enforce exact margin and gross caps, and preserve two-stage approval/shared durable recovery. Short/derivative/restricted portfolios, new carry entries and carry-fee evidence integration remain unsupported.
 
-- Add sourced non-trade inventory reconciliation for settled, T1, pledged, MTF and entitlement lots, with explicit settlement/pledge transfers, funded principal repayment, whole-unit split/bonus events and audited corrections. Requires local evidence hashes and exact closing-statement agreement; never authorizes orders or guesses provider conventions. Fifteen new tests; the full development suite passes 812 tests.
+- Add sourced non-trade inventory reconciliation for settled, T1, pledged, MTF and entitlement lots, with explicit settlement/pledge transfers, funded principal repayment, whole-unit split/bonus events and audited corrections. Requires local evidence hashes and exact closing-statement agreement; never authorizes orders or guesses provider conventions.
 
-- Add Angel One/FYERS reducing carry exits, stop-limits and cancellation, preserving native products, exact session/delivery evidence and complete account reconciliation. Add sixteen simulated regression cases; the full suite passes 797 tests.
+- Add Angel One/FYERS reducing carry exits, stop-limits and cancellation, preserving native products, exact session/delivery evidence and complete account reconciliation.
 - Tighten recovery to match cancellation variety and Angel placement variety.
 
 ## 0.9.9-broker-workflows-alpha — 14 November 2026
