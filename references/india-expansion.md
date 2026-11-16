@@ -37,9 +37,11 @@ Sizing caps quantity by haircut visible depth executable at the entry limit, ava
 
 ## Exact basket-margin research
 
+Development after 0.9.9 extends this command to [Upstox, Angel One and FYERS](basket-margin-providers.md), preserving their different response semantics. The original Kite contract below remains supported.
+
 `python scripts/portfolio_margin.py --input basket.json --out basket-margin-new.json` queries Kite's read-only basket margin endpoint for each ordered prefix, considering existing positions. Input contains `broker: "kite"`, `account_id` and 1–20 `legs`; each leg contains the exact dated `instrument`, same `account_id`, `product`, `side`, whole-lot `quantity` and tick-aligned limit `price`. CNC applies to equity, NRML to derivatives and MIS to intraday. Account books are read before and after; changes invalidate the estimate. Peak prefix and final requirements are reported separately.
 
-This is not a local SPAN implementation, a guarantee for every partial-fill permutation or an execution permission. Other brokers' basket adapters and scenario-based portfolio margin remain outstanding. Accounts and brokers are never netted against one another.
+This is not a local SPAN implementation, a guarantee for every partial-fill permutation or an execution permission. Dhan baskets and broader collateral/market stress remain outstanding. Accounts and brokers are never netted against one another.
 
 ## Automatic collection and dated sessions
 
@@ -81,7 +83,7 @@ See the [protection controller and bounded runner](protection-controller.md) and
 ## Still required for the requested complete scope
 
 1. Comprehensive permitted data sources, BSE-specific feeds, surveillance and automatic effective-date/session reconstruction.
-2. Queue/fill simulation, calibrated execution costs, derivative depth units and other-broker portfolio-margin integration. Explicit Kite partial-fill basket scenarios are implemented; unenumerated fill sequences remain unknown.
+2. Queue/fill simulation, calibrated execution costs, derivative depth units, Dhan baskets and broader collateral/market stress. Requested partial-fill basket scenarios are implemented for four brokers; unenumerated fill sequences remain unknown.
 3. Broader settlement/T1/pledged/MTF and corporate-action handling, new mixed-inventory entries and other brokers' carry execution. A separate [Kite mixed-inventory reducing-exit workflow](mixed-inventory-exits.md) is now implemented with per-action human review; existing conservative collectors still block unsupported inventory states.
 4. Production acceptance and broader coordination of unattended protection/auto-flatten. The separate [bounded runner](protection-controller.md) implements one-instrument intraday operation under explicit human arming, expiry and action caps. It does not install a service or guarantee flatness.
 5. End-user authenticated broker, installed-host invocation and production-service acceptance. The publisher has no broker account; offline tests cannot supply this evidence.

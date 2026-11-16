@@ -2,6 +2,8 @@
 
 ## Unreleased — sequential completion work
 
+- Extend read-only basket-prefix and partial-fill margin research to Upstox, Angel One and FYERS. Validate input/account identity and changes, retain request/response hashes, keep missing initial/final and echoed identity semantics explicit, and separate FYERS proposed-order from account-total requirements. Dhan baskets and broader collateral/market stress remain incomplete.
+
 - Extend cash-equity depth collection to Upstox, Dhan, Angel and FYERS; preserve source timestamp semantics and block last-trade-only books from liquidity sizing. Add quantity-dependent replay fees with brokerage caps and optional explicit latency/linear-impact cost sensitivity, binding changed policies to regenerated replay evidence. Queue/fill simulation and authenticated acceptance remain outstanding.
 
 - Add credential-free dated NSE closing reports through daily commands, with exact index/CSV dates, observed EQ breadth, optional reviewed constituent breadth and separately dated FII/DII/GIFT context. Keep missing Sensex coverage, stale GIFT observations and unknown release/finality explicit; do not invent intraday candles or calendar clearance.

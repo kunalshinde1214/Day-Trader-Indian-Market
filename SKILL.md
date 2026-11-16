@@ -30,6 +30,7 @@ Research and paper-trading tools for Indian markets, adapted from Jake Schincari
 | Streaming quotes, monitoring deployment | `scripts/streaming.py`, `scripts/market_stream.py`, `scripts/deployment.py` | [streaming and deployment](references/streaming-deployment.md) |
 | One-minute/custom-level broker entries, liquidity, basket margin, sessions | see guide | [India expansion](references/india-expansion.md) |
 | Five-broker cash depth and quantity-dependent replay cost sensitivity | `scripts/depth_collect.py`, normal replay | [depth and replay costs](references/depth-and-replay-costs.md) |
+| Broker basket-margin prefixes and partial-fill scenarios | `scripts/portfolio_margin.py` | [basket providers and limits](references/basket-margin-providers.md) |
 | Live order previews, protection, mixed-inventory exits | `scripts/live.py`, `scripts/portfolio_exit.py` | [execution](references/execution.md), [protection](references/protection-controller.md), [mixed-inventory exits](references/mixed-inventory-exits.md) — mandatory |
 | Long MIS cash-equity entry alongside supported long CNC/MIS inventory | `scripts/mixed_entry.py` | [mixed-inventory entries](references/mixed-inventory-entries.md) — separate opt-in, complete portfolio risk and human confirmations; broader inventory remains blocked |
 | What is finished, roadmap, licensing | — | [release status](references/release-status.md), [requirements](references/requirements.md), [product spec](references/product-spec.md), [license](LICENSE), [notices](THIRD_PARTY_NOTICES.md) |

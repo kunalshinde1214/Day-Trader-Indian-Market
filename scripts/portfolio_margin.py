@@ -1,23 +1,29 @@
-"""Exact Kite basket margin research. No order submission or cross-account netting."""
+"""Read-only broker basket margin research. No submission or cross-account netting."""
 import argparse
 import json
 from pathlib import Path
 from itertools import product as combinations
-from core import Block, instant, fingerprint, integer, positive, number, validate_instrument, on_tick
+from core import Block, instant, fingerprint, integer, positive, number, validate_instrument, on_tick, fresh
+from basket_margins import estimate, identity
 
 
 def quote(client, bundle, clock=instant):
     now=clock()
-    if bundle.get("broker")!="kite" or not bundle.get("account_id"):
+    broker = bundle.get('broker')
+    if broker not in {'kite', 'upstox', 'angel', 'fyers'} or not bundle.get("account_id"):
         raise Block("BASKET: supported exact broker/account required")
     legs=bundle.get("legs")
     if not isinstance(legs,list) or not 1<=len(legs)<=20:
         raise Block("BASKET: one to twenty ordered legs required")
-    orders=[];seen=set()
+    orders=[];seen=set();instruments={};tokens=set()
     for leg in legs:
         i=leg["instrument"];validate_instrument(i,now)
-        if i["broker"]!="kite" or leg.get("account_id")!=bundle["account_id"]:
+        if i["broker"]!=broker or leg.get("account_id")!=bundle["account_id"]:
             raise Block("BASKET: never combine accounts or brokers")
+        identity(broker, i)
+        if broker == 'upstox' and i['token'] in tokens:
+            raise Block('BASKET: Upstox forbids repeated instrument keys, including different products')
+        tokens.add(i['token'])
         key=(i["exchange"],i["token"],leg["product"])
         if key in seen:raise Block("BASKET: duplicate instrument/product leg")
         seen.add(key)
@@ -26,6 +32,9 @@ def quote(client, bundle, clock=instant):
         if "freeze_quantity" in i and qty>integer(i["freeze_quantity"]):raise Block("BASKET: freeze limit exceeded")
         if leg["side"] not in ("BUY","SELL") or leg["product"] not in ({"MIS","CNC"} if i["kind"]=="equity" else {"MIS","NRML"}):
             raise Block("BASKET: unsupported side/product")
+        label=(i['exchange'],i['symbol'],leg['product'])
+        if label in instruments: raise Block('BASKET: conflicting symbol/token identity')
+        instruments[label]=i
         orders.append({"exchange":i["exchange"],"tradingsymbol":i["symbol"],"transaction_type":leg["side"],
                        "variety":"regular","product":leg["product"],"order_type":"LIMIT","quantity":qty,"price":float(price),"trigger_price":0})
     scenarios=bundle.get('fill_scenarios',[])
@@ -56,32 +65,32 @@ def quote(client, bundle, clock=instant):
         scenario_orders.append((quantities,selected))
     before=client.account()
     if before.get("account_id")!=bundle["account_id"]:raise Block("BASKET: observed account mismatch")
+    if broker != 'kite':
+        if before.get('source') != broker or before.get('broker') != broker: raise Block('BASKET: account provider mismatch')
+        fresh(before.get('as_of'), clock(), 60, 'basket account')
     baseline=fingerprint({k:before[k] for k in ("positions","orders","margins")})
     estimates=[];scenario_estimates=[]
     # Every execution prefix is quoted: a cheap fully hedged final basket must not hide interim funding.
     for count in range(1,len(orders)+1):
-        result=client.request("POST","/margins/basket",query={"consider_positions":"true"},body=orders[:count])
-        rows=result.get("orders")
-        if not isinstance(rows,list) or len(rows)!=count or any((r.get("exchange"),r.get("tradingsymbol"))!=(o["exchange"],o["tradingsymbol"]) for r,o in zip(rows,orders)):
-            raise Block("BASKET: margin response legs mismatch")
-        estimates.append({"prefix_legs":count,"initial_inr":float(number(result["initial"]["total"])),
-                          "final_inr":float(number(result["final"]["total"])),"response_hash":fingerprint(result)})
+        estimates.append({'prefix_legs':count, **estimate(client, broker, orders[:count], instruments)})
     for quantities,selected in scenario_orders:
-        result=client.request('POST','/margins/basket',query={'consider_positions':'true'},body=selected)
-        rows=result.get('orders')
-        if not isinstance(rows,list) or len(rows)!=len(selected) or any((r.get('exchange'),r.get('tradingsymbol'))!=(o['exchange'],o['tradingsymbol']) for r,o in zip(rows,selected)):
-            raise Block('BASKET: scenario response legs mismatch')
-        scenario_estimates.append({'quantities':quantities,'initial_inr':float(number(result['initial']['total'])),
-                                   'final_inr':float(number(result['final']['total'])),'response_hash':fingerprint(result)})
+        scenario_estimates.append({'quantities':quantities, **estimate(client, broker, selected, instruments)})
     after=client.account()
     if after.get("account_id")!=bundle["account_id"] or fingerprint({k:after[k] for k in ("positions","orders","margins")})!=baseline:
         raise Block("BASKET: account books changed during estimates")
-    return {"schema":"portfolio_margin_v1","broker":"kite","account_id":bundle["account_id"],"as_of":clock().isoformat(),
+    if broker != 'kite':
+        if after.get('source') != broker or after.get('broker') != broker: raise Block('BASKET: account provider mismatch')
+        fresh(after.get('as_of'), clock(), 60, 'basket account')
+        fresh(now.isoformat(), clock(), 60, 'basket estimate window')
+    return {"schema":"portfolio_margin_v1","broker":broker,"account_id":bundle["account_id"],"as_of":clock().isoformat(),
             "basket_hash":fingerprint(orders),"input_hash":fingerprint(bundle),"account_state_hash":baseline,
             "prefix_estimates":estimates,"fill_scenario_estimates":scenario_estimates,
-            "peak_estimate_inr":max(max(r['initial_inr'],r['final_inr']) for r in estimates+scenario_estimates),
+            "peak_estimate_inr":max(r['required_inr'] for r in estimates+scenario_estimates),
             "final_estimate_inr":estimates[-1]['final_inr'],"submitted":False,"execution_eligible":False,
+            "final_required_inr":estimates[-1]['required_inr'],
+            "peak_account_total_inr":max(r['account_total_inr'] for r in estimates+scenario_estimates) if broker=='fyers' else None,
             "limitations":["Broker estimates, not a local SPAN replica or a funding guarantee.",
+                           "Upstox/Angel/FYERS responses do not echo exact leg identities; request hashes bind submitted inputs but cannot independently verify response identity.",
                            "Only ordered prefixes and explicitly supplied partial-fill scenarios were estimated; unenumerated quantities, market shocks, collateral changes and future margins remain unknown.",
                            "No cross-account netting; rerun after account, order, instrument or price changes. Does not authorize basket execution."]}
 
@@ -91,10 +100,11 @@ def main(argv=None):
     a=p.parse_args(argv)
     try:
         from trader import read
-        from kite_readonly import KiteReadOnly
+        from broker import adapter
         out=Path(a.out)
         if out.exists():raise Block("OUTPUT: choose a new file")
-        report=quote(KiteReadOnly(),read(a.input))
+        bundle=read(a.input)
+        report=quote(adapter(bundle['broker']),bundle)
         out.parent.mkdir(parents=True,exist_ok=True)
         with out.open('x',encoding='utf-8') as f:json.dump(report,f,indent=2,allow_nan=False)
         print(json.dumps({'status':'SAVED','submitted':False,'path':str(out)}));return 0
