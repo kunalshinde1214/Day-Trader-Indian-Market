@@ -7,8 +7,6 @@ def interval(config):
     value = config.get("interval_minutes", 5)
     if type(value) is not int or value not in (1, 5):
         raise Block("INTERVAL: integer 1 or 5 required")
-    if value == 1 and config.get("setup", "orb") not in ("orb", "level"):
-        raise Block("INTERVAL: one-minute broker entries support ORB and level only")
     return value
 
 

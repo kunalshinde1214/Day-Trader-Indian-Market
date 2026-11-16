@@ -159,7 +159,7 @@ def replay(p, instrument, history, config, card):
         result["historical_level_reference_sessions"] = sum(d in history.get("level_entries", {}) for d, _ in complete)
         result["limitations"].append("Historical rule matching only evaluates sessions with separately supplied point-in-time level entries; today's level is never projected into history.")
     elif p["setup"] == "vwap_reclaim":
-        result["limitations"].append("VWAP is estimated from five-minute HLC3 and bar volume, not individual trades.")
+        result["limitations"].append(f"VWAP is estimated from {minutes}-minute HLC3 and bar volume, not individual trades.")
     elif p["setup"] == "gap_and_go":
         result["historical_gap_reference_sessions"] = len(complete)
         result["limitations"].append("Gap matching uses supplied prior-session close/calendar evidence; bootstrap paths remain conditioned on the observed entry, not gap-matched or pre-open forecasts.")

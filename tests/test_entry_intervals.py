@@ -83,10 +83,10 @@ class EntryIntervalTests(unittest.TestCase):
         with self.assertRaises(Block):check(p,{**c,'interval_minutes':5})
         with self.assertRaises(Block):check(p,{**c,'level_entry':{**c['level_entry'],'price':100}})
 
-    def test_invalid_intervals_and_unsupported_rules(self):
+    def test_invalid_intervals_and_candle_metadata(self):
         for minutes in (True,0,2,'1'):
             with self.assertRaises(Block):interval({'interval_minutes':minutes})
-        with self.assertRaises(Block):interval({'interval_minutes':1,'setup':'gap_and_go'})
+        self.assertEqual(interval({'interval_minutes':1,'setup':'gap_and_go'}),1)
         with self.assertRaises(Block):check_candles({}, {'interval_minutes':1})
 
     def test_one_minute_adapter_wire_contracts(self):

@@ -4,7 +4,7 @@ This work is released in 0.9.7. It does not certify complete Indian-market cover
 
 ## One-minute and custom-level broker entries
 
-Set `interval_minutes: 1` for ORB or `level`; the existing six scanners retain their five-minute defaults. The opening range remains fifteen clock minutes, so one-minute ORB requires fifteen opening bars plus a completed confirmation. Real five-minute bars are never interpolated into minute observations. All five read-only adapters and `broker.py candles --interval minute` support minute requests. Use the exact instrument's broker data, not an underlying or Yahoo proxy. Source candle/history metadata must say `minute`; replay and risk bind the interval to the plan. Watch refresh and the read-only acceptance probe support it too.
+Set `interval_minutes: 1` for any of the six scanners or `level`; five minutes remains the default. The opening range remains fifteen clock minutes, so one-minute ORB requires fifteen opening bars plus a completed confirmation, while Gap and Go still triggers at 09:30 after fifteen completed bars. Real five-minute bars are never interpolated into minute observations. All five read-only adapters and `broker.py candles --interval minute` support minute requests. Use the exact instrument's broker data, not an underlying or Yahoo proxy. Source candle/history metadata must say `minute`; replay and risk bind the interval to the plan. Watch refresh and the read-only acceptance probe support it too. Regular-session assumptions remain; this does not implement pre-open/regime or alternative-session models.
 
 For `setup: "level"`, supply `config.level_entry`:
 

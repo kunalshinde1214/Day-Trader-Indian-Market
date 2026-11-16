@@ -234,9 +234,9 @@ def orb(rows, now, interval=5):
     return {"state": "waiting", "setup": "orb", "range_high": high, "range_low": low}
 
 
-def vwap_reclaim(rows, now, entry_start="09:30", entry_end="14:30"):
+def vwap_reclaim(rows, now, entry_start="09:30", entry_end="14:30", interval=5):
     """First eligible strict close crossover of session HLC3-volume VWAP; bar approximation."""
-    bars = session_bars(rows, now)
+    bars = session_bars(rows, now, interval)
     first = max(time(9, 30), time.fromisoformat(entry_start))
     last = time.fromisoformat(entry_end)
     weighted, volume, turnover = D(0), D(0), D(0)
@@ -251,7 +251,7 @@ def vwap_reclaim(rows, now, entry_start="09:30", entry_end="14:30"):
         turnover += c*v
         vwap = weighted/volume
         high, low = max(high, h) if high is not None else h, min(low, l) if low is not None else l
-        at = instant(b["at"]) + timedelta(minutes=5)
+        at = instant(b["at"]) + timedelta(minutes=interval)
         side = None
         if previous_vwap is not None and first <= at.time() <= last:
             if previous_close < previous_vwap and c > vwap:
@@ -259,14 +259,14 @@ def vwap_reclaim(rows, now, entry_start="09:30", entry_end="14:30"):
             elif previous_close > previous_vwap and c < vwap:
                 side = "SELL"
         if side:
-            return {"state": "triggered", "setup": "vwap_reclaim", "rule_version": 1, "side": side,
+            return {"state": "triggered", "setup": "vwap_reclaim", "rule_version": 1, "side": side, "interval_minutes":interval,
                     "entry": float(c), "vwap": float(vwap), "reference_price": float(vwap),
                     "range_high": float(high), "range_low": float(low), "trigger_at": at.isoformat(),
                     "percent_over_level": money((c/vwap-1)*100), "turnover_estimate_inr": money(turnover),
-                    "vwap_basis": "session cumulative HLC3 times volume / volume; five-minute approximation",
+                    "vwap_basis": f"session cumulative HLC3 times volume / volume; {interval}-minute approximation",
                     "label": "matched a rule"}
         previous_close, previous_vwap = c, vwap
-    return {"state": "waiting", "setup": "vwap_reclaim", "vwap": float(weighted/volume) if volume else None,
+    return {"state": "waiting", "setup": "vwap_reclaim", "interval_minutes":interval, "vwap": float(weighted/volume) if volume else None,
             "reason": "No eligible completed-bar VWAP crossover"}
 
 
@@ -298,10 +298,13 @@ def validate_gap_reference(ref, instrument, session_date):
 
 def gap_and_go(rows, now, config, instrument, prior_close):
     previous = validate_gap_reference(prior_close, instrument, now.date().isoformat())
-    bars = session_bars(rows, now)
-    if len(bars) < 3:
-        return {"state": "waiting", "setup": "gap_and_go", "reason": "Need all three completed opening bars"}
-    opening = bars[:3]
+    from entry_policy import interval
+    minutes = interval(config)
+    bars = session_bars(rows, now, minutes)
+    opening_count = 15 // minutes
+    if len(bars) < opening_count:
+        return {"state": "waiting", "setup": "gap_and_go", "interval_minutes":minutes, "reason": "Need the full completed fifteen-minute opening window"}
+    opening = bars[:opening_count]
     for b in opening:
         positive(b["volume"], "gap opening-bar volume")
     opened = positive(opening[0]["open"])
@@ -310,8 +313,8 @@ def gap_and_go(rows, now, config, instrument, prior_close):
     high = max(positive(b["high"]) for b in opening)
     low = min(positive(b["low"]) for b in opening)
     entry = positive(opening[-1]["close"])
-    trigger = instant(opening[-1]["at"]) + timedelta(minutes=5)
-    waiting = {"state": "waiting", "setup": "gap_and_go", "gap_pct": float(gap)}
+    trigger = instant(opening[-1]["at"]) + timedelta(minutes=minutes)
+    waiting = {"state": "waiting", "setup": "gap_and_go", "interval_minutes":minutes, "gap_pct": float(gap)}
     if abs(gap) < minimum:
         return {**waiting, "reason": "Opening gap below configured threshold"}
     if not time.fromisoformat(config["no_entries_before"]) <= trigger.time() <= time.fromisoformat(config["no_entries_after"]):
@@ -319,7 +322,7 @@ def gap_and_go(rows, now, config, instrument, prior_close):
     long = gap > 0
     if not (low > previous and entry >= opened if long else high < previous and entry <= opened):
         return {**waiting, "reason": "Opening gap filled/touched or continuation close failed"}
-    return {"state": "triggered", "setup": "gap_and_go", "rule_version": 1, "side": "BUY" if long else "SELL",
+    return {"state": "triggered", "setup": "gap_and_go", "rule_version": 1, "side": "BUY" if long else "SELL", "interval_minutes":minutes,
             "entry": float(entry), "range_high": float(high), "range_low": float(low),
             "opening_price": float(opened), "gap_pct": float(gap), "gap_min_pct": float(minimum),
             "reference_price": float(previous), "percent_over_level": money((entry/previous-1)*100),
@@ -337,7 +340,7 @@ def setup_hit(rows, now, config, instrument=None, prior_close=None, daily=None):
     if setup == "level":
         return level_hit(rows, now, config, instrument)
     if setup == "vwap_reclaim":
-        return vwap_reclaim(rows, now, config["no_entries_before"], config["no_entries_after"])
+        return vwap_reclaim(rows, now, config["no_entries_before"], config["no_entries_after"], minutes)
     if setup == "gap_and_go":
         return gap_and_go(rows, now, config, instrument, prior_close)
     if setup in {"breakout_20d", "bull_flag", "oversold_bounce"}:

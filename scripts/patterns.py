@@ -47,11 +47,13 @@ def rsi(closes, period=14):
 
 
 def daily_setup(rows, now, config, instrument, reference):
+    from entry_policy import interval
+    minutes = interval(config)
     setup = config["setup"]
     daily = daily_reference(reference, instrument, now.date().isoformat())
-    bars = session_bars(rows, now)
+    bars = session_bars(rows, now, minutes)
     closes = [positive(b["close"]) for b in daily]
-    waiting = {"state": "waiting", "setup": setup}
+    waiting = {"state": "waiting", "setup": setup, "interval_minutes":minutes}
     diagnostics = {}
     if setup == "breakout_20d":
         level = max(closes[-20:])
@@ -69,7 +71,7 @@ def daily_setup(rows, now, config, instrument, reference):
             return {**waiting, **diagnostics, "reason": "Prior-session Wilder RSI14 is not below 30"}
         level = positive(daily[-1]["high"])
     for k, b in enumerate(bars):
-        at = instant(b["at"])+timedelta(minutes=5)
+        at = instant(b["at"])+timedelta(minutes=minutes)
         if at.time() < max(time(9, 30), time.fromisoformat(config["no_entries_before"])):
             continue
         if at.time() > time.fromisoformat(config["no_entries_after"]):
@@ -80,7 +82,7 @@ def daily_setup(rows, now, config, instrument, reference):
             high = max(positive(x["high"]) for x in bars[:k+1])
             for x in bars[:k+1]:
                 positive(x["volume"], "signal bar volume")
-            return {"state": "triggered", "setup": setup, "rule_version": 1, "side": "BUY",
+            return {"state": "triggered", "setup": setup, "rule_version": 1, "side": "BUY", "interval_minutes":minutes,
                     "entry": float(close), "range_low": float(low), "range_high": float(high),
                     "stop_reference": float(low), "reference_price": float(level),
                     "percent_over_level": money((close/level-1)*100), "trigger_at": at.isoformat(),

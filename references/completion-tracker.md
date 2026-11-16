@@ -1,6 +1,6 @@
 # Sequential development checklist
 
-Development status after the published 0.9.9 ZIP. Updated 15 November 2026. Local implementation and offline tests do not establish broker or production acceptance. Items are maintained in the user's requested order; partial items are not counted as complete.
+Development status after the published 0.9.9 ZIP. Updated 16 November 2026. Local implementation and offline tests do not establish broker or production acceptance. Items are maintained in the user's requested order; partial items are not counted as complete.
 
 | # | Area | Current status | Remaining acceptance boundary |
 | --- | --- | --- | --- |
@@ -13,7 +13,7 @@ Development status after the published 0.9.9 ZIP. Updated 15 November 2026. Loca
 | 7 | Daily context | Partial: [public NSE index closes, EQ/constituent breadth, dated FII/DII and GIFT observations](closing-context.md), available through daily aliases; public smoke test passed | BSE closing provider, macro-event feeds, independently verified publication/finality and membership, broader providers. |
 | 8 | Liquidity/costs | Partial: [five-broker cash depth and quantity-dependent replay fees/cost sensitivity](depth-and-replay-costs.md) | Dhan/FYERS book timestamps remain unverified; derivative units, queue/partial-fill simulation, calibrated impact/latency and account acceptance remain. |
 | 9 | Portfolio margin | Partial: [Kite/Upstox/Angel/FYERS basket prefixes and requested fill scenarios](basket-margin-providers.md), with provider-specific semantics and account-change checks | Dhan baskets, verified response/account semantics, collateral and market stress, scenarios beyond supplied fill grids and end-user acceptance. |
-| 10 | Strategy/replay | Pending expansion | Other one-minute rules, pre-open/regime models and consistent special sessions. |
+| 10 | Strategy/replay | Partial: [all six scanners plus custom levels at one/five minutes](setups.md), with interval-bound replay and 25 additional broker/rule paper combinations | Pre-open/regime models, calibrated strategy evidence and consistent special-session handling. |
 | 11 | Protection operations | Pending expansion | Multi-instrument/account and carry protection, deployment/runtime acceptance. |
 | 12 | Compatibility/charges | Pending expansion | Ambiguous Angel/FYERS fields, master compatibility and account-specific tariffs/exemptions/rounding. |
 

@@ -106,7 +106,7 @@ A separate opt-in [mixed cash-entry workflow](references/mixed-inventory-entries
 | --- | --- | --- |
 | Stock research | Price context, Nifty comparison, technicals, available ratios and news | Source availability and financial-statement coverage vary |
 | Daily briefings | India daily, Nifty, Sensex, Bank Nifty; pre-open / intraday / close modes | Public feeds can be delayed; membership and breadth are partial |
-| Scanning & paper plans | Six scanners; one-/five-minute ORB and custom levels; replay, sizing and risk checks | Other scanner rules remain five-minute; results are research |
+| Scanning & paper plans | Six scanners and custom levels at one/five minutes; replay, sizing and risk checks | Regular-session rules; pre-open/regime and broader special-session models pending |
 | News & filings | RSS discovery, deduplication, attachment extraction, supported XBRL and filing backlog | Not comprehensive exchange or historical coverage |
 | Repeated collection | Bounded foreground runs, saved reports, shared backlog and stop latch | No automatic service installation; partial sources stay partial |
 | Broker data | Kite, Upstox, Dhan, Angel One and FYERS adapters | User login, entitlements and account-specific checks required |
