@@ -59,7 +59,10 @@ def load(spec, root):
         if not isinstance(sid, str) or not sid.strip() or sid in seen:
             raise Block('MEMBERSHIP_HISTORY: unique snapshot ID required')
         seen.add(sid)
-        start, end = date.fromisoformat(row['effective_from']), date.fromisoformat(row['effective_through'])
+        try:
+            start, end = date.fromisoformat(row['effective_from']), date.fromisoformat(row['effective_through'])
+        except (TypeError, ValueError):  # Python 3.10 rejects compact dates that 3.11+ parses
+            raise Block('MEMBERSHIP_HISTORY: ISO calendar dates required') from None
         if row['effective_from'] != start.isoformat() or row['effective_through'] != end.isoformat():
             raise Block('MEMBERSHIP_HISTORY: ISO calendar dates required')
         if start > end or previous is not None and start <= previous:

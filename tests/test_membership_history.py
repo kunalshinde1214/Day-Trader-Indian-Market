@@ -97,7 +97,10 @@ class MembershipHistoryTests(unittest.TestCase):
         for mutate in (lambda s: s['artifacts']['oct'].update(source='https://www.niftyindices.com.evil/'),
                        lambda s: s['artifacts']['oct'].update(source='https://user:secret@www.niftyindices.com/a'),
                        lambda s: s['artifacts']['oct'].update(published_at='2026-10-01T10:00:00'),
-                       lambda s: s['snapshots'][0].update(effective_from='20261001')):
+                       lambda s: s['snapshots'][0].update(effective_from='20261001'),
+                       lambda s: s['snapshots'][0].update(effective_from='2026-13-01'),
+                       lambda s: s['snapshots'][0].update(effective_through='2026-02-30'),
+                       lambda s: s['snapshots'][0].update(effective_through=None)):
             self.spec = copy.deepcopy(original); mutate(self.spec)
             with self.assertRaises(Block): self.result()
 
