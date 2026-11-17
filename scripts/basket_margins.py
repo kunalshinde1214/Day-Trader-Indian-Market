@@ -3,7 +3,10 @@ from core import Block, fingerprint, number
 
 
 def identity(broker, instrument):
-    if broker == 'upstox':
+    if broker == 'dhan':
+        from dhan_readonly import security_id, segment_for
+        security_id(instrument['token']); segment_for(instrument['exchange'])
+    elif broker == 'upstox':
         from upstox_readonly import instrument_key, SEGMENTS
         key = instrument_key(instrument['token'])
         if SEGMENTS[key.split('|')[0]] != instrument['exchange']:
@@ -18,7 +21,7 @@ def identity(broker, instrument):
         symbol_key(full_symbol(instrument['symbol'], instrument['exchange']))
 
 
-def estimate(client, broker, orders, instruments):
+def estimate(client, broker, orders, instruments, account_id=None):
     if broker == 'kite':
         body = orders
         result = client.request('POST', '/margins/basket', query={'consider_positions': 'true'}, body=body)
@@ -34,7 +37,29 @@ def estimate(client, broker, orders, instruments):
                     'basis': 'Kite initial/final estimates with consider_positions=true'}
     else:
         selected = [instruments[(o['exchange'], o['tradingsymbol'], o['product'])] for o in orders]
-        if broker == 'upstox':
+        if broker == 'dhan':
+            from dhan_readonly import segment_for
+            if not isinstance(account_id, str) or not account_id.isascii() or not account_id.isdigit():
+                raise Block('BASKET: exact numeric Dhan account identity required')
+            products = {'MIS': 'INTRADAY', 'CNC': 'CNC', 'NRML': 'MARGIN'}
+            # Official SDK spelling; the web guide also contains a conflicting
+            # scripts/includeOrders example. Never retry a different contract.
+            body = {'dhanClientId': account_id, 'includePosition': True, 'includeOrder': True, 'scripList': [
+                {'exchangeSegment': segment_for(i['exchange']), 'securityId': i['token'],
+                 'transactionType': o['transaction_type'], 'quantity': o['quantity'],
+                 'productType': products[o['product']], 'price': o['price'], 'triggerPrice': 0}
+                for o, i in zip(orders, selected)]}
+            result = client.request('POST', '/margincalculator/multi', body=body)
+            if not isinstance(result, dict) or result.get('currency') != 'INR':
+                raise Block('BASKET: Dhan documented INR response required')
+            total = number(result['total_margin'])
+            for field in ('span_margin', 'exposure_margin', 'equity_margin', 'fo_margin', 'commodity_margin'):
+                number(result[field])
+            observed = {'initial_inr': None, 'final_inr': None, 'required_inr': float(total),
+                        'account_total_inr': float(total),
+                        'basis': 'Dhan total_margin requested with positions and open orders; account-inclusive estimate, not incremental cash requirement',
+                        'contract_acceptance': 'UNVERIFIED_ON_USER_ACCOUNT'}
+        elif broker == 'upstox':
             body = {'instruments': [{'instrument_key': i['token'], 'quantity': o['quantity'],
                     'transaction_type': o['transaction_type'], 'product': 'I' if o['product'] == 'MIS' else 'D',
                     'price': o['price']} for o, i in zip(orders, selected)]}

@@ -1,5 +1,7 @@
 # Sourced inventory adjustments
 
+Version 0.10.1 adds [trade-inclusive v2 reconciliation](development-progress.md), matching each sourced buy/sell fill exactly once before later settlement or corporate-action events. The original v1 format below remains supported and does not accept trade activity. Neither format authorizes restricted inventory execution.
+
 Included in 0.10.0. `scripts/inventory_book.py` reconciles reviewed equity lots in settled, T1, pledged, funded (MTF) and pending-entitlement buckets. It applies explicit non-trade events and compares the exact result with a separately supplied closing statement. It does not change the existing broker collectors' eligibility rules or enable orders against restricted inventory.
 
 ```text

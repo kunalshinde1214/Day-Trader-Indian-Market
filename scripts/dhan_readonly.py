@@ -88,7 +88,7 @@ class DhanReadOnly:
 
     def request(self, method, path, body=None):
         allowed = ((method == "GET" and path in {"/fundlimit", "/positions", "/holdings", "/orders", "/trades"}) or
-                   (method == "POST" and path in {"/charts/historical", "/charts/intraday", "/marketfeed/quote", "/margincalculator"}))
+                   (method == "POST" and path in {"/charts/historical", "/charts/intraday", "/marketfeed/quote", "/margincalculator", "/margincalculator/multi"}))
         if not allowed:
             raise Block("READ_ONLY: endpoint/method not allowed; live execution unavailable")
         client_id, token = self.credentials()

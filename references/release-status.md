@@ -1,6 +1,8 @@
-# Release status — 16 November 2026
+# Release status — 17 November 2026
 
-Version: **0.10.0-market-workflows-alpha**. A public alpha with expanded Indian-market research and broker workflows. **The full specification is not complete.** See the [feature matrix](../README.md#what-is-implemented) and [ordered completion tracker](completion-tracker.md).
+**0.10.1, 17 November 2026:** adds the [history, inventory, risk and protection work](development-progress.md) on top of 0.10.0. Release validation passed **984 offline tests**. The 0.10.0 feature description below still applies.
+
+Version: **0.10.1-carry-protection-alpha** (builds on 0.10.0-market-workflows-alpha). A public alpha with expanded Indian-market research and broker workflows. **The full specification is not complete.** See the [feature matrix](../README.md#what-is-implemented) and [ordered completion tracker](completion-tracker.md).
 
 ## Included in this release
 
@@ -39,6 +41,6 @@ Users supply broker login, API permissions and entitlements, delivery authorizat
 
 ## Distribution
 
-Build with `python scripts/release.py --out dist/india-day-trader-0.10.0-market-workflows-alpha.zip`. The command refuses overwrite and does not skip tests. The manifest retains `full_specification_complete: false`, `authenticated_broker_acceptance: false` and `live_enabled_by_default: false`.
+Build with `python scripts/release.py --out dist/india-day-trader-0.10.1-carry-protection-alpha.zip`. The command refuses overwrite and does not skip tests. The manifest retains `full_specification_complete: false`, `authenticated_broker_acceptance: false` and `live_enabled_by_default: false`.
 
-The [0.10.0 release page](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.0-market-workflows-alpha) provides the ZIP, checksum and scope notes. Original contributions remain source-available for personal use; third-party MIT rights remain intact.
+The [0.10.1 release page](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.1-carry-protection-alpha) provides the ZIP, checksum and scope notes. Original contributions remain source-available for personal use; third-party MIT rights remain intact.

@@ -11,7 +11,7 @@ from live_state import consistent, state_hash, TERMINAL
 from session_policy import validate as validate_session
 
 
-def decide(bundle, snapshot, profile, policy, now, state=None, intents=()):
+def decide(bundle, snapshot, profile, policy, now, state=None, intents=(), portfolio=None):
     """Evaluate one fresh observation; caller persists next_state before returning.
 
     A target/stop/cutoff latch survives cancellation and later price reversals.
@@ -20,19 +20,27 @@ def decide(bundle, snapshot, profile, policy, now, state=None, intents=()):
     i, config = bundle['instrument'], bundle['config']
     validate_instrument(i, now)
     identity = ('broker', 'exchange', 'symbol', 'token')
-    if (policy.get('schema') != 'protection_policy_v1' or not isinstance(policy.get('policy_id'), str) or not policy['policy_id'].strip()
+    carry = portfolio is not None
+    product = policy.get('product')
+    if (policy.get('schema') != ('portfolio_protection_policy_v1' if carry else 'protection_policy_v1') or not isinstance(policy.get('policy_id'), str) or not policy['policy_id'].strip()
             or any(policy.get(k) != i[k] for k in identity)
-            or policy.get('account_id') != config['account_id'] or policy.get('product') != 'MIS'
+            or policy.get('account_id') != config['account_id'] or product not in (('MIS', 'CNC', 'NRML') if carry else ('MIS',))
             or policy.get('date') != now.date().isoformat() or policy.get('entry_side') not in ('BUY', 'SELL')):
-        raise Block('PROTECTION: exact dated intraday policy required')
+        raise Block('PROTECTION: exact dated product policy required')
     if config['broker'] != i['broker'] or any(snapshot.get(k) != config[k] for k in ('broker', 'account_id')):
         raise Block('PROTECTION: snapshot account mismatch')
     if snapshot.get('source') != config['broker'] or snapshot.get('date') != policy['date'] or snapshot.get('state_hash') != state_hash(snapshot):
         raise Block('PROTECTION: invalid snapshot source/date/hash')
     fresh(snapshot['as_of'], now, 30, 'protection snapshot')
-    if any(r['product'] != 'MIS' for r in snapshot['positions'] + snapshot['orders']):
-        raise Block('PROTECTION: carry inventory requires a separate controller')
-    consistent(snapshot)
+    if carry:
+        from portfolio_exit import reconcile
+        verified, _ = reconcile(portfolio['collection'], portfolio['instruments'], now)
+        if verified != snapshot:
+            raise Block('PROTECTION: portfolio snapshot differs from reconciled collection')
+    else:
+        if any(r['product'] != 'MIS' for r in snapshot['positions'] + snapshot['orders']):
+            raise Block('PROTECTION: carry inventory requires a separate controller')
+        consistent(snapshot)
     if any(r['state'] in UNRESOLVED for r in intents):
         raise Block('PROTECTION: unresolved intent; reconcile without retry')
     cap = integer(policy['max_quantity'])
@@ -65,7 +73,7 @@ def decide(bundle, snapshot, profile, policy, now, state=None, intents=()):
         raise Block('PROTECTION: changed policy or invalid saved state; start a new policy ID')
     if state.get('as_of') and instant(state['as_of']) > now:
         raise Block('PROTECTION: observation predates saved state')
-    matching = lambda r: all(r[k] == i[k] for k in ('exchange', 'symbol', 'token'))
+    matching = lambda r: all(r[k] == i[k] for k in ('exchange', 'symbol', 'token')) and r['product'] == product
     positions = [p for p in snapshot['positions'] if matching(p)]
     if len(positions) > 1:
         raise Block('PROTECTION: duplicate position')
@@ -112,8 +120,14 @@ def decide(bundle, snapshot, profile, policy, now, state=None, intents=()):
         if desired_kind == 'stop': args['trigger'] = float(prices['stop_trigger'])
         status = 'REVIEW_EXIT' if desired_kind == 'exit' else 'REVIEW_STOP'
     if args:
-        review = prepare(args['kind'], bundle, snapshot, profile, now,
-                         **{k: v for k, v in args.items() if k != 'kind'})
+        if carry:
+            from portfolio_exit import prepare as portfolio_prepare
+            review, _ = portfolio_prepare(portfolio['collection'], portfolio['instruments'], i, config, profile, now,
+                product=product, kind=args['kind'], **{k: v for k, v in args.items() if k != 'kind'},
+                delivery=portfolio.get('delivery'), quote=quote, session=bundle['context'].get('instrument_session'))
+        else:
+            review = prepare(args['kind'], bundle, snapshot, profile, now,
+                             **{k: v for k, v in args.items() if k != 'kind'})
         review['protection_policy_hash'] = policy_hash
         review['protection_phase'] = state['phase']
         review['review_hash'] = fingerprint({k: v for k, v in review.items() if k not in ('review_hash', 'as_of')})
@@ -123,7 +137,7 @@ def decide(bundle, snapshot, profile, policy, now, state=None, intents=()):
             'warning': 'Preview only. Confirm each action through the human broker tool, then refresh. A limit order may not fill.'}
 
 
-def preview(database, bundle, snapshot, profile, policy, now, intents=()):
+def preview(database, bundle, snapshot, profile, policy, now, intents=(), portfolio=None):
     """Persist the exit latch transactionally; never import a broker transport."""
     path = Path(database)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -132,7 +146,7 @@ def preview(database, bundle, snapshot, profile, policy, now, intents=()):
         db.execute('CREATE TABLE IF NOT EXISTS protection_states (policy_id TEXT PRIMARY KEY, body TEXT NOT NULL)')
         db.execute('BEGIN IMMEDIATE')
         saved = db.execute('SELECT body FROM protection_states WHERE policy_id=?', (policy['policy_id'],)).fetchone()
-        result = decide(bundle, snapshot, profile, policy, now, json.loads(saved[0]) if saved else None, intents)
+        result = decide(bundle, snapshot, profile, policy, now, json.loads(saved[0]) if saved else None, intents, portfolio)
         db.execute('INSERT OR REPLACE INTO protection_states VALUES (?,?)',
                    (policy['policy_id'], json.dumps(result['next_state'], allow_nan=False)))
         db.commit()

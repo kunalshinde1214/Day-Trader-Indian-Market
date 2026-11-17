@@ -22,6 +22,8 @@ EVENT_FIELDS = {
     'split': {'numerator', 'denominator', 'symbol', 'token', 'isin'},
     'bonus': {'numerator', 'denominator', 'new_lot_id'},
     'adjustment': {'reason', 'replacement_lots'},
+    'buy': {'fill_id', 'new_lot', 'price', 'capitalized_charges_inr'},
+    'sell': {'fill_id', 'quantity', 'price', 'charges_inr', 'principal_repaid_inr'},
 }
 
 
@@ -84,7 +86,8 @@ def evidence_files(spec, root):
 
 def reconcile(spec, root, now):
     broker, account = identity(spec)
-    if spec.get('schema') != 'inventory_reconciliation_v1' or spec.get('reviewed') is not True or spec.get('complete') is not True:
+    trades = spec.get('schema') == 'inventory_reconciliation_v2'
+    if spec.get('schema') not in ('inventory_reconciliation_v1', 'inventory_reconciliation_v2') or spec.get('reviewed') is not True or spec.get('complete') is not True:
         raise Block('INVENTORY: complete reviewed reconciliation required')
     fresh(spec['as_of'], now, 60, 'inventory statement')
     hashes = evidence_files(spec, root)
@@ -92,14 +95,31 @@ def reconcile(spec, root, now):
     start, end = instant(opening['as_of']), instant(closing['as_of'])
     if not start <= end == instant(spec['as_of']) or (end - start).total_seconds() > 31 * 86400:
         raise Block('INVENTORY: ordered statement window of at most 31 days required')
-    if spec.get('trading_activity') is not False:
+    if not trades and spec.get('trading_activity') is not False:
         raise Block('INVENTORY: reconcile trade activity separately; never omit fills')
+    fills = {}
+    if trades:
+        ledger = spec.get('trade_ledger', {})
+        if ledger.get('complete') is not True or ledger.get('evidence_id') not in hashes or any(ledger.get(k) != spec[k] for k in ('broker', 'account_id')):
+            raise Block('INVENTORY: complete sourced account trade ledger required')
+        for row in array(ledger['fills']):
+            if set(row) != {'fill_id', 'exchange', 'symbol', 'token', 'side', 'quantity', 'price', 'at'}:
+                raise Block('INVENTORY: exact observed fill fields required')
+            fid = row['fill_id']
+            if not isinstance(fid, str) or not fid or fid in fills or row['side'] not in ('BUY', 'SELL'):
+                raise Block('INVENTORY: unique trade identity and side required')
+            if not start <= instant(row['at']) <= end:
+                raise Block('INVENTORY: trade outside statement interval')
+            integer(row['quantity']); number(row['price'], minimum='0.00000001')
+            fills[fid] = row
+        if type(spec.get('trading_activity')) is not bool or spec['trading_activity'] != bool(fills):
+            raise Block('INVENTORY: trading activity disagrees with complete ledger')
     for statement in (opening, closing):
         if any(statement.get(k) != spec[k] for k in ('broker', 'account_id')) or statement.get('evidence_id') not in hashes:
             raise Block('INVENTORY: sourced same-account statements required')
     expected, observed = book(opening['lots']), book(closing['lots'])
     seen_lots, seen_events, audit = set(expected), set(), []
-    previous = start
+    previous = start; seen_fills = set(); sale_cash = Decimal(0)
     for event in array(spec['events']):
         action = event.get('action')
         if action not in EVENT_FIELDS or set(event) != COMMON_EVENT | EVENT_FIELDS[action]:
@@ -115,9 +135,12 @@ def reconcile(spec, root, now):
             raise Block('INVENTORY: events must be supplied in effective order inside statement window')
         previous = at
         key = event['lot_id']
-        if key not in expected or event['expected_lot_hash'] != fingerprint(expected[key]):
+        buying = action == 'buy'
+        if buying and (not trades or key in seen_lots or event['expected_lot_hash'] is not None):
+            raise Block('INVENTORY: a buy needs a new lot identity and v2 trade ledger')
+        if not buying and (key not in expected or event['expected_lot_hash'] != fingerprint(expected[key])):
             raise Block('INVENTORY: exact pre-event lot hash required')
-        before = copy.deepcopy(expected[key])
+        before = None if buying else copy.deepcopy(expected[key])
 
         def add(row):
             value = lot(row)
@@ -125,7 +148,33 @@ def reconcile(spec, root, now):
                 raise Block('INVENTORY: replacement/new lot ID was already used')
             seen_lots.add(value['lot_id']); expected[value['lot_id']] = value
 
-        if action == 'transfer':
+        if action in ('buy', 'sell'):
+            fid = event['fill_id']; fill = fills.get(fid)
+            row = lot(event['new_lot']) if buying else before
+            q = row['quantity'] if buying else integer(event['quantity'])
+            if (not trades or fid in seen_fills or fill is None or
+                    any(fill[k] != row[k] for k in ('exchange', 'symbol', 'token')) or
+                    fill['side'] != action.upper() or integer(fill['quantity']) != q or
+                    number(fill['price']) != number(event['price']) or instant(fill['at']) != at):
+                raise Block('INVENTORY: event must exactly match one unconsumed observed fill')
+            seen_fills.add(fid)
+            if buying:
+                if row['lot_id'] != key or row['bucket'] not in ('T1', 'MTF') or number(row['cost_basis_inr']) != q * number(fill['price']) + number(event['capitalized_charges_inr']):
+                    raise Block('INVENTORY: sourced new T1/MTF purchase cost required')
+                add(row)
+            else:
+                if q > before['quantity']:
+                    raise Block('INVENTORY: sale exceeds identified lot')
+                principal = number(before['principal_inr']) * q / before['quantity']
+                if number(event['principal_repaid_inr']) != principal:
+                    raise Block('INVENTORY: sale funding repayment differs from allocated principal')
+                sale_cash += q * number(fill['price']) - number(event['charges_inr']) - principal
+                if q == before['quantity']: del expected[key]
+                else:
+                    expected[key] = lot({**before, 'quantity': before['quantity'] - q,
+                        'cost_basis_inr': decimal_text(number(before['cost_basis_inr']) * (before['quantity'] - q) / before['quantity']),
+                        'principal_inr': decimal_text(number(before['principal_inr']) - principal)})
+        elif action == 'transfer':
             q = integer(event['quantity']); destination = event['destination_bucket']
             if (before['bucket'], destination) not in MOVES or q > before['quantity']:
                 raise Block('INVENTORY: invalid bucket transfer or excess quantity')
@@ -165,6 +214,8 @@ def reconcile(spec, root, now):
             del expected[key]
         audit.append({'event_id': event_id, 'event_hash': fingerprint(event), 'before': before,
                       'after_book_hash': fingerprint(expected), 'evidence_sha256': hashes[event['evidence_id']]})
+    if seen_fills != set(fills):
+        raise Block('INVENTORY: every observed fill must be consumed exactly once')
     if expected != observed:
         raise Block('INVENTORY: projected lots differ from closing broker/depository statement')
     totals = {bucket: {'cost_basis_inr': Decimal(0), 'principal_inr': Decimal(0), 'lots': 0} for bucket in sorted(BUCKETS)}
@@ -179,6 +230,7 @@ def reconcile(spec, root, now):
             'lot_hashes': {key: fingerprint(value) for key, value in sorted(expected.items())},
             'audit': audit, 'evidence_hashes': hashes, 'submitted': False, 'execution_eligible': False,
             'sellable_quantity': None,
+            'trade_fills_reconciled': len(seen_fills), 'sale_cash_after_charges_and_principal_inr': str(sale_cash),
             'limitations': ['Local hashes and arithmetic do not authenticate statements or verify operator declarations.',
                             'No automatic settlement-date, broker-field, tax/P&L, funding-interest or sellability inference.',
                             'Corporate-action ratios and entitlement eligibility require reviewed source evidence.']}

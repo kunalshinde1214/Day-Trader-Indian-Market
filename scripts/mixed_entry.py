@@ -1,4 +1,4 @@
-"""Opt-in human-operated long cash-equity entries alongside reconciled CNC/MIS inventory."""
+"""Opt-in cash MIS entries alongside reconciled long CNC and signed MIS inventory."""
 import argparse
 import copy
 import json
@@ -6,7 +6,7 @@ from pathlib import Path
 import sqlite3
 
 from core import Block, check_order, fingerprint, fresh, instant, integer, money, number, on_tick, positive, validate_instrument
-from execution import ExecutionStore, TerminalApproval, execute, profile_check, review_data
+from execution import ExecutionStore, TerminalApproval, execute, profile_check, review_data, store_path
 from journal import Journal, reconcile as reconcile_intraday
 from live_broker import LiveBroker, wire_payload
 from live_state import TERMINAL, available_funds
@@ -29,11 +29,11 @@ def risk_ledger(collection, instruments, funds, reservations, profile, card, now
     values = {}; gross = number(0)
     for row in current:
         key = tuple(row[k] for k in FIELDS)
-        if row['product'] not in ('CNC', 'MIS') or master[key[:3]]['kind'] != 'equity' or row['quantity'] < 0:
-            raise Block('MIXED_ENTRY: first implementation supports long cash equity CNC/MIS only')
+        if row['product'] not in ('CNC', 'MIS') or master[key[:3]]['kind'] != 'equity' or (row['product'] == 'CNC' and row['quantity'] < 0):
+            raise Block('MIXED_ENTRY: cash equity long CNC and signed MIS only')
         if row['quantity']:
             fresh(row['mark_as_of'], now, 30, 'portfolio mark')
-            value = integer(row['quantity']) * positive(row['mark_price']); gross += value
+            value = integer(abs(row['quantity'])) * positive(row['mark_price']); gross += value
             name = row['exchange'] + ':' + row['symbol']
             values[name] = values.get(name, number(0)) + value
     carry_reserved = {}
@@ -48,8 +48,9 @@ def risk_ledger(collection, instruments, funds, reservations, profile, card, now
             carry_reserved[key] = carry_reserved.get(key, 0) + remaining
             if carry_reserved[key] > positions.get(key, {}).get('quantity', 0):
                 raise Block('MIXED_ENTRY: carry exits can overdraw current inventory')
-        elif order['side'] == 'BUY':
-            # Do not reserve only the filled slice of a partially filled entry.
+        else:
+            # Count all outstanding MIS units conservatively, on either side.
+            # A pending cover/exit cannot release exposure before it fills.
             value = remaining * positive(order['price']); gross += value
             name = order['exchange'] + ':' + order['symbol']
             values[name] = values.get(name, number(0)) + value
@@ -96,8 +97,8 @@ def prepare(bundle, collection, instruments, funds, reservations, profile, now):
     fresh(acceptance.get('as_of'), now, 86400, 'mixed entry acceptance')
     validate_instrument(i, now)
     order = bundle['order']; plan = order['plan']
-    if i not in instruments or i['broker'] != broker or i['kind'] != 'equity' or plan['side'] != 'BUY' or plan['product'] != 'MIS':
-        raise Block('MIXED_ENTRY: exact selected master and long intraday cash-equity plan required')
+    if i not in instruments or i['broker'] != broker or i['kind'] != 'equity' or plan['side'] not in ('BUY', 'SELL') or plan['product'] != 'MIS':
+        raise Block('MIXED_ENTRY: exact selected master and intraday cash-equity plan required')
     sources = [card.get('source', ''), collection['opening'].get('source', '')]
     sources += [ctx[name].get('source', '') for name in ('session', 'restrictions', 'event', 'quote')]
     sources += [row.get(k, '') for row in collection['opening']['positions'] for k in ('cost_source', 'mark_source')]
@@ -149,7 +150,7 @@ def main(argv=None):
         from broker_data import normalize_quote, quote_key
         from live import load_bundle
         w = Path(a.workdir); initial = read(w / 'config.json'); client = adapter(initial['broker'])
-        store = ExecutionStore(w / 'state/execution.sqlite')
+        store = ExecutionStore(store_path(w,initial))
         def refresh():
             bundle = load_bundle(w); config = bundle['config']; selected = bundle['instrument']
             if any(config[k] != initial[k] for k in ('broker', 'account_id')): raise Block('MIXED_ENTRY: selected account changed')

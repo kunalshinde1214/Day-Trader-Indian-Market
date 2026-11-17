@@ -14,7 +14,7 @@ import sys
 from broker import adapter
 from broker_data import normalize_quote, quote_key
 from core import Block, instant, fingerprint
-from execution import ExecutionStore, TerminalApproval, execute, prepare
+from execution import ExecutionStore, TerminalApproval, execute, prepare, store_path
 from journal import Journal, reconcile
 from live_broker import LiveBroker, wire_payload
 from live_state import normalize, consistent, TERMINAL
@@ -59,10 +59,11 @@ def reconcile_account(w, snap):
                  "cash_available": max(0, snap["available_inr"]), "margin_available": max(0, snap["available_inr"]),
                  "positions": [{**p, "position_value_inr": 0} for p in snap["positions"]]}
     rpath = w / "reservations.json"
+    database = store_path(w, read(w/'config.json') if (w/'config.json').exists() else {})
     if rpath.exists():
         reservations = read(rpath)
-    elif (w / "state/execution.sqlite").exists():
-        executions = ExecutionStore(w / "state/execution.sqlite")
+    elif database.exists():
+        executions = ExecutionStore(database)
         try:
             executions.observe(snap, instant())
             reservations = executions.reservations(snap)
@@ -135,7 +136,7 @@ def main(argv=None):
         bundle = load_bundle(w)
         c = bundle["config"]
         client = adapter(c["broker"])
-        store = ExecutionStore(w / "state" / "execution.sqlite")
+        store = ExecutionStore(store_path(w,c))
         approval = TerminalApproval()
         if a.command in {'protection-preview', 'protection-step'}:
             from protection import preview as protection_preview

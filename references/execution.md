@@ -71,7 +71,7 @@ Cancellation IDs are recorded before the request. A timed-out cancel retains its
 
 `panic-preview` immediately writes the local entry halt, lists outstanding orders and current positions, and sends no order. Approve cancellations individually, confirm terminal states, refresh remaining positions, then approve reducing limit exits. If the API is unavailable or an intent is unresolved, use the broker's own controls and reconcile afterwards. Keep the original intent database; deleting it is not recovery. The tool does not promise that a stop, a limit exit or an exchange halt can guarantee flatness at a deadline.
 
-## Protection-status interpretation (unreleased)
+## Protection-status interpretation (0.10.1)
 
 `status` evaluates waiting-stop quantities for the exact exchange, symbol, token and product. Remaining quantities exclude fills. `STOP_WAITING` requires exact coverage with no additional working entry or excess exit quantity; it never guarantees execution. Independent stop and target orders that could sell/buy more than the remaining position produce `OVER_EXIT_RISK`. Pending exposure-increasing orders produce `POSITION_CAN_INCREASE`; ambiguous working states produce `ORDER_STATE_UNVERIFIED`. Triggered limits and generic pending orders do not count as verified waiting stops. Reports include uncovered, excess-exit and working-entry quantities. These diagnostics send no orders and do not install unattended protection.
 

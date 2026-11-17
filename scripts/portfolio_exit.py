@@ -6,7 +6,7 @@ from pathlib import Path
 import sqlite3
 
 from core import Block, BROKERS, fingerprint, fresh, instant, integer, positive, on_tick, validate_instrument, reducing_exit
-from execution import ExecutionStore, TerminalApproval, execute, profile_check, review_data
+from execution import ExecutionStore, TerminalApproval, execute, profile_check, review_data, store_path
 from journal import Journal
 from live_broker import LiveBroker, identifier, wire_payload
 from live_state import TERMINAL, state_hash
@@ -151,7 +151,7 @@ def main(argv=None):
         if initial['broker'] not in BROKERS:raise Block('MIXED_EXIT: unsupported broker')
         from broker import adapter
         client=KiteReadOnly() if initial['broker']=='kite' else adapter(initial['broker'])
-        store=ExecutionStore(w/'state/execution.sqlite');approval=TerminalApproval()
+        store=ExecutionStore(store_path(w,initial));approval=TerminalApproval()
         def current():
             config=read(w/'config.json');instrument=read(w/'instrument.json');instruments=read(a.master)['instruments']
             if (config['broker'],config['account_id'])!=(initial['broker'],initial['account_id']):raise Block('MIXED_EXIT: selected account changed')

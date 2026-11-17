@@ -1,5 +1,7 @@
 # Protection controller
 
+The 0.10.0 runner described below covers one intraday policy. Version 0.10.1 also supports [carry-aware policies and multi-scope coordination](portfolio-protection.md), with separate opt-in, reconciled inventory, delivery evidence and shared account journals. Production acceptance remains unperformed.
+
 ## Optional unattended runner
 
 `scripts/protection_runner.py` provides a bounded foreground runner for one selected intraday instrument. It is disabled unless the live profile has `unattended_protection: true` and fresh `automation_acceptance` with exact `broker`, `account_id`, `status: PASS`, `as_of`, a real evidence `source`, and `broker_api_automation_permitted: true`. These are operator-supplied acceptance records, not independent broker certification. Do not invent them. The ordinary profile and human-approved arming remain required.

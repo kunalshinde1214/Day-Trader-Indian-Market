@@ -16,6 +16,22 @@ from live_state import TERMINAL, consistent, state_hash
 UNRESOLVED = {"SUBMITTING", "UNKNOWN", "ACKNOWLEDGED"}
 
 
+def store_path(workdir, config):
+    """Explicit shared account journal. Never silently abandon a local journal."""
+    local = (Path(workdir) / 'state/execution.sqlite').resolve()
+    configured = config.get('execution_database')
+    if configured is None: return local
+    if not isinstance(configured, str) or not configured.strip():
+        raise Block('EXECUTION_DB: explicit absolute SQLite path required')
+    path = Path(configured)
+    if not path.is_absolute() or path.suffix != '.sqlite':
+        raise Block('EXECUTION_DB: absolute .sqlite path required')
+    path = path.resolve()
+    if path != local and local.exists():
+        raise Block('EXECUTION_DB: local execution history exists; reconcile and migrate it explicitly before sharing')
+    return path
+
+
 def review_data(value):
     """Refresh timestamps may advance; economic inputs and evidence identities may not."""
     if isinstance(value, dict):

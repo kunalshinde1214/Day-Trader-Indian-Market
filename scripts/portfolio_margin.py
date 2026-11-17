@@ -10,7 +10,7 @@ from basket_margins import estimate, identity
 def quote(client, bundle, clock=instant):
     now=clock()
     broker = bundle.get('broker')
-    if broker not in {'kite', 'upstox', 'angel', 'fyers'} or not bundle.get("account_id"):
+    if broker not in {'kite', 'upstox', 'angel', 'fyers', 'dhan'} or not bundle.get("account_id"):
         raise Block("BASKET: supported exact broker/account required")
     legs=bundle.get("legs")
     if not isinstance(legs,list) or not 1<=len(legs)<=20:
@@ -72,9 +72,9 @@ def quote(client, bundle, clock=instant):
     estimates=[];scenario_estimates=[]
     # Every execution prefix is quoted: a cheap fully hedged final basket must not hide interim funding.
     for count in range(1,len(orders)+1):
-        estimates.append({'prefix_legs':count, **estimate(client, broker, orders[:count], instruments)})
+        estimates.append({'prefix_legs':count, **estimate(client, broker, orders[:count], instruments, bundle['account_id'])})
     for quantities,selected in scenario_orders:
-        scenario_estimates.append({'quantities':quantities, **estimate(client, broker, selected, instruments)})
+        scenario_estimates.append({'quantities':quantities, **estimate(client, broker, selected, instruments, bundle['account_id'])})
     after=client.account()
     if after.get("account_id")!=bundle["account_id"] or fingerprint({k:after[k] for k in ("positions","orders","margins")})!=baseline:
         raise Block("BASKET: account books changed during estimates")
@@ -88,9 +88,9 @@ def quote(client, bundle, clock=instant):
             "peak_estimate_inr":max(r['required_inr'] for r in estimates+scenario_estimates),
             "final_estimate_inr":estimates[-1]['final_inr'],"submitted":False,"execution_eligible":False,
             "final_required_inr":estimates[-1]['required_inr'],
-            "peak_account_total_inr":max(r['account_total_inr'] for r in estimates+scenario_estimates) if broker=='fyers' else None,
+            "peak_account_total_inr":max(r['account_total_inr'] for r in estimates+scenario_estimates) if broker in ('fyers','dhan') else None,
             "limitations":["Broker estimates, not a local SPAN replica or a funding guarantee.",
-                           "Upstox/Angel/FYERS responses do not echo exact leg identities; request hashes bind submitted inputs but cannot independently verify response identity.",
+                           "Upstox/Angel/FYERS/Dhan responses do not echo exact leg identities; request hashes bind submitted inputs but cannot independently verify response identity.",
                            "Only ordered prefixes and explicitly supplied partial-fill scenarios were estimated; unenumerated quantities, market shocks, collateral changes and future margins remain unknown.",
                            "No cross-account netting; rerun after account, order, instrument or price changes. Does not authorize basket execution."]}
 

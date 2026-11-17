@@ -26,7 +26,9 @@ python scripts/acceptance.py --broker kite --authenticated-readonly --instrument
 
 Use the selected broker name and work directory; choose a new output file each time. The harness checks observed account identity and selected-instrument candle/quote responses. Optional `--payload` tests exact proposed margin evidence; it does not place an order. A missing/expired credential, unsupported instrument or unavailable market session can block. A PASS covers only the tested reads, not every instrument or live execution.
 
-6. Run the [paper pipeline](commands.md), reconcile fills and review costs. Keep the live profile disabled until you independently review the [execution workflow](execution.md). Any real action remains a separate exact-order human decision; an assistant cannot type confirmations. No unattended trading, automatic protection or account-wide certification is supplied.
+6. Run the [paper pipeline](commands.md), reconcile fills and review costs. Keep the live profile disabled until you independently review the [execution workflow](execution.md). Ordinary real actions require exact-order human decisions; an assistant cannot type confirmations. The separate experimental [protection runner](protection-controller.md) requires bounded owner arming and specific acceptance. No live setting is enabled or account-wide certification supplied by setup.
+
+Version 0.10.1 adds [optional read-only carry, basket and depth probes](development-progress.md). They do not change a profile or replace actual order/production acceptance.
 
 ## Reporting problems
 

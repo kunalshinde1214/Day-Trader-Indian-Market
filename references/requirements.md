@@ -1,5 +1,7 @@
 # Requirements and implementation status
 
+For 0.10.1 additions, read [0.10.1 scope](development-progress.md) and the [current completion tracker](completion-tracker.md). The 0.10.0 counts and scope below are preserved as publication evidence.
+
 Development checkpoint: **16 November 2026**, version **0.10.0-market-workflows-alpha**. Includes sixteen Claude plugin skills, credential-free charts and screening, one-minute/custom-level research, explicit exit policies, news and supplied XBRL analysis. Limited five-broker carry collection/execution, streaming, monitoring deployment files, daily reports and paper analysis are included. Each user supplies their broker/data entitlement, approved limits and sourced evidence for broker-bound workflows. Example capital and loss limits are not approvals.
 
 Implemented development includes all six broker-bound scanners/custom levels at one/five minutes, depth stress and replay cost sensitivity, four-broker basket estimates, partial public collection and a persistent filing backlog; see the [completion tracker](completion-tracker.md) for current scope. The full platform is not complete. Read [published release status](release-status.md) before making publication claims. All six requested scanners and five read-only adapters have offline coverage. A separate human-operated execution tool covers all five brokers and remains disabled by default; see [execution](execution.md).

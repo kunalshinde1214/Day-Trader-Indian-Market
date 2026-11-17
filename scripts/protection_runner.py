@@ -6,7 +6,7 @@ import sqlite3
 import time
 
 from core import Block, fingerprint, fresh, instant, integer
-from execution import ExecutionStore, TerminalApproval, execute, profile_check
+from execution import ExecutionStore, TerminalApproval, execute, profile_check, store_path
 from live import load_bundle, snapshot
 from broker import adapter
 from broker_data import normalize_quote, quote_key
@@ -19,12 +19,16 @@ from trader import read, write
 def scope(workdir):
     w=Path(workdir)
     values={name:read(w/(name+'.json')) for name in ('config','instrument','live-profile','protection-policy')}
+    if values['protection-policy'].get('schema') == 'portfolio_protection_policy_v1':
+        values.update({name: read(w/(name+'.json')) for name in ('opening','universe')})
     return fingerprint(values),values
 
 
 def eligibility(values, now):
     c,p=values['config'],values['live-profile']
     profile_check(p,c['broker'],c['account_id'],now)
+    if values['protection-policy'].get('schema') == 'portfolio_protection_policy_v1' and p.get('portfolio_unattended_protection') is not True:
+        raise Block('AUTOMATION: separate portfolio protection opt-in required')
     evidence=p.get('automation_acceptance',{})
     if (p.get('unattended_protection') is not True or evidence.get('status')!='PASS'
             or any(evidence.get(k)!=c[k] for k in ('broker','account_id'))
@@ -55,9 +59,18 @@ def validate_mandate(mandate, scope_hash, values, records, now, revoked=False):
 def observe(w,client,store,now):
     b=load_bundle(w);i=b['instrument']
     b['context']['quote']=normalize_quote(client.quotes([quote_key(i)]),i,now,30)
-    snap=snapshot(client,w,b)
+    policy=read(w/'protection-policy.json');portfolio=None
+    if policy.get('schema') == 'portfolio_protection_policy_v1':
+        from portfolio_exit import collect, reconcile
+        instruments=read(w/'universe.json')['instruments']
+        collection=collect(client,b['config']['broker'],b['config']['account_id'],read(w/'opening.json'),instruments)
+        snap,_=reconcile(collection,instruments,now)
+        portfolio={'collection':collection,'instruments':instruments,
+                   'delivery':read(w/'delivery-authorization.json') if policy['product']=='CNC' else None}
+    else:
+        snap=snapshot(client,w,b)
     records=store.observe(snap,now)
-    decision=preview(w/'state/protection.sqlite',b,snap,read(w/'live-profile.json'),read(w/'protection-policy.json'),now,records)
+    decision=preview(w/'state/protection.sqlite',b,snap,read(w/'live-profile.json'),policy,now,records,portfolio)
     return decision,snap
 
 
@@ -77,7 +90,7 @@ def arm(w, expires_at, max_actions, *, approval=None, clock=instant):
              'armed_at':now.isoformat(),'expires_at':instant(expires_at).isoformat(),'max_actions':integer(max_actions),
              'policy_id':values['protection-policy']['policy_id']}
     validate_mandate(mandate,digest,values,[],now)
-    store=ExecutionStore(w/'state/execution.sqlite')
+    store=ExecutionStore(store_path(w,c))
     try:
         client=adapter(c['broker']);decision,snap=observe(w,client,store,clock())
         if decision['next_state']['phase']=='COMPLETE':raise Block('MANDATE: selected lifecycle is already complete')
@@ -101,7 +114,7 @@ def run(w, *, cycles=12, interval=5, clock=instant, sleep=time.sleep):
     w=Path(w);cycles=integer(cycles);interval=integer(interval)
     if cycles>8640 or not 5<=interval<=60:raise Block('AUTOMATION: bounded cycles and 5..60 second interval required')
     mandate=read(w/'state/protection-mandate.json');scope_hash,values=scope(w);c=values['config']
-    store=ExecutionStore(w/'state/execution.sqlite');submitted=0;status='STARTING';completed=0;reason='cycle_limit'
+    store=ExecutionStore(store_path(w,c));submitted=0;status='STARTING';completed=0;reason='cycle_limit'
     def check():
         current_hash,current_values=scope(w)
         if read(w/'state/protection-mandate.json')!=mandate:raise Block('MANDATE: arming changed while running')

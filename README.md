@@ -8,9 +8,11 @@
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-244b3f)
 ![Public alpha](https://img.shields.io/badge/Release-public_alpha-bb702b)
 
-[Install](#install) · [See the workflow](#from-question-to-research) · [Feature matrix](#what-is-implemented) · [Download 0.10.0](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.0-market-workflows-alpha) · [Documentation](#go-deeper)
+[Install](#install) · [See the workflow](#from-question-to-research) · [Feature matrix](#what-is-implemented) · [Download 0.10.1](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.1-carry-protection-alpha) · [Documentation](#go-deeper)
 
 Created by **Kunal Shinde**. Source-available and free for personal use. Public research needs **no brokerage account or API key**. Broker workflows use **your own account**, with credentials kept locally.
+
+**New in 0.10.1:** resumable NSE announcement history, trade-inclusive inventory reconciliation, short MIS entries alongside existing inventory, Dhan basket margins, fill and collateral stress scenarios, and carry-aware protection. See [0.10.1 scope](references/development-progress.md).
 
 ## From question to research
 
@@ -70,7 +72,7 @@ There are **16 plugin skills**: eleven trading-workflow roles, four daily aliase
 
 ### Python CLI
 
-Clone the repository, or open the folder from the [release ZIP](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.0-market-workflows-alpha):
+Clone the repository, or open the folder from the [release ZIP](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.1-carry-protection-alpha):
 
 ```bash
 git clone https://github.com/kunalshinde1214/Day-Trader-Indian-Market.git india-day-trader
@@ -82,7 +84,7 @@ python scripts/daily.py india-daily --collect-public
 
 The `--demo` command uses **fictional demo data**. The last two fetch public data and need internet access. Use `python3` on macOS/Linux or `py` on Windows if `python` is unavailable. Core CLI workflows use the Python standard library; optional streaming and document-extraction paths have [additional requirements](references/operations.md).
 
-For a ZIP install, download both release assets into the same folder. Before extracting, run `sha256sum -c india-day-trader-0.10.0-market-workflows-alpha.zip.sha256` on Linux, or `shasum -a 256 -c india-day-trader-0.10.0-market-workflows-alpha.zip.sha256` on macOS. In Windows PowerShell, run `Get-FileHash .\india-day-trader-0.10.0-market-workflows-alpha.zip -Algorithm SHA256` and compare the hash with the `.sha256` file. Extract the ZIP, open its `india-day-trader` folder, then run the Python commands above.
+For a ZIP install, download both release assets into the same folder. Before extracting, run `sha256sum -c india-day-trader-0.10.1-carry-protection-alpha.zip.sha256` on Linux, or `shasum -a 256 -c india-day-trader-0.10.1-carry-protection-alpha.zip.sha256` on macOS. In Windows PowerShell, run `Get-FileHash .\india-day-trader-0.10.0-market-workflows-alpha.zip -Algorithm SHA256` and compare the hash with the `.sha256` file. Extract the ZIP, open its `india-day-trader` folder, then run the Python commands above.
 
 ## What is implemented
 
@@ -100,7 +102,7 @@ A separate opt-in [mixed cash-entry workflow](references/mixed-inventory-entries
 
 [Dated closing reports](references/closing-context.md) add public NSE Nifty/Bank Nifty closes, EQ breadth and separately dated FII/DII and GIFT context to the daily commands. BSE closing coverage, macro feeds and independent publication/finality verification remain unfinished.
 
-**0.10.0 public alpha** includes the following. “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
+**0.10.1 public alpha** includes the following (0.10.1 additions are listed above and in its [scope](references/development-progress.md)). “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
 
 | Capability | Available now | Boundary |
 | --- | --- | --- |
@@ -133,7 +135,7 @@ Ordinary execution requires two human confirmations and fresh checks. The separa
 
 ## Release evidence, not performance claims
 
-This checkpoint has **936 passing offline tests**, including simulated broker responses and failure cases. Release validation checks Python syntax, JSON, local links and an explicit packaging allowlist. GitHub CI tests Python **3.10, 3.12 and 3.13**; the [release](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.0-market-workflows-alpha) includes a ZIP and SHA-256 checksum.
+The published 0.10.1 checkpoint has **984 passing offline tests**, including simulated broker responses and failure cases. Release validation checks Python syntax, JSON, local links and an explicit packaging allowlist. GitHub CI tests Python **3.10, 3.12 and 3.13**; the [release](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.1-carry-protection-alpha) includes a ZIP and SHA-256 checksum. Published CI results do not validate later local edits.
 
 ```bash
 python scripts/release.py --check
@@ -150,7 +152,7 @@ Offline tests do **not** prove live broker acceptance, profitability or producti
 | Carry execution | [Kite](references/mixed-inventory-exits.md) · [Upstox](references/upstox-execution.md) · [Dhan](references/dhan-execution.md) · [Angel/FYERS](references/angel-fyers-execution.md) |
 | Project | [Changelog](CHANGELOG.md) · [Requirements](references/requirements.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) |
 
-**Still on the roadmap:** broader inventory and mixed-entry variants; comprehensive BSE/calendar/surveillance/filing coverage; independent historical and financial-fact verification; calibrated queue/fill/impact and collateral stress models; Dhan baskets; special-session/pre-open/regime models; multi-instrument/carry protection and broker-specific compatibility. See the [ordered completion checklist](references/completion-tracker.md). User account acceptance is separate from this engineering roadmap.
+**Still on the roadmap:** broader restricted-inventory and carry-entry variants; comprehensive BSE/calendar/surveillance/filing coverage; independent historical and financial-fact verification; calibrated execution models; special-session/pre-open/regime models; production protection and remaining broker compatibility. Dhan baskets, explicit stress/fill scenarios and carry/group protection were [added in 0.10.1](references/development-progress.md). See the [ordered completion checklist](references/completion-tracker.md). User account acceptance is separate from this engineering roadmap.
 
 ## License & responsible use
 

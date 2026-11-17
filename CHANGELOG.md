@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10.1-carry-protection-alpha — 17 November 2026
+
+- Add resumable NSE announcement-history windows feeding the existing filing backlog; preserve cursors on source gaps or archive failure.
+- Reconcile sourced inventory buy/sell events against every observed fill, alongside settlement and corporate-action events. Accounting does not enable restricted inventory execution.
+- Extend mixed cash MIS entries to explicitly enabled shorts and existing signed MIS exposure; use absolute gross exposure and conservatively reserve all outstanding MIS units.
+- Add Dhan multi-order basket estimates using the official SDK request spelling, without summing single-leg estimates or claiming authenticated acceptance.
+- Add explicit passive-limit queue/latency/partial-fill cost scenarios and account-separated collateral/cash-component stress.
+- Add carry-aware bounded protection and sequential group coordination. Preserve delivery/session checks, per-policy human arming, shared same-account execution logs and revocation after failures. One account per broker per process; no services activated.
+- Extend end-user read-only probes to supported carry inventory, basket contracts and cash depth. Real order and production acceptance remain unperformed.
+
+See [0.10.1 scope and remaining work](references/development-progress.md).
+
 ## 0.10.0-market-workflows-alpha — 16 November 2026
 
 This public alpha packages the sequential development work below. The full specification remains incomplete; account acceptance belongs to each end user. The final local suite passes 936 tests.

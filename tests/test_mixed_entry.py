@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from core import Block, fingerprint
+from core import Block, fingerprint, size
 from execution import ExecutionStore, execute
 from mixed_entry import prepare, risk_ledger, main
 from live_broker import wire_payload
@@ -109,6 +109,31 @@ class MixedEntryTests(unittest.TestCase):
         self.assertEqual(review['account_risk']['position_values']['NSE:CARRY'], 1500)
         self.assertEqual(review['account_risk']['daily_risk_used'], 100)
         self.assertEqual(review['account_risk']['trades_today'], 1)
+
+    def test_existing_short_mis_and_long_carry_use_gross_not_net_exposure(self):
+        self.order(quantity=5, filled=2, side='SELL')
+        self.collection['snapshot']['positions'].append({**self.position, 'product': 'MIS', 'quantity': -2})
+        self.reservations['entries'] = [{'entry_order_id': 'O1', 'exit_order_ids': [], 'planned_loss_inr': 100}]
+        review, _ = self.review()
+        self.assertEqual(review['account_risk']['position_values']['NSE:CARRY'], 1500)
+        self.assertEqual(review['account_risk']['daily_risk_used'], 100)
+
+    def test_new_short_requires_short_opt_in_and_exact_margin_payload(self):
+        plan = copy.deepcopy(self.bundle['order']['plan'])
+        plan.update(side='SELL', stop=2*plan['entry']-plan['stop'], target=2*plan['entry']-plan['target'])
+        self.bundle['context']['replay']['plan_hash'] = fingerprint(plan)
+        self.bundle['config']['allow_short'] = True
+        self.bundle['order'] = size(plan, self.bundle['instrument'], self.bundle['config'],
+                                    self.bundle['context'], self.bundle['charges'], self.now)
+        action = {'broker': 'kite', 'account_id': '123456', 'kind': 'entry', 'product': 'MIS',
+                  'instrument': self.bundle['instrument'], 'quantity': self.bundle['order']['quantity'],
+                  'price': plan['entry'], 'side': 'SELL'}
+        self.bundle['live_margin']['payload_hash'] = fingerprint(wire_payload(action))
+        review, _ = self.review()
+        self.assertEqual(review['action']['side'], 'SELL')
+        self.assertEqual(review['action']['product'], 'MIS')
+        self.bundle['config']['allow_short'] = False
+        with self.assertRaisesRegex(Block, 'SHORT'): self.review()
 
     def test_unmapped_orders_or_missing_fills_block(self):
         self.intraday(); self.reservations['entries'] = []
