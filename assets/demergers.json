@@ -1,0 +1,124 @@
+{
+  "schema": "demergers_v1",
+  "description": "Curated demergers of NSE-listed Indian companies (2023 onwards) used by scripts/holdings_review.py to flag holdings bought before a record date. ratio = new shares of the resulting company per parent shares held on the record date. cost_split_pct = the parent's published apportionment of the pre-demerger cost of acquisition (null when not verified). Each entry carries its sources and the date it was checked. Add entries only from the company's or the exchange's own announcement; never estimate numbers.",
+  "checked": "2026-11-18",
+  "demergers": [
+    {
+      "parent": "RELIANCE",
+      "parent_name": "Reliance Industries Limited",
+      "resulting_company": "Jio Financial Services Limited (formerly Reliance Strategic Investments Limited)",
+      "resulting_symbol": "JIOFIN",
+      "record_date": "2023-07-20",
+      "ratio": {"new_shares": 1, "per_parent_shares": 1},
+      "cost_split_pct": {"parent": 95.32, "resulting": 4.68},
+      "sources": [
+        {"url": "https://rilstaticasset.akamaized.net/sites/default/files/2023-08/SEIntimation_ApportionmentofCost_0.pdf",
+         "covers": "RIL letter to BSE/NSE, 19 Jul 2023: 1:1 ratio, record date 20 Jul 2023, cost split 95.32% / 4.68%"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "parent": "RAYMOND",
+      "parent_name": "Raymond Limited",
+      "resulting_company": "Raymond Lifestyle Limited (formerly Raymond Consumer Care Limited)",
+      "resulting_symbol": "RAYMONDLSL",
+      "record_date": "2024-07-11",
+      "ratio": {"new_shares": 4, "per_parent_shares": 5},
+      "cost_split_pct": null,
+      "cost_split_note": "No published apportionment found when checked; leave null until the company's notice is verified.",
+      "sources": [
+        {"url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/be1a2a3b-2a62-4578-988d-0368e27b6f8c.pdf",
+         "covers": "Raymond letter RL/SE/24-25/71 to BSE/NSE, 1 Jul 2024: record date 11 Jul 2024, 4 Raymond Lifestyle shares for every 5 Raymond shares"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "parent": "ITC",
+      "parent_name": "ITC Limited",
+      "resulting_company": "ITC Hotels Limited",
+      "resulting_symbol": "ITCHOTELS",
+      "record_date": "2025-01-06",
+      "ratio": {"new_shares": 1, "per_parent_shares": 10},
+      "cost_split_pct": {"parent": 86.49, "resulting": 13.51},
+      "sources": [
+        {"url": "https://nsearchives.nseindia.com/corporate/ITC_18122024125536_SE_Recorddate_.pdf",
+         "covers": "ITC letter to NSE/BSE, 18 Dec 2024: record date 6 Jan 2025"},
+        {"url": "https://nsearchives.nseindia.com/corporate/ITC_28012025004206_SE_COA_.pdf",
+         "covers": "ITC revised cost-of-acquisition guidance, 28 Jan 2025: 1 ITC Hotels share per 10 ITC shares, cost split 86.49% / 13.51%"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "parent": "SIEMENS",
+      "parent_name": "Siemens Limited",
+      "resulting_company": "Siemens Energy India Limited",
+      "resulting_symbol": "ENRIN",
+      "record_date": "2025-04-07",
+      "ratio": {"new_shares": 1, "per_parent_shares": 1},
+      "cost_split_pct": {"parent": 76.18, "resulting": 23.82},
+      "sources": [
+        {"url": "https://assets.ctfassets.net/17si5cpawjzf/3BaVBX9bhEbuweltVvQxbw/e3a52babbcfb8e885c0f6e7f8c0657f8/SEdisclosureRecordDate25032025.pdf",
+         "covers": "Siemens letter to NSE/BSE, 25 Mar 2025: 1:1 ratio, record date 7 Apr 2025"},
+        {"url": "https://assets.ctfassets.net/17si5cpawjzf/1eIuZLuvSghEP1UDL8BTE0/88d568a97ed7f1284238a144c7a132f0/3--guidance-on-cost-of-apportionment.pdf",
+         "covers": "Siemens guidance to shareholders, 14 Apr 2025: cost split 76.18% / 23.82%"},
+        {"url": "https://www.siemens.com/in/en/company/investor-relations/scheme-of-arrangement.html",
+         "covers": "Siemens Limited scheme-of-arrangement page linking both documents"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "parent": "RAYMOND",
+      "parent_name": "Raymond Limited",
+      "resulting_company": "Raymond Realty Limited",
+      "resulting_symbol": "RAYMONDREL",
+      "record_date": "2025-05-14",
+      "ratio": {"new_shares": 1, "per_parent_shares": 1},
+      "cost_split_pct": {"parent": 60.92, "resulting": 39.08},
+      "sources": [
+        {"url": "https://api.raymond.in/uploads/investor/1747203921975Cost%20of%20Acquisition%20%E2%80%93%20May%2013,%202025.pdf",
+         "covers": "Raymond letter RL/SE/25-26/15 to BSE/NSE, 13 May 2025: 1:1 ratio, record date 14 May 2025, cost split 60.92% / 39.08%"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "parent": "ABFRL",
+      "parent_name": "Aditya Birla Fashion and Retail Limited",
+      "resulting_company": "Aditya Birla Lifestyle Brands Limited",
+      "resulting_symbol": "ABLBL",
+      "record_date": "2025-05-22",
+      "ratio": {"new_shares": 1, "per_parent_shares": 1},
+      "cost_split_pct": {"parent": 75.68, "resulting": 24.32},
+      "sources": [
+        {"url": "https://www.abfrl.com/wp-content/uploads/2025/05/SE-Record-Date.pdf",
+         "covers": "ABFRL letter to BSE/NSE, 12 May 2025: record date 22 May 2025, 1:1 ratio"},
+        {"url": "https://www.abfrl.com/wp-content/uploads/2025/06/ABFRL-ABLBL-Apportionment-of-Cost.pdf",
+         "covers": "ABFRL letter to BSE/NSE, 22 May 2025: cost split 75.68% / 24.32%"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "parent": "TMPV",
+      "parent_aliases": ["TATAMOTORS"],
+      "parent_name": "Tata Motors Passenger Vehicles Limited (formerly Tata Motors Limited, NSE symbol TATAMOTORS until Oct 2025)",
+      "resulting_company": "Tata Motors Limited (formerly TML Commercial Vehicles Limited)",
+      "resulting_symbol": "TMCV",
+      "record_date": "2025-10-14",
+      "ratio": {"new_shares": 1, "per_parent_shares": 1},
+      "cost_split_pct": {"parent": 68.85, "resulting": 31.15},
+      "cost_split_note": "From the company's 12 Nov 2025 exchange filing as reported by Angel One and Groww; the filing PDF itself was not retrieved when checked.",
+      "sources": [
+        {"url": "https://nsearchives.nseindia.com/corporate/TATAMOTORSSJS_15102025215827_NSEBSELISTING.pdf",
+         "covers": "Company letter to BSE/NSE, 15 Oct 2025: allotment of TMCV shares to shareholders in the ratio 1:1"},
+        {"url": "https://nsearchives.nseindia.com/corporate/TATAMOTORSSJS_10112025220440_NSEBSELISTING.pdf",
+         "covers": "Company letter to BSE/NSE, 10 Nov 2025: TMCV shares listed from 12 Nov 2025"},
+        {"url": "https://www.business-standard.com/markets/news/tata-motors-fixes-october-14-as-record-date-for-demerger-stock-rallies-5-125100100609_1.html",
+         "covers": "Record date 14 Oct 2025"},
+        {"url": "https://www.angelone.in/news/market-updates/tata-motors-passenger-vehicles-and-tata-motors-commercial-vehicles-shares-in-focus-as-it-announces-cost-apportionment-post-demerger",
+         "covers": "Cost split 68.85% TMPV / 31.15% TMCV from the 12 Nov 2025 filing"},
+        {"url": "https://groww.in/blog/tata-motors-demerger",
+         "covers": "Same final cost split 68.85% / 31.15%"}
+      ],
+      "checked": "2026-11-18"
+    }
+  ]
+}

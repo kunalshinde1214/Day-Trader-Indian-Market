@@ -139,9 +139,45 @@ class StockDepthTests(unittest.TestCase):
         self.assertEqual(c["evaluated"], 3)
         self.assertEqual({x["symbol"] for x in c["rows"]}, {"BETA.NS", "GAMMA.NS"})
         self.assertIn("pe", c["medians"])
-        self.assertIn("## Peers", sa.markdown(r))
+        self.assertIn("## Index peers", sa.markdown(r))
         r = sa.analyse("ALPHA", fetcher=Feed(), news_fetcher=Feed(), clock=lambda: NOW, peers=False)
         self.assertIsNone(r["peers"])
+
+    def test_chosen_peers_replace_index_peers(self):
+        r = sa.analyse("ALPHA", fetcher=Feed(), news_fetcher=Feed(), clock=lambda: NOW, peer_symbols=["delta", "EPSILON.NS", "ALPHA"])
+        c = r["peers"]
+        self.assertEqual(c["kind"], "chosen")
+        self.assertEqual({x["symbol"] for x in c["rows"]}, {"DELTA.NS", "EPSILON.NS"})  # own symbol dropped
+        text = sa.markdown(r)
+        self.assertIn("## Peers", text)
+        self.assertNotIn("Index peers", text)
+
+    def test_index_peers_are_labelled_and_size_mismatch_flagged(self):
+        own = {"symbol": "ALPHA.NS", "name": "Alpha", "market_cap_cr": 10 ** 9, "pe": 20.0}
+        c = sa.peer_comparison("ALPHA.NS", own, fetcher=Feed(), now=NOW)
+        self.assertEqual(c["kind"], "index")
+        self.assertTrue(c["size_mismatch"])
+        r = sa.analyse("ALPHA", fetcher=Feed(), news_fetcher=Feed(), clock=lambda: NOW)
+        self.assertIn("## Index peers (same NSE index, not necessarily the same business)", sa.markdown(r))
+
+    def test_summary_is_short_and_answer_first(self):
+        r = sa.analyse("ALPHA", fetcher=Feed(), news_fetcher=Feed(), clock=lambda: NOW)
+        text = sa.summary(r)
+        self.assertLessEqual(len(text.splitlines()), 14)
+        self.assertTrue(text.startswith("ALPHA Ltd (ALPHA.NS) — prices as of"))
+        for part in ("Valuation: P/E", "Levels:", "not investment advice"):
+            self.assertIn(part, text)
+
+    def test_google_news_links_are_not_dumped_into_markdown(self):
+        r = sa.analyse("ALPHA", fetcher=Feed(), news_fetcher=Feed(), clock=lambda: NOW, peers=False)
+        r["news"]["items"] = [{"published_at": "2026-11-17T10:00:00+05:30", "headline": "Alpha wins order", "outlet": "Mint",
+                               "url": "https://news.google.com/rss/articles/" + "x" * 300},
+                              {"published_at": "2026-11-17T09:00:00+05:30", "headline": "Alpha Ltd", "outlet": "NSE",
+                               "url": "https://nsearchives.nseindia.com/corporate/a.pdf"}]
+        text = sa.markdown(r)
+        self.assertNotIn("news.google.com", text)
+        self.assertIn("Alpha wins order · Mint", text)
+        self.assertIn("(https://nsearchives.nseindia.com/corporate/a.pdf)", text)
 
     def test_price_chart_svg(self):
         r = sa.analyse("ALPHA", fetcher=Feed(), news_fetcher=Feed(), clock=lambda: NOW, peers=False)

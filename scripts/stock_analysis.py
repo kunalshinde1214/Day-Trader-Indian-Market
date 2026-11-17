@@ -409,11 +409,18 @@ def gather_news(selected, name, now, *, fetcher, news_fetcher, hours):
 PEER_FIELDS = ("market_cap_cr", "pe", "pb", "roe", "net_margin", "revenue_growth", "return_1y")
 
 
-def peer_comparison(selected, own, *, fetcher, now, show=6):
+def peer_comparison(selected, own, *, fetcher, now, show=6, chosen=None):
     from screener import peers_for, snapshot
-    group = peers_for(selected, fetcher=fetcher)
+    if chosen:
+        base = selected.rsplit(".", 1)[0]
+        picked = [s.strip().upper().replace(".NS", "") for s in chosen if s.strip()]
+        group = {"basis": "peers chosen for this business", "kind": "chosen",
+                 "peers": [{"symbol": s} for s in dict.fromkeys(picked) if s != base][:12]}
+        group["group_size"] = len(group["peers"]) + 1
+    else:
+        group = {**peers_for(selected, fetcher=fetcher), "kind": "index"}
     if not group["peers"]:
-        return {"basis": group["basis"], "rows": [], "medians": {}}
+        return {"basis": group["basis"], "kind": group["kind"], "rows": [], "medians": {}}
 
     def one(member):
         try:
@@ -429,11 +436,14 @@ def peer_comparison(selected, own, *, fetcher, now, show=6):
         if values:
             medians[field] = statistics.median(values)
     ranked = sorted(rows, key=lambda r: -(r.get("market_cap_cr") or 0))
-    return {"basis": group["basis"], "group_size": group.get("group_size"), "evaluated": len(everyone), "capped": group.get("capped", False),
-            "truncated": len(ranked) > show, "rows": ranked[:show], "own": own, "medians": medians}
+    caps = [r["market_cap_cr"] for r in rows if r.get("market_cap_cr")]
+    mismatch = bool(caps and own.get("market_cap_cr") and own["market_cap_cr"] > 3 * max(caps))
+    return {"basis": group["basis"], "kind": group["kind"], "group_size": group.get("group_size"), "evaluated": len(everyone),
+            "capped": group.get("capped", False), "truncated": len(ranked) > show, "rows": ranked[:show], "own": own, "medians": medians,
+            "size_mismatch": mismatch, "failed": [m["symbol"] for m in group["peers"] if m["symbol"] + ".NS" not in {r["symbol"] for r in rows}]}
 
 
-def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=instant, news_hours=168, peers=True):
+def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=instant, news_hours=168, peers=True, peer_symbols=None):
     selected = normalize(raw_symbol)
     now = clock()
     try:
@@ -474,7 +484,7 @@ def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=ins
                **({"market_cap_cr": fund["market_cap"] / 1e7 if fund.get("market_cap") else None,
                    **{k: fund.get(k) for k in ("pe", "pb", "roe", "net_margin", "revenue_growth")}} if fund else {})}
         try:
-            comparison = peer_comparison(selected, own, fetcher=fetcher, now=now)
+            comparison = peer_comparison(selected, own, fetcher=fetcher, now=now, chosen=peer_symbols)
             if not comparison["rows"]:
                 errors["peers"] = f"No peer group found ({comparison['basis']})"
         except (Block, ValueError, KeyError, TypeError, OSError):
@@ -550,18 +560,28 @@ def markdown(r):
         cols = (("market_cap_cr", "Mkt cap ₹ cr"), ("pe", "P/E"), ("pb", "P/B"), ("roe", "ROE"), ("net_margin", "Net margin"),
                 ("revenue_growth", "Revenue growth"), ("return_1y", "1Y return"))
         show = lambda k, v: "n/a" if v is None else f"{v:,.0f}" if k == "market_cap_cr" else f"{v:.1f}" if k in ("pe", "pb") else pct(v, sign=k in ("revenue_growth", "return_1y"))
-        lines += ["## Peers", "", f"Group: {c['basis']} — {c.get('group_size')} stocks" + ("; the largest by market cap are shown" if c.get("truncated") else "")
+        title = "## Peers" if c.get("kind") == "chosen" else "## Index peers (same NSE index, not necessarily the same business)"
+        lines += [title, "", f"Group: {c['basis']} — {c.get('group_size')} stocks" + ("; the largest by market cap are shown" if c.get("truncated") else "")
                   + f"; medians use all {c.get('evaluated')} that loaded" + (" (group capped at 40)" if c.get("capped") else "") + ".", "",
+                  *([f"⚠ {r['name']} is more than three times the size of every peer here, so this comparison says little about its valuation. "
+                     "Compare it with companies in the same businesses instead.", ""] if c.get("size_mismatch") else []),
+                  *([f"Could not load: {', '.join(c['failed'])}.", ""] if c.get("failed") else []),
                   "| Company | " + " | ".join(h for _, h in cols) + " |", "| --- |" + " ---: |" * len(cols),
                   f"| **{r['name']}** | " + " | ".join(f"**{show(k, c['own'].get(k))}**" for k, _ in cols) + " |"]
         for row in c["rows"]:
             lines.append(f"| {row['name']} | " + " | ".join(show(k, row.get(k)) for k, _ in cols) + " |")
-        lines += ["| Group median | " + " | ".join(show(k, c["medians"].get(k)) for k, _ in cols) + " |", "",
-                  "Peers are chosen from NSE index membership, not business similarity; check that each one is a fair comparison.", ""]
+        lines += ["| Group median | " + " | ".join(show(k, c["medians"].get(k)) for k, _ in cols) + " |", ""]
+        if c.get("kind") != "chosen":
+            lines += ["These peers come from NSE index membership, not business similarity. For a fairer comparison, rerun with `--peers` and companies in the same businesses.", ""]
     lines += ["## News (last 7 days)", ""]
     if r["news"]["items"]:
-        lines += [f"- {n['published_at'][:16].replace('T', ' ')} — [{n['headline']}]({n['url']})" + (f" · {n['outlet']}" if n.get("outlet") else "") for n in r["news"]["items"]]
-        lines += ["", r["news"]["note"]]
+        for n in r["news"]["items"]:
+            when = n["published_at"][:16].replace("T", " ")
+            if "news.google.com" in n["url"]:
+                lines.append(f"- {when} — {n['headline']}" + (f" · {n['outlet']}" if n.get("outlet") else ""))
+            else:
+                lines.append(f"- {when} — [{n['headline']}]({n['url']})" + (f" · {n['outlet']}" if n.get("outlet") else ""))
+        lines += ["", r["news"]["note"] + " Links to each story are in the `--format json` output."]
     else:
         lines.append("No matching headlines found in the public feeds. That does not mean there was no news.")
     if r["news"]["failures"]:
@@ -577,6 +597,40 @@ def markdown(r):
     if r["errors"]:
         lines += ["## Data gaps", ""] + [f"- {v}" for v in r["errors"].values()] + [""]
     lines.append(f"Sources: {r['price_source']}; {r['fundamentals_source']}; NSE index constituent lists; Google News, Yahoo and NSE news feeds. {r['warning']}")
+    return "\n".join(lines) + "\n"
+
+
+def summary(r):
+    """Answer-first digest: the handful of lines most questions need, with dates and warnings."""
+    t, f, o, c = r["technical"], r["fundamentals"], r["outlook"], r.get("peers")
+    lines = [f"{r['name']} ({r['symbol']}) — prices as of {t['last_close_date']}"]
+    if r.get("price_note"):
+        lines.append(f"⚠ {r['price_note']}")
+    lines.append(f"Price ₹{num(t['last_close'])} ({pct(t['day_change'], 2)} on the day); 1 year {pct(t['returns']['1Y'])} vs Nifty "
+                 f"{pct(t['relative']['1Y']['nifty'])}; {pct(t['from_high'])} from the 52-week high.")
+    lines.append(f"Trend: {t['trend']}; RSI {num(t['rsi14'], 0)} ({t['rsi_reading'] or 'n/a'}).")
+    if f:
+        band = f.get("pe_band")
+        valuation = f"P/E {num(f['pe'], 1)}" + (f" (usual range {num(band['p25'], 1)}–{num(band['p75'], 1)}, today higher than {band['percentile'] * 100:.0f}% of the last {band['years']} years)" if band else "")
+        lines.append(f"Valuation: {valuation}; P/B {num(f['pb'], 2)}; ROE {pct(f['roe'], sign=False)}; debt/equity {num(f['debt_to_equity'], 2)}.")
+        lines.append(f"Growth: revenue {pct(f['revenue_growth'])} last year, EPS {pct(f['eps_growth'])}; latest quarter profit {pct(f['quarter_profit_change'])} vs previous quarter.")
+        lines += [f"⚠ {x}" for x in (f.get("eps_flags") or [])]
+        if f.get("currency_note"):
+            lines.append(f"⚠ {f['currency_note']}")
+    if c and c.get("rows"):
+        lines.append(f"{'Peers' if c.get('kind') == 'chosen' else 'Index peers'}: median P/E {num(c['medians'].get('pe'), 1)}, ROE {pct(c['medians'].get('roe'), sign=False)}"
+                     + (" — ⚠ much larger than every peer, weak comparison" if c.get("size_mismatch") else "") + ".")
+    month = o["ranges"].get("1 month")
+    if month:
+        lines.append(f"Past 1-month moves from today's price: ₹{num(month['low_10'])} to ₹{num(month['high_90'])} (10th–90th percentile, not a forecast).")
+    lines.append(f"Levels: above ₹{num(t['resistance'])} extends the move; below ₹{num(t['support'])} weakens it.")
+    if r["news"]["items"]:
+        n = r["news"]["items"][0]
+        lines.append(f"Latest headline ({n['published_at'][:10]}): {n['headline']}" + (f" · {n['outlet']}" if n.get("outlet") else ""))
+    gaps = [k for k in r["errors"] if k != "price"]
+    if gaps:
+        lines.append("Data gaps: " + ", ".join(gaps) + ".")
+    lines.append("Research only; not investment advice.")
     return "\n".join(lines) + "\n"
 
 
@@ -629,12 +683,14 @@ def main(argv=None):
     p.add_argument("--news-hours", type=int, default=168)
     p.add_argument("--out", help="Write the report to a new file")
     p.add_argument("--no-peers", action="store_true", help="Skip the peer comparison (faster)")
+    p.add_argument("--peers", nargs="+", metavar="SYMBOL", help="Compare with these companies (same businesses) instead of index peers")
+    p.add_argument("--summary", action="store_true", help="Print a short answer-first digest instead of the full report")
     p.add_argument("--chart", help="Write a one-year SVG price chart to a new file")
     a = p.parse_args(argv)
     try:
         if a.chart and Path(a.chart).exists():
             raise Block("STOCK: chart file exists; choose a new path")
-        report = analyse(a.symbol, news_hours=a.news_hours, peers=not a.no_peers)
+        report = analyse(a.symbol, news_hours=a.news_hours, peers=not a.no_peers, peer_symbols=a.peers)
         if a.chart:
             Path(a.chart).parent.mkdir(parents=True, exist_ok=True)
             Path(a.chart).write_text(svg_price_chart(report), encoding="utf-8")
@@ -643,7 +699,7 @@ def main(argv=None):
         print(f"BLOCKED - {error}", file=sys.stderr)
         return 2
     public = {k: v for k, v in report.items() if not k.startswith("_")}
-    text = json.dumps(public, indent=2, ensure_ascii=False) if a.format == "json" else markdown(report)
+    text = json.dumps(public, indent=2, ensure_ascii=False) if a.format == "json" else summary(report) if a.summary else markdown(report)
     if a.out:
         out = Path(a.out)
         if out.exists():

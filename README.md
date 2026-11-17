@@ -33,6 +33,40 @@ Created by **Kunal Shinde**. Source-available and free for personal use. Public 
 
 Historical ranges are **observed outcomes, not forecasts**. A rule match is not a buy/sell recommendation. Reports depend on available history and source coverage; missing data is flagged rather than replaced with demo figures.
 
+## See it in action
+
+Real output from 17–18 November 2026, unedited apart from trimming. Prices and figures are as of those dates, not current.
+
+**“Analyse Reliance”** (`stock_analysis.py RELIANCE --summary`):
+
+```text
+Reliance Industries Limited (RELIANCE.NS) — prices as of 2026-11-17
+⚠ Yahoo's daily bar for 2026-11-17 had no close; using its last traded price ₹1,367.00 at 15:28 IST and that day's high/low.
+Price ₹1,367.00 (+1.65% on the day); 1 year -9.6% vs Nifty -1.2%; -15.2% from the 52-week high.
+Trend: uptrend; RSI 84 (overbought (>70)).
+Valuation: P/E 22.5 (usual range 24.0–28.5, today higher than 14% of the last 3.4 years); P/B 2.05; ROE 9.2%; debt/equity 0.44.
+Growth: revenue +9.6% last year, EPS +16.0%; latest quarter profit +22.0% vs previous quarter.
+Index peers: median P/E 16.5, ROE 14.5% — ⚠ much larger than every peer, weak comparison.
+Past 1-month moves from today's price: ₹1,275.22 to ₹1,476.99 (10th–90th percentile, not a forecast).
+Levels: above ₹1,374.00 extends the move; below ₹1,152.50 weakens it.
+```
+
+**“Nifty ka option chain dikhao”** (`fno.py chain NIFTY --summary`):
+
+```text
+NIFTY options, expiry 2026-11-23 (6.0 days) — data 2026-11-17 (NSE F&O bhavcopy, end of day)
+- Spot 25,387.40 · forward 25,409.26
+- PCR (OI) 1.08 (+0.02 vs 2026-11-16)
+- Max pain 25,000 (+200 vs 2026-11-16)
+- ATM IV 14.2% (-0.4 pts vs 2026-11-16)
+- Expected move to expiry ±369.15 (1.5%) by ATM straddle; 68% implied range 24,946–25,872
+- Call OI walls above spot: 26,000, 25,500, 26,500 · put OI walls below spot: 25,000, 24,000, 23,000
+```
+
+**“Payoff of selling the 25800 call and buying the 26000 call”** (`fno.py payoff NIFTY --leg SELL:CE:25800:1 --leg BUY:CE:26000:1 --chart …`): net credit ₹1,693, maximum loss ₹11,307, breakeven 25,826, probability of profit 81.6% as implied by option prices.
+
+![Payoff chart for a NIFTY 25800/26000 bear call spread, expiry 23 November 2026: profit of ₹1,693 below the 25,826 breakeven, loss capped at ₹11,307 above 26,000, with a dashed line showing the value today.](assets/example-payoff.svg)
+
 ## Install
 
 ### Claude Code plugin
@@ -43,7 +77,7 @@ Requires **Claude Code**, **Git** and **Python 3.10+** installed. For a first-ti
 claude plugin marketplace add kunalshinde1214/Day-Trader-Indian-Market && claude plugin install india-day-trader@kunal-india-trading
 ```
 
-This registers the marketplace and installs all 19 plugin skills for your user account. The install step runs only if marketplace registration succeeds. Open a new Claude Code session after installation. It does not configure brokerage credentials or enable live trading.
+This registers the marketplace and installs all 8 plugin skills for your user account. The install step runs only if marketplace registration succeeds. Open a new Claude Code session after installation. It does not configure brokerage credentials or enable live trading.
 
 <details>
 <summary>Windows PowerShell 5.1, or marketplace already added?</summary>
@@ -68,16 +102,16 @@ Alternatively, inside an existing Claude Code session, run these two commands se
 Then ask naturally, or use a namespaced command:
 
 ```text
-/india-day-trader:stock-analysis RELIANCE
-/india-day-trader:india-daily
-/india-day-trader:nifty
+/india-day-trader:stock RELIANCE
+/india-day-trader:fno NIFTY
+/india-day-trader:market
 ```
 
-There are **19 plugin skills**: eleven trading-workflow roles, four daily aliases, one-stock analysis, F&O analytics, a stock screener and a portfolio review. See the [command reference](references/commands.md). For other skill-compatible hosts, download the release ZIP, unpack `india-day-trader`, and follow that host’s skill installation process. Claude plugin installation is not a universal installer for other hosts.
+There are **8 plugin skills**: `stock`, `fno`, `screener`, `portfolio`, `market`, `news`, `trade-plan` and `broker`. Most people never type them; just ask in plain English, Hindi or Hinglish. See the [command reference](references/commands.md). For other skill-compatible hosts, download the release ZIP, unpack `india-day-trader`, and follow that host’s skill installation process. Claude plugin installation is not a universal installer for other hosts.
 
 ### Python CLI
 
-Clone the repository, or open the folder from the [release ZIP](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.0.0):
+Clone the repository, or open the folder from the [latest release ZIP](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/latest):
 
 ```bash
 git clone https://github.com/kunalshinde1214/Day-Trader-Indian-Market.git india-day-trader
@@ -158,7 +192,7 @@ Offline tests do **not** prove live broker acceptance, profitability or producti
 | Research | [Daily reports](references/daily.md) · [News](references/india-news.md) · [Public workflows](references/public-workflows.md) · [Web research](references/web-research.md) · [Broker connectors](references/broker-connectors.md) |
 | Trading logic | [Setup definitions](references/setups.md) · [Execution](references/execution.md) · [Risk/data expansion](references/india-expansion.md) |
 | Carry execution | [Kite](references/mixed-inventory-exits.md) · [Upstox](references/upstox-execution.md) · [Dhan](references/dhan-execution.md) · [Angel/FYERS](references/angel-fyers-execution.md) |
-| Project | [Changelog](CHANGELOG.md) · [Requirements](references/requirements.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) |
+| Project | [Changelog](CHANGELOG.md) · [Requirements](references/requirements.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Advanced tools](references/advanced.md) |
 
 **Scope:** the skill is complete for its purpose: research, daily reports, analysis and paper trading, with web research and your own broker filling what scripts cannot bundle. Optional future enhancements (calibrated execution models, pre-open/regime models, extra inventory types) are listed in the [completion checklist](references/completion-tracker.md). Each user validates their own broker connection.
 

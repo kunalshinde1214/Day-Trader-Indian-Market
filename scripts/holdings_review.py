@@ -38,7 +38,9 @@ RATE_BASIS = ("Default rates — verify current rates: STCG 20% (s.111A) and LTC
 NOT_MODELLED = [
     "Surcharge on capital-gains tax",
     "Grandfathering of shares bought before 1 Feb 2018 (cost = higher of cost and 31 Jan 2018 FMV)",
-    "Demergers, mergers and rights issues (cost apportionment); bonuses and splits are applied from Yahoo's split events",
+    "Mergers and rights issues (cost apportionment); bonuses and splits are applied from Yahoo's split events",
+    "Demergers are flagged from a curated list (assets/demergers.json) with the published cost split spelled out; "
+    "cost changes only with --apply-demergers, and demergers missing from the list are not detected",
     "Set-off of capital losses against other income, and carry-forward of losses to later years",
     "Intraday and F&O trades (business income)",
     "Brokerage and exchange charges as transfer expenses (STT is not deductible)",
@@ -47,6 +49,7 @@ NOT_MODELLED = [
 ]
 DISCLAIMER = ("For information only; not investment or tax advice and not a recommendation to buy, sell or "
               "harvest gains or losses. Tax figures are estimates; check with a tax professional.")
+DEMERGERS_PATH = Path(__file__).resolve().parents[1] / "assets" / "demergers.json"
 HOLDINGS_CSV = {"instrument": "Instrument", "qty.": "Qty.", "avg. cost": "Avg. cost"}
 TRADEBOOK_CSV = ["symbol", "trade_date", "segment", "trade_type", "quantity", "price"]
 
@@ -223,6 +226,42 @@ def load(path):
     return parse_text(text, p.name)
 
 
+def load_demergers(path=DEMERGERS_PATH):
+    """Load and validate the curated demerger list. Returns entries with dates and Decimals; blocks on any malformed entry."""
+    try:
+        doc = json.loads(Path(path).read_text(encoding="utf-8"),
+                         parse_constant=lambda _: (_ for _ in ()).throw(ValueError("non-finite JSON")))
+    except (OSError, ValueError) as error:
+        raise Block(f"DEMERGERS: cannot read {Path(path).name} ({error})") from None
+    if not isinstance(doc, dict) or doc.get("schema") != "demergers_v1" or not isinstance(doc.get("demergers"), list):
+        raise Block('DEMERGERS: expected {"schema": "demergers_v1", "demergers": [...]}')
+    out = []
+    for n, e in enumerate(doc["demergers"]):
+        try:
+            parent = str(e["parent"]).strip().upper()
+            aliases = [str(a).strip().upper() for a in (e.get("parent_aliases") or [])]
+            new, per = e["ratio"]["new_shares"], e["ratio"]["per_parent_shares"]
+            if not all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in (new, per)):
+                raise ValueError("ratio must be positive whole numbers")
+            split = e.get("cost_split_pct")
+            parent_pct = resulting_pct = None
+            if split is not None:
+                parent_pct, resulting_pct = D(str(split["parent"])), D(str(split["resulting"]))
+                if not (0 < parent_pct < 100 and 0 < resulting_pct < 100) or abs(parent_pct + resulting_pct - 100) > D("0.011"):
+                    raise ValueError("cost split must be two percentages adding to 100")
+            sources = e["sources"]
+            if not isinstance(sources, list) or not sources or not all(isinstance(s, dict) and str(s.get("url", "")).startswith("https://") for s in sources):
+                raise ValueError("at least one https source URL is required")
+            out.append({"parent": parent, "symbols": [parent] + aliases, "parent_name": str(e.get("parent_name") or parent),
+                        "resulting_company": str(e["resulting_company"]), "resulting_symbol": (str(e["resulting_symbol"]).upper() if e.get("resulting_symbol") else None),
+                        "record_date": date.fromisoformat(e["record_date"]), "new": new, "per": per,
+                        "parent_pct": parent_pct, "resulting_pct": resulting_pct, "sources": [s["url"] for s in sources],
+                        "checked": date.fromisoformat(e["checked"])})
+        except (KeyError, TypeError, ValueError, InvalidOperation, AttributeError) as error:
+            raise Block(f"DEMERGERS: entry {n + 1} is invalid ({error})") from None
+    return out
+
+
 # ---------------------------------------------------------------- dates and FIFO
 
 def add_months(day, months):
@@ -262,7 +301,9 @@ def fifo(lots, events=None):
 
     `events` maps symbol -> [{"date", "ratio", "kind"}]. On the ex-date, before that day's trades, a split
     multiplies open quantities and divides their cost (holding period unchanged); a bonus adds a new lot of
-    (ratio - 1) x open quantity at nil cost dated on the ex-date, as Indian tax treats bonus shares.
+    (ratio - 1) x open quantity at nil cost dated on the ex-date, as Indian tax treats bonus shares. A demerger
+    event ({"kind": "demerger", "factor"}) keeps quantities and multiplies open lots' cost by the parent's published
+    share of the cost of acquisition; trades on the record date itself are not entitled, so it applies before them.
     """
     symbols = {x["symbol"] for x in lots}
     marks = [{"symbol": s, "date": e["date"], "time": "", "side": "EVENT", "seq": -1, **e}
@@ -278,6 +319,9 @@ def fifo(lots, events=None):
             if held:
                 if x["kind"] == "bonus":
                     queue.append({"symbol": x["symbol"], "date": x["date"], "quantity": held * (x["ratio"] - 1), "price": D(0), "bonus": True})
+                elif x["kind"] == "demerger":
+                    for l in queue:
+                        l["price"] *= x["factor"]
                 else:
                     for l in queue:
                         l["quantity"] *= x["ratio"]
@@ -395,9 +439,87 @@ def hhi_reading(value):
     return "highly concentrated"
 
 
+# ---------------------------------------------------------------- demergers
+
+def plural(n, word):
+    return f"{qty(n)} {word} share" + ("" if n == 1 else "s")
+
+
+def demerger_checks(symbol, entries, sym_lots, prior_events, quantity, average, holding, held, applied):
+    """Warnings for one holding whose symbol is a demerger parent. Returns (texts, details).
+
+    Dated (lots or a bought date): only shares held before the record date count; their quantity and cost on that date come
+    from FIFO over the earlier lots, with earlier splits and earlier published demerger splits applied. Undated: the whole
+    holding, worded conditionally. Nothing is changed here; `applied` says whether --apply-demergers already adjusted the cost.
+    """
+    texts, details = [], []
+    for e in sorted(entries, key=lambda x: x["record_date"]):
+        rd = e["record_date"]
+        res = e["resulting_symbol"] or e["resulting_company"]
+        if sym_lots:
+            pre = [l for l in sym_lots if l["date"] < rd]
+            if not pre:
+                continue
+            open_pre = fifo(pre, {symbol: [x for x in prior_events if x["date"] < rd]})[1]
+            held_rd = sum((l["quantity"] for l in open_pre), D(0))
+            cost_rd = sum((l["quantity"] * l["price"] for l in open_pre), D(0))
+            if held_rd == 0:
+                continue
+            conditional = False
+        else:
+            held_rd, cost_rd, conditional = quantity, quantity * average, True
+        ratio = D(e["new"]) / D(e["per"])
+        new_q = held_rd * ratio
+        whole = int(new_q)
+        terms = f"{plural(e['new'], res)} for every {plural(e['per'], symbol)}"
+        if conditional:
+            text = (f"Demerger: if you bought {symbol} before {rd.isoformat()} (record date for the demerger of {e['resulting_company']}: "
+                    f"{terms}), you should also hold {plural(whole, res)} for these {qty(held_rd)}")
+        else:
+            text = (f"Demerger: {e['resulting_company']} was demerged from {symbol} with record date {rd.isoformat()} ({terms}). "
+                    f"You held {plural(held_rd, symbol)} then, so you should also have received {plural(whole, res)}")
+            if holding and holding.get("bought_approx") and (holding["bought"].year, holding["bought"].month) == (rd.year, rd.month):
+                text += f" (your purchase date is month-only and taken as the 1st; if you bought on or after {rd.isoformat()} this does not apply)"
+        if new_q != whole:
+            text += ", plus cash for the fractional entitlement"
+        text += "."
+        text += (f" {res} is also in this file ({plural(held[res], res)})." if res in held else f" {res} is not in this file; add it if you still hold it.")
+        per_share = cost_rd / held_rd if held_rd else D(0)
+        info = {"resulting_company": e["resulting_company"], "resulting_symbol": e["resulting_symbol"], "record_date": rd.isoformat(),
+                "conditional": conditional, "held_at_record_date": f(held_rd, 4), "entitled_new_shares": f(new_q, 4),
+                "cost_split_known": e["parent_pct"] is not None, "applied": bool(applied and e["parent_pct"] is not None and not conditional),
+                "sources": e["sources"]}
+        if e["parent_pct"] is not None:
+            pp, rp = e["parent_pct"] / 100, e["resulting_pct"] / 100
+            info.update({"cost_at_record_date": f(cost_rd), "parent_cost_after": f(cost_rd * pp), "parent_cost_per_share_after": f(per_share * pp),
+                         "resulting_cost": f(cost_rd * rp), "resulting_cost_per_share": f(per_share * rp / ratio)})
+            text += (f" The published cost split is {e['parent_pct']}% {symbol} / {e['resulting_pct']}% {res}: of the {inr(cost_rd)} paid for these shares, "
+                     f"{inr(cost_rd * pp)} stays with {symbol} ({inr(per_share * pp, 2)} a share instead of {inr(per_share, 2)}) and "
+                     f"{inr(cost_rd * rp)} becomes the cost of the {res} shares ({inr(per_share * rp / ratio, 2)} each).")
+            later = sorted({x["date"].isoformat() for x in prior_events if x.get("kind") in ("split", "bonus") and x["date"] >= rd})
+            if later and not conditional:
+                text += (f" The {symbol} per-share figures are in the units held on {rd.isoformat()}; the later share change on "
+                         f"{', '.join(later)} changes them, not the rupee totals.")
+            if info["applied"]:
+                text += " The cost and P&L above already use this split (--apply-demergers)."
+            elif conditional:
+                text += " The cost above is not adjusted; if your broker has not already adjusted it, it is overstated and the P&L understated."
+            else:
+                text += (" The cost and P&L above are not adjusted for it: run with --apply-demergers, or adjust it yourself, "
+                         "unless your broker has already done so.")
+        else:
+            text += (f" The cost split between {symbol} and {res} is not in this skill's reference list; {e['parent_name']} publishes it as an "
+                     "'apportionment of cost of acquisition' notice. Until it is applied the cost here may be overstated and the P&L understated.")
+        text += " The new shares' holding period counts from your original purchase date."
+        texts.append(text)
+        details.append(info)
+    return texts, details
+
+
 # ---------------------------------------------------------------- review
 
-def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=request, clock=instant, sleep=time.sleep, bonus=()):
+def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=request, clock=instant, sleep=time.sleep, bonus=(),
+           demergers=None, apply_demergers=False):
     now = clock()
     today = now.date()
     rates = {**DEFAULT_RATES, **(rates or {})}
@@ -440,8 +562,33 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
     bonus = {s.strip().upper().replace(".NS", "") for s in bonus}
     events = {s: [{"date": a["date"], "ratio": a["ratio"], "kind": "bonus" if s in bonus else "split", "label": a["label"], "num": a["num"], "den": a["den"]} for a in q["actions"]]
               for s, q in quotes.items() if q.get("actions")}
-    matches, open_lots, unmatched, fifo_notes = fifo(lots, events) if lots else ([], [], [], [])
+    if demergers is None:
+        try:
+            demergers = load_demergers()
+        except Block as error:
+            demergers = []
+            errors["demergers"] = f"demerger reference list unavailable ({error}); demergers not checked"
+    parents = {}
+    for e in demergers:
+        for name in e["symbols"]:
+            parents.setdefault(name, []).append(e)
+    # Published cost splits as FIFO events, for symbols with dated lots. Always used to work out the figures in warnings;
+    # applied to the reported cost only with --apply-demergers.
+    dm_events = {s: [{"date": e["record_date"], "kind": "demerger", "factor": e["parent_pct"] / 100} for e in parents[s] if e["parent_pct"] is not None]
+                 for s in {l["symbol"] for l in lots} if s in parents}
+    dm_events = {s: evs for s, evs in dm_events.items() if evs}
+    fifo_events = events
+    if apply_demergers and dm_events:
+        fifo_events = {s: events.get(s, []) + dm_events.get(s, []) for s in set(events) | set(dm_events)}
+    matches, open_lots, unmatched, fifo_notes = fifo(lots, fifo_events) if lots else ([], [], [], [])
     notes += fifo_notes
+    dm_factor = {}
+    if apply_demergers and dm_events:
+        base, adjusted = {}, {}
+        for target, source_lots in ((base, fifo(lots, events)[1]), (adjusted, open_lots)):
+            for l in source_lots:
+                target[l["symbol"]] = target.get(l["symbol"], D(0)) + l["quantity"] * l["price"]
+        dm_factor = {s: adjusted[s] / base[s] for s in dm_events if base.get(s) and adjusted.get(s) is not None and adjusted[s] != base[s]}
     raw_open = {}
     if lots and events:
         for l in fifo(lots)[1]:
@@ -473,6 +620,7 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
         a["quantity"] += l["quantity"]
         a["cost"] += l["quantity"] * l["price"]
     rows = []
+    held_qty = {h["symbol"]: h["quantity"] for h in holdings}
     for h in holdings:
         q, avg = h["quantity"], h["average_price"]
         warning = None
@@ -487,6 +635,26 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
                            f"multiply the quantity and divide the cost by the ratio; the P&L shown would otherwise be wrong."
                            + (" Broker holdings exports are normally already adjusted." if source["kind"] != "holdings_v1" else
                               " Give the purchase date (bought) so this can be applied automatically."))
+        sym = h["symbol"]
+        dm_applied = False
+        if sym in dm_factor:
+            lots_q = adjusted_open.get(sym, {}).get("quantity")
+            if source["holdings"] is None:
+                dm_applied = True
+                notes.append(f"{sym}: --apply-demergers: cost of lots bought before the demerger record date reduced by the published cost split")
+            elif lots_q == q:
+                dm_applied = True
+                notes.append(f"{sym}: --apply-demergers: average cost {inr(avg, 2)} became {inr(avg * dm_factor[sym], 2)} "
+                             "(published cost split for lots held on the demerger record date; quantity unchanged)")
+                avg = avg * dm_factor[sym]
+            else:
+                notes.append(f"{sym}: --apply-demergers not applied: open lots total {qty(lots_q)} shares but the holding shows {qty(q)}")
+        demerger_warning, demerger_details = None, []
+        if sym in parents:
+            sym_lots = [l for l in lots if l["symbol"] == sym]
+            texts, demerger_details = demerger_checks(sym, parents[sym], sym_lots, events.get(sym, []) + dm_events.get(sym, []),
+                                                      q, avg, h, held_qty, dm_applied)
+            demerger_warning = " ".join(texts) or None
         invested = q * avg
         quote = quotes.get(h["symbol"])
         value = q * quote["price"] if quote else None
@@ -500,7 +668,8 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
                      "pnl_pct": None if value is None or invested == 0 else (value - invested) / invested,
                      "day_change": day, "previous_value": None if day is None else value - day,
                      "weight_basis": value if value is not None else invested, "valued_at_cost": value is None,
-                     "sector": sector, "splits_recent": quote["splits"] if quote else [], "corporate_action_warning": warning})
+                     "sector": sector, "splits_recent": quote["splits"] if quote else [], "corporate_action_warning": warning,
+                     "demerger_warning": demerger_warning, "demergers": demerger_details})
         if stale:
             notes.append(f"{h['symbol']}: latest price is from {quote['price_date']} (more than 7 days old)")
         if quote and quote.get("price_note"):
@@ -573,6 +742,15 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
                 notes.append(f"{r['symbol']}: open lots total {qty(held)} shares but holdings show {qty(r['quantity'])}; lots may be incomplete")
         for u in unmatched:
             notes.append(f"{u['symbol']}: sell of {qty(u['quantity'])} on {u['date'].isoformat()} has no matching earlier buy in the file; its gain is not computed")
+        spanned = set()
+        for m in in_fy:
+            for e in parents.get(m["symbol"], []):
+                if m["buy_date"] < e["record_date"] <= m["sell_date"] and not (apply_demergers and e["parent_pct"] is not None):
+                    spanned.add((m["symbol"], e["record_date"], e["resulting_symbol"] or e["resulting_company"], e["parent_pct"]))
+        for s, rd, res, pp in sorted(spanned, key=lambda x: (x[0], x[1])):
+            notes.append(f"{s}: shares bought before the {res} demerger (record date {rd.isoformat()}) were sold this FY; the realised gain uses the "
+                         "full original cost" + (f", but only {pp}% of it belongs to {s} (use --apply-demergers), so the gain is understated" if pp is not None
+                                                 else "; the published cost split is not in the reference list, so the gain is understated"))
         if any(m["sell_date"] < RATE_DATE for m in in_fy):
             notes.append("Some sales in this FY are before 23 July 2024, when older rates applied (15% STCG; 10% LTCG above ₹1,00,000); the estimate uses the rates shown")
         if any(m["buy_date"] < GRANDFATHER_DATE for m in matches) or any(l["date"] < GRANDFATHER_DATE for l in open_lots):
@@ -611,6 +789,8 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
     return {"schema": "holdings_review_v1", "as_of": now.isoformat(), "source": source["source"], "input_format": source["kind"],
             "holdings_as_of": source["as_of"], "price_source": "Yahoo Finance public daily chart (SYMBOL.NS); latest daily close, may be delayed" if prices else None,
             "sector_source": NIFTY500_URL if sector_map is not None else None,
+            "demerger_reference": {"source": "assets/demergers.json", "entries": len(demergers), "applied": bool(apply_demergers),
+                                   "checked": max(e["checked"] for e in demergers).isoformat() if demergers else None},
             "totals": totals, "holdings": out_rows, "concentration": concentration, "sectors": sector_rows, "tax": tax_section,
             "errors": errors, "notes": notes, "disclaimer": DISCLAIMER, "execution_eligible": False, "submitted": False}
 
@@ -673,15 +853,16 @@ def markdown(r):
               "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"]
     for h in r["holdings"]:
         last = f"{inr(h['last_price'], 2)} ({h['price_date']}{' ⚠ stale' if h['price_stale'] else ''})" if h["last_price"] is not None else h["price_status"]
-        lines.append(f"| {h['symbol']}{' ⚠' if h.get('corporate_action_warning') else ''} | {qty(h['quantity'])} | {inr(h['average_price'], 2)} | {last} | {inr(h['invested'])} | {inr(h['current_value'])} | "
+        flag = " ⚠" if h.get("corporate_action_warning") or h.get("demerger_warning") else ""
+        lines.append(f"| {h['symbol']}{flag} | {qty(h['quantity'])} | {inr(h['average_price'], 2)} | {last} | {inr(h['invested'])} | {inr(h['current_value'])} | "
                      f"{inr(h['pnl'])} | {pct(h['pnl_pct'])} | {pct(h['weight'], sign=False)}{' *' if h['valued_at_cost'] and priced else ''} | {h['sector'] or 'n/a'} |")
     if any(h["valued_at_cost"] for h in r["holdings"]) and priced:
         lines.append("")
         lines.append("\\* price unavailable; weighted at average cost, P&L not shown.")
-    flagged = [h for h in r["holdings"] if h.get("corporate_action_warning")]
+    flagged = [(h["symbol"], text) for h in r["holdings"] for text in (h.get("corporate_action_warning"), h.get("demerger_warning")) if text]
     if flagged:
         lines += ["", "**⚠ Check before trusting these numbers**", ""]
-        lines += [f"- **{h['symbol']}**: {h['corporate_action_warning']}" for h in flagged]
+        lines += [f"- **{s}**: {text}" for s, text in flagged]
     lines += ["", "## Concentration", "",
               f"Weights use {c['basis']}. Herfindahl index (sum of squared weights) is {num(c['herfindahl'], 3)}: {c['reading']}. "
               "Readings: below 0.10 diversified, 0.10–0.18 moderately concentrated, above 0.18 highly concentrated.", ""]
@@ -756,6 +937,64 @@ def markdown(r):
     return "\n".join(lines) + "\n"
 
 
+def flags(r):
+    """Holdings needing a check, grouped: [(label, [symbols])] in a fixed order, empty groups dropped."""
+    rows = r["holdings"]
+    groups = [("bonus/split", [h["symbol"] for h in rows if h.get("corporate_action_warning")]),
+              ("demerger", [h["symbol"] for h in rows if h.get("demerger_warning")]),
+              ("stale price", [h["symbol"] for h in rows if h.get("price_stale")]),
+              ("missing price", [h["symbol"] for h in rows if h.get("price_status") == "price unavailable"])]
+    return [(label, syms) for label, syms in groups if syms]
+
+
+def summary(r):
+    """Short answer-first block (about ten lines): value, P&L, day change, best/worst, concentration, top sector, tax, flags."""
+    t, c, rows = r["totals"], r["concentration"], r["holdings"]
+    lines = [f"# Portfolio summary — {r['as_of'][:10]}", ""]
+    if t["current_value"] is not None:
+        partial = f" ({t['priced_holdings']} of {t['holdings']} holdings priced)" if t["priced_holdings"] < t["holdings"] else ""
+        lines.append(f"- **Value** {inr(t['current_value'])} on {inr(t['invested_priced'])} invested: "
+                     f"P&L **{inr(t['unrealised_pnl'])} ({pct(t['unrealised_pnl_pct'])})**{partial}")
+        lines.append(f"- **Day change** {inr(t['day_change'])} ({pct(t['day_change_pct'], 2)})")
+        ranked = sorted((h for h in rows if h["pnl_pct"] is not None), key=lambda h: h["pnl_pct"])
+        if len(ranked) > 1:
+            best, worst = ranked[-1], ranked[0]
+            lines.append(f"- **Best** {best['symbol']} {pct(best['pnl_pct'])} ({inr(best['pnl'])}) · "
+                         f"**worst** {worst['symbol']} {pct(worst['pnl_pct'])} ({inr(worst['pnl'])})")
+        elif ranked:
+            lines.append(f"- **Only priced holding** {ranked[0]['symbol']} {pct(ranked[0]['pnl_pct'])} ({inr(ranked[0]['pnl'])})")
+    else:
+        lines.append(f"- **Invested** {inr(t['invested'])} at average cost; no prices loaded, so no P&L or day change")
+    lines.append(f"- **Largest holding** {c['top_holding']} {pct(c['top_holding_weight'], sign=False)} · top 5 {pct(c['top5_weight'], sign=False)} · "
+                 f"{c['reading']} (Herfindahl {num(c['herfindahl'], 3)})")
+    if r["sectors"]:
+        s = r["sectors"][0]
+        lines.append(f"- **Top sector** {s['sector']} {pct(s['weight'], sign=False)} ({', '.join(s['holdings'])})")
+    h = (r["tax"] or {}).get("hypothetical_sell_all")
+    if h:
+        low, high = h.get("estimated_total_tax_low", h["estimated_total_tax"]), h["estimated_total_tax"]
+        text = f"- **If you sold everything today**: estimated FY {r['tax']['financial_year']} tax " + (inr(high) if low == high else f"{inr(low)} to {inr(high)}")
+        undated = h.get("undated_symbols") or []
+        if undated:
+            text += (f" (a range because {', '.join(undated)} have no purchase date)" if low != high
+                     else f" ({', '.join(undated)} undated; it does not change the figure)")
+        pending = [d for x in rows for d in x.get("demergers", []) if not d["applied"]]
+        if pending:
+            text += "; demerger cost splits (⚠) are not applied, so gains and tax may be understated"
+        lines.append(text)
+    else:
+        lines.append("- **If you sold everything today**: tax not estimated (needs prices, and the current FY)")
+    groups = flags(r)
+    if groups:
+        count = sum(len(s) for _, s in groups)
+        lines.append(f"- **⚠ {count} item{'s' if count != 1 else ''} to check**: " + "; ".join(f"{label} {', '.join(s)}" for label, s in groups))
+    else:
+        lines.append("- **⚠ Nothing flagged** (bonus/split, demerger, stale or missing price)")
+    dates = f"prices: Yahoo daily close {', '.join(t['price_dates'])}" if t["price_dates"] else "no prices"
+    lines += ["", f"_{dates}. Research only, not advice or a suggestion to sell. Run without --summary for the full report and the ⚠ details._"]
+    return "\n".join(lines) + "\n"
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description="Review personal Indian equity holdings: P&L, concentration, sectors and an FIFO capital-gains estimate (research only).")
     p.add_argument("--input", required=True, help="holdings_v1 JSON, Zerodha Console holdings CSV, or Zerodha tradebook CSV")
@@ -768,6 +1007,10 @@ def main(argv=None):
     p.add_argument("--no-prices", action="store_true", help="offline: no network; values at average cost")
     p.add_argument("--bonus", action="append", default=[], metavar="SYMBOL",
                    help="Treat this symbol's Yahoo split events as bonus issues (nil-cost new shares dated on the ex-date) instead of splits; repeatable")
+    p.add_argument("--apply-demergers", action="store_true",
+                   help="Apply published demerger cost splits (assets/demergers.json) to dated lots/holdings bought before the record date; "
+                        "default is to flag them only")
+    p.add_argument("--summary", action="store_true", help="Short answer-first summary instead of the full report")
     p.add_argument("--format", choices=["markdown", "json"], default="markdown")
     p.add_argument("--out", help="Write the report to a new file (refuses to overwrite)")
     a = p.parse_args(argv)
@@ -781,11 +1024,17 @@ def main(argv=None):
         if tradebook is not None and tradebook["kind"] != "zerodha_tradebook_csv":
             raise Block("INPUT: --tradebook must be a Zerodha tradebook CSV")
         rates = {"stcg_rate": a.stcg_rate, "ltcg_rate": a.ltcg_rate, "ltcg_exemption": a.ltcg_exemption, "cess_rate": a.cess_rate}
-        report = review(source, tradebook, fy=a.fy, rates=rates, prices=not a.no_prices, bonus=a.bonus)
+        report = review(source, tradebook, fy=a.fy, rates=rates, prices=not a.no_prices, bonus=a.bonus, apply_demergers=a.apply_demergers)
     except Block as error:
         print(f"BLOCKED - {error}", file=sys.stderr)
         return 2
-    text = json.dumps(report, indent=2, ensure_ascii=False) if a.format == "json" else markdown(report)
+    if a.summary:
+        brief = summary(report)
+        text = (json.dumps({"schema": "holdings_summary_v1", "as_of": report["as_of"], "summary": brief, "flags": dict(flags(report)),
+                            "execution_eligible": False, "submitted": False}, indent=2, ensure_ascii=False)
+                if a.format == "json" else brief)
+    else:
+        text = json.dumps(report, indent=2, ensure_ascii=False) if a.format == "json" else markdown(report)
     if a.out:
         out = Path(a.out)
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -796,7 +1045,8 @@ def main(argv=None):
             print("BLOCKED - output exists; choose a new path", file=sys.stderr)
             return 2
     else:
-        sys.stdout.reconfigure(encoding="utf-8")
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
         print(text)
     return 0
 

@@ -11,9 +11,13 @@ python scripts/holdings_review.py --input tradebook.csv                     # ho
 python scripts/holdings_review.py --input holdings.json --no-prices          # offline, values at average cost
 python scripts/holdings_review.py --input holdings.json --format json --out reports/review.json
 python scripts/holdings_review.py --input holdings.json --stcg-rate 0.20 --ltcg-rate 0.125 --ltcg-exemption 125000 --cess-rate 0.04
+python scripts/holdings_review.py --input holdings.json --summary            # short answer-first block
+python scripts/holdings_review.py --input holdings.json --apply-demergers    # apply published demerger cost splits
 ```
 
 `--out` writes a new file and refuses to overwrite one. Errors print `BLOCKED - ...` on stderr and exit 2.
+
+`--summary` prints about ten lines instead of the full report: value and P&L (₹ and %), day change, best and worst holding, largest-holding weight with the concentration reading, top sector, the "if you sold everything today" tax (one figure, or a range naming the undated holdings), and a count of ⚠ items grouped as bonus/split, demerger, stale price and missing price. With `--format json` it returns `{"schema": "holdings_summary_v1", "summary": ..., "flags": {...}}`. Lead with the summary when the user asks "how is my portfolio doing"; offer the full report for the details behind each ⚠.
 
 ## Input formats
 
@@ -75,15 +79,40 @@ A holding may carry `"bought": "YYYY-MM-DD"` or just `"YYYY-MM"` (the 1st of the
 
 Yahoo's split events from the last five years are applied inside FIFO on the ex-date, before that day's trades. By default an event is treated as a **split**: open lots are multiplied by the ratio and their cost divided, keeping the purchase date. With `--bonus SYMBOL` it is treated as a **bonus**: a new lot of (ratio − 1) × the open quantity is added at nil cost, dated on the ex-date, as Indian tax treats bonus shares. Yahoo records a 1:1 bonus as a 2-for-1 split and does not say which it was, so check the company announcement. Values and P&L are the same either way; only tax lots differ.
 
-If a holding's quantity equals its lots before the event, it is converted to today's units and a note says so. A holding with no date that had an event gets a ⚠ in the table and an explanation under it (broker exports are normally already adjusted). Demergers, mergers and rights issues are not applied.
+If a holding's quantity equals its lots before the event, it is converted to today's units and a note says so. A holding with no date that had an event gets a ⚠ in the table and an explanation under it (broker exports are normally already adjusted). Mergers and rights issues are not applied.
 
 When some priced holdings have no purchase date, the "if you sold everything today" tax is a range: the low end treats their gains as long-term and losses as short-term, the high end the reverse.
+
+## Demergers
+
+Yahoo reports no demerger events, so `assets/demergers.json` ships a short curated list of NSE demergers from 2023 onwards: parent symbol (plus old symbols, such as `TATAMOTORS` for `TMPV`), resulting company and NSE symbol, record date, entitlement (new shares per parent shares) and, only where the company published it, the split of the cost of acquisition. Every entry carries its source URLs (company or exchange letters where available) and the date it was checked. Unverified fields are `null`, never estimated.
+
+| Parent | Resulting company (symbol) | Record date | Entitlement | Cost split parent / new |
+| --- | --- | --- | --- | --- |
+| RELIANCE | Jio Financial Services (JIOFIN) | 2023-07-20 | 1 for 1 | 95.32% / 4.68% |
+| RAYMOND | Raymond Lifestyle (RAYMONDLSL) | 2024-07-11 | 4 for 5 | not verified |
+| ITC | ITC Hotels (ITCHOTELS) | 2025-01-06 | 1 for 10 | 86.49% / 13.51% |
+| SIEMENS | Siemens Energy India (ENRIN) | 2025-04-07 | 1 for 1 | 76.18% / 23.82% |
+| RAYMOND | Raymond Realty (RAYMONDREL) | 2025-05-14 | 1 for 1 | 60.92% / 39.08% |
+| ABFRL | Aditya Birla Lifestyle Brands (ABLBL) | 2025-05-22 | 1 for 1 | 75.68% / 24.32% |
+| TMPV (was TATAMOTORS) | Tata Motors, the CV business (TMCV) | 2025-10-14 | 1 for 1 | 68.85% / 31.15% |
+
+For a holding whose symbol is a parent:
+
+- **Dated before the record date** (lots, a tradebook or `bought`): only shares held at the end of the day before the record date count, since a purchase on the record date is not entitled. The holding gets a ⚠ saying how many new shares the user should also hold (fractions are paid in cash) and whether the new symbol is already in the file. With a known split it spells out the cost: for 1,000 ITC at ₹400, ₹3,45,960 (₹345.96 a share) stays with ITC and ₹54,040 (₹540.40 each) goes to the 100 ITC Hotels shares. Without one it says the company publishes the split and the cost shown may be overstated. A month-only `bought` in the record month is caveated.
+- **Undated**: the same ⚠, worded "if you bought before DATE".
+- **Dated on or after the record date**: nothing.
+- **Realised sales** of shares bought before a record date and sold after it get a note that the gain uses the full original cost.
+
+Nothing is changed by default, because the user may already hold the new shares separately or the broker may already have adjusted the cost. `--apply-demergers` applies a published split as a FIFO event on the record date: open lots keep their quantity and purchase date and their cost is multiplied by the parent's percentage, so realised gains and the tax estimate use the apportioned cost. It applies only to dated lots, only where the split is known, and to a holdings-file average cost only when the lots match the holding quantity (otherwise a note says it was not applied). The new shares are not added; the user adds them, at the cost shown, if they hold them. Successive demergers of one parent (Raymond) compound.
+
+To add an entry, take the record date, ratio and cost split from the company's exchange letter ("apportionment of cost of acquisition"), cite it, and set `checked`; `tests/test_demergers.py` refuses entries without a source.
 
 ## Not modelled
 
 - Surcharge.
 - Grandfathering for shares bought before 1 Feb 2018 (flagged when such lots appear).
-- Bonus, split, merger and demerger cost adjustments.
+- Merger and rights-issue cost adjustments. Demergers outside `assets/demergers.json` are not detected.
 - Set-off of capital losses against other income, and carry-forward of losses.
 - Intraday and F&O trades (business income).
 - Brokerage and exchange charges as transfer expenses (STT is not deductible).
@@ -92,5 +121,5 @@ When some priced holdings have no purchase date, the "if you sold everything tod
 ## Limits
 
 - Public prices may be delayed or revised; they are research data, not broker valuations.
-- Holdings files carry no purchase dates, so the tax section needs lots or a tradebook. A tradebook covers only the period it was exported for; buys before it, transfers in, IPO allotments, bonus and split shares are missing unless added as lots. Quantity mismatches between lots and holdings are listed.
+- Holdings files carry no purchase dates, so the tax section needs lots or a tradebook. A tradebook covers only the period it was exported for; buys before it, transfers in, IPO allotments, bonus, split and demerger shares are missing unless added as lots. Quantity mismatches between lots and holdings are listed.
 - Tax figures are estimates for information. Check current rules and your own position with a tax professional; use [web research](web-research.md) for rate changes and anything listed as not modelled.

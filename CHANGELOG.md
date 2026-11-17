@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.0 — 18 November 2026
+
+Easier to use, and the remaining issues from the user-testing review.
+
+- **8 skills instead of 19:** `stock` (analysis, results, disclosures), `fno`, `screener` (fundamental screens and chart-pattern scans), `portfolio`, `market` (Nifty, Sensex, Bank Nifty), `news`, `trade-plan` (entry, stop, replay, size, risk) and `broker`. Old commands such as `/india-day-trader:nifty` and `/india-day-trader:stock-analysis` are replaced by `/india-day-trader:market` and `/india-day-trader:stock`. Always-loaded skill descriptions shrink from about 845 to 335 words.
+- **Short core skill:** the main skill file is now research and paper trading only (770 words, down from 1,744). Broker plumbing, accounting, streaming and the live-order and protection tools moved to [advanced tools](references/advanced.md), as an optional module that stays disabled unless the user explicitly asks.
+- **Answer templates** for "which looks best", "kal kya lagta hai / where tomorrow", "is it cheap", "should I sell this option", partial purchase dates and bonus shares.
+- **Summary modes:** `--summary` on stock analysis, F&O chain and payoff, and the portfolio review gives an answer-first digest.
+- **Stock analysis:** `--peers` compares with companies in the same businesses; index peers are labelled as such, and a warning appears when the company is more than three times the size of every index peer. Google News redirect links are no longer dumped into the text report (they stay in JSON).
+- **Portfolio review:** demergers from a curated, sourced list (ITC → ITC Hotels, Reliance → Jio Financial, Siemens → Siemens Energy India, Raymond, Aditya Birla Fashion, Tata Motors) are flagged with the new shares due and the published cost split; `--apply-demergers` applies the split to dated lots.
+- **F&O:** OI change shown as signed additions and reductions that add up to the net; day-over-day PCR, max pain, ATM IV and OI; India VIX taken from the chain's own date; a 15–20 row payoff table; probability of profit and of finishing above each breakeven implied by option prices; and a today (T+0) value column and chart line.
+- **README:** a "See it in action" section with real, dated output and a payoff chart.
+
 ## 1.2.1 — 18 November 2026
 
 Trust fixes found by testing the skill as ordinary users would.

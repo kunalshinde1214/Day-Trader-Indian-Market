@@ -1,13 +1,13 @@
 ---
-name: nifty
-description: Nifty 50 market briefing with today's levels, previous-day high/low/close, opening range and bullish/bearish scenarios. Use when the user asks "how is Nifty doing", "Nifty levels today", "Nifty pre-open/close report" or types /nifty.
+name: market
+description: Indian market today — Nifty 50, Sensex and Bank Nifty levels, previous-day ranges, scenarios and closing context. Use for "how is the market today", "Nifty levels", "Bank Nifty today", "aaj market kaisa hai", or /india-daily, /nifty, /sensex, /banknifty.
 ---
 
-# nifty
+# market
 
-Read the [shared skill](../../SKILL.md) for safety rules. Resolve scripts relative to `${CLAUDE_PLUGIN_ROOT}`. Run them with `python`; if that is not found use `python3` (macOS/Linux) or `py` (Windows). Keep user files outside the plugin folder, and pass the user's words as arguments, never as raw shell text.
+Read the [core skill](../../SKILL.md) first. Resolve scripts relative to `${CLAUDE_PLUGIN_ROOT}`. Run them with `python`; if that is not found use `python3` (macOS/Linux) or `py` (Windows). Keep user files outside the plugin folder, and pass the user's words as arguments, never as raw shell text.
 
-Primary route: `python "${CLAUDE_PLUGIN_ROOT}/scripts/daily.py" nifty --collect-public`.
+Routes: `python "${CLAUDE_PLUGIN_ROOT}/scripts/daily.py" india-daily --collect-public` for all three indices, or `nifty`, `sensex`, `banknifty` for one. Pass the name without a leading slash ([daily reports](../../references/daily.md)).
 
 For a specified closing-report date, use `--collect-close --session YYYY-MM-DD` instead. Read [closing context](../../references/closing-context.md) and keep source dates and stale context explicit.
 

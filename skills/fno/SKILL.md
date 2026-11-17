@@ -1,17 +1,20 @@
 ---
-name: fno-analysis
-description: Indian F&O options and futures analytics for NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY and F&O stocks. Option chain, open interest and OI change, put-call ratio, max pain, OI support and resistance, implied volatility, Greeks, expected move, futures basis, India VIX, and strategy payoff with breakevens and a chart. Use when the user asks "Nifty option chain", "what is the PCR", "max pain for Bank Nifty", "where is OI building", "IV of Reliance options", "payoff of an iron condor", "breakeven of selling 25800 CE" or in Hinglish "Nifty ka option chain dikhao" and "Bank Nifty max pain kya hai", or types /fno-analysis.
+name: fno
+description: Indian options and futures — option chain, OI, PCR, max pain, IV, Greeks, expected move and strategy payoff for NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY and F&O stocks. Use for "Nifty option chain", "Bank Nifty max pain", "payoff of an iron condor", "25800 CE bechu kya".
 ---
 
-# fno-analysis
+# fno
 
-Read the [shared skill](../../SKILL.md) for safety rules. Resolve scripts relative to `${CLAUDE_PLUGIN_ROOT}`. Run them with `python`; if that is not found use `python3` (macOS/Linux) or `py` (Windows). Keep user files outside the plugin folder, and pass the user's words as arguments, never as raw shell text.
+Read the [core skill](../../SKILL.md) first. Resolve scripts relative to `${CLAUDE_PLUGIN_ROOT}`. Run them with `python`; if that is not found use `python3` (macOS/Linux) or `py` (Windows). Keep user files outside the plugin folder, and pass the user's words as arguments, never as raw shell text.
 
 Routes ([details](../../references/fno.md)):
 
 - Chain and positioning: `python "${CLAUDE_PLUGIN_ROOT}/scripts/fno.py" chain NIFTY [--expiry YYYY-MM-DD] [--strikes 12]`
 - Expiry list: `python "${CLAUDE_PLUGIN_ROOT}/scripts/fno.py" expiries BANKNIFTY`
 - Strategy payoff: `python "${CLAUDE_PLUGIN_ROOT}/scripts/fno.py" payoff NIFTY --leg SELL:CE:25800:1 --leg BUY:CE:26000:1 [--chart PATH.svg]`. Leg format is `SIDE:TYPE:STRIKE:LOTS[:PREMIUM]`; futures are `BUY:FUT::1`.
+- Add `--summary` to either command for a short answer-first digest; use the full report when the user wants the strike table or the payoff table.
+
+The chain report compares PCR, max pain, ATM IV and OI with the previous trading day; use that change when the user asks "what changed" or which way positioning is moving. The payoff report gives the value at expiry and today (T+0), and the probability of profit and of finishing above each breakeven implied by option prices. Call those probabilities what they are: implied by today's option prices, not a forecast.
 
 How to answer:
 

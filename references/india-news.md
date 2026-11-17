@@ -26,7 +26,7 @@ Use a fresh output path. `--limit` controls displayed Markdown headlines (1–20
 
 NSE announcements and corporate actions are the default sources, following the [NSE RSS directory](https://www.nseindia.com/static/rss-feed). The optional Economic Times market feed follows the publisher's [RSS directory and terms](https://economictimes.indiatimes.com/rss.cms). Use it only for individual personal reading with direct links and attribution; this tool grants no publisher-content redistribution, syndication or hosted-service rights. No full articles or publisher content are bundled in the repository. Other sites, including Moneycontrol, can be consulted manually; they are not configured or claimed as tested automatic connectors.
 
-Ask the combined skill for `/india-news`, or use `/india-day-trader:trader-news` in Claude and request a market-wide briefing. The existing watchlist-specific `research.py news --symbols ...` route remains available. No scheduler is installed; each invocation produces one report.
+Ask the combined skill for `/india-news`, or use `/india-day-trader:news` in Claude and request a market-wide briefing. The existing watchlist-specific `research.py news --symbols ...` route remains available. No scheduler is installed; each invocation produces one report.
 
 Live check on 10 November 2026 IST: Economic Times returned 50 valid recent headlines. NSE announcements and corporate actions returned respectively 1 and 59 unparsed items, with no accepted dated items. The combined report was PARTIAL. This demonstrates transport and display-input collection at that time, not complete news coverage or continuous reliability.
 

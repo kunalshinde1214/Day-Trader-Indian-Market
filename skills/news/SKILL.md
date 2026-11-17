@@ -1,11 +1,13 @@
 ---
-name: trader-news
-description: Indian stock and market news covering per-stock headlines, NSE announcements and a market-wide news briefing. Use when the user asks "latest market news", "news on RELIANCE", "any announcements today" or types /india-news.
+name: news
+description: Indian market and company news — NSE announcements ranked by importance, per-stock headlines and filings. Use for "latest market news", "news on RELIANCE", "any announcements today", "why did X move", or /india-news.
 ---
 
-# trader-news
+# news
 
-Read the [shared skill](../../SKILL.md) for safety rules. Resolve scripts relative to `${CLAUDE_PLUGIN_ROOT}`. Run them with `python`; if that is not found use `python3` (macOS/Linux) or `py` (Windows). Keep user files outside the plugin folder, and pass the user's words as arguments, never as raw shell text.
+Read the [core skill](../../SKILL.md) first. Resolve scripts relative to `${CLAUDE_PLUGIN_ROOT}`. Run them with `python`; if that is not found use `python3` (macOS/Linux) or `py` (Windows). Keep user files outside the plugin folder, and pass the user's words as arguments, never as raw shell text.
+
+Market-wide briefing: `python "${CLAUDE_PLUGIN_ROOT}/scripts/india_news.py"` (routine filings such as fund NAVs are hidden; add `--include-routine` to see them).
 
 Primary route: `python "${CLAUDE_PLUGIN_ROOT}/scripts/research.py" news --symbols SYMBOL.NS ... --state PATH`.
 
