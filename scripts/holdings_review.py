@@ -38,7 +38,7 @@ RATE_BASIS = ("Default rates — verify current rates: STCG 20% (s.111A) and LTC
 NOT_MODELLED = [
     "Surcharge on capital-gains tax",
     "Grandfathering of shares bought before 1 Feb 2018 (cost = higher of cost and 31 Jan 2018 FMV)",
-    "Bonus, split, merger and demerger cost adjustments",
+    "Demergers, mergers and rights issues (cost apportionment); bonuses and splits are applied from Yahoo's split events",
     "Set-off of capital losses against other income, and carry-forward of losses to later years",
     "Intraday and F&O trades (business income)",
     "Brokerage and exchange charges as transfer expenses (STT is not deductible)",
@@ -90,6 +90,15 @@ def trade_date(value, name="date"):
         except ValueError:
             continue
     raise Block(f"INPUT: {name} must be a date such as 2025-04-01 (got {text!r})")
+
+
+def purchase_date(value, name):
+    """Full date, or a month (2024-03) when the user only knows that; month-only dates are flagged as approximate."""
+    text = str(value or "").strip()
+    m = re.fullmatch(r"(\d{4})-(\d{2})", text)
+    if m and 1 <= int(m.group(2)) <= 12:
+        return date(int(m.group(1)), int(m.group(2)), 1), True
+    return trade_date(text, name), False
 
 
 def blank(row):
@@ -163,7 +172,10 @@ def parse_text(text, name="input"):
         for h in doc["holdings"]:
             if not isinstance(h, dict) or not {"symbol", "quantity", "average_price"} <= h.keys():
                 raise Block("INPUT: each holding needs symbol, quantity and average_price")
-            rows.append(holding(h["symbol"], h["quantity"], h["average_price"], notes))
+            row = holding(h["symbol"], h["quantity"], h["average_price"], notes)
+            if row is not None and h.get("bought"):
+                row["bought"], row["bought_approx"] = purchase_date(h["bought"], f"bought date for {row['symbol']}")
+            rows.append(row)
         lots = []
         for n, x in enumerate(doc.get("lots") or []):
             if not isinstance(x, dict) or not {"symbol", "quantity", "price", "date"} <= x.keys():
@@ -245,14 +257,33 @@ def financial_year(text=None, today=None):
     return m.group(0), date(start, 4, 1), date(start + 1, 3, 31)
 
 
-def fifo(lots):
-    """Match sells to the oldest open buys per symbol. Returns matches, open lots, unmatched sells, notes."""
-    order = sorted(lots, key=lambda x: (x["symbol"], x["date"], x["time"], 0 if x["side"] == "BUY" else 1, x["seq"]))
+def fifo(lots, events=None):
+    """Match sells to the oldest open buys per symbol. Returns matches, open lots, unmatched sells, notes.
+
+    `events` maps symbol -> [{"date", "ratio", "kind"}]. On the ex-date, before that day's trades, a split
+    multiplies open quantities and divides their cost (holding period unchanged); a bonus adds a new lot of
+    (ratio - 1) x open quantity at nil cost dated on the ex-date, as Indian tax treats bonus shares.
+    """
+    symbols = {x["symbol"] for x in lots}
+    marks = [{"symbol": s, "date": e["date"], "time": "", "side": "EVENT", "seq": -1, **e}
+             for s, evs in (events or {}).items() if s in symbols for e in evs]
+    rank = {"EVENT": 0, "BUY": 1, "SELL": 2}
+    order = sorted(list(lots) + marks, key=lambda x: (x["symbol"], x["date"], x["time"], rank[x["side"]], x["seq"]))
     queues, matches, unmatched, notes = {}, [], [], []
     days = {}
     for x in order:
-        days.setdefault((x["symbol"], x["date"]), set()).add(x["side"])
         queue = queues.setdefault(x["symbol"], [])
+        if x["side"] == "EVENT":
+            held = sum((l["quantity"] for l in queue), D(0))
+            if held:
+                if x["kind"] == "bonus":
+                    queue.append({"symbol": x["symbol"], "date": x["date"], "quantity": held * (x["ratio"] - 1), "price": D(0), "bonus": True})
+                else:
+                    for l in queue:
+                        l["quantity"] *= x["ratio"]
+                        l["price"] /= x["ratio"]
+            continue
+        days.setdefault((x["symbol"], x["date"]), set()).add(x["side"])
         if x["side"] == "BUY":
             queue.append({"symbol": x["symbol"], "date": x["date"], "quantity": x["quantity"], "price": x["price"]})
             continue
@@ -321,10 +352,16 @@ def latest_price(yahoo, *, fetcher, clock):
     bars = history["bars"]
     last = bars[-1]
     previous = bars[-2]["close"] if len(bars) > 1 else None
-    splits = sorted({datetime.fromtimestamp(int(s.get("date", k)), IST).date().isoformat()
-                     for k, s in (history.get("corporate_actions", {}).get("splits") or {}).items()})
+    actions = []
+    for k, s in (history.get("corporate_actions", {}).get("splits") or {}).items():
+        num, den = s.get("numerator"), s.get("denominator")
+        if isinstance(num, (int, float)) and isinstance(den, (int, float)) and num > 0 and den > 0 and num != den:
+            actions.append({"date": datetime.fromtimestamp(int(s.get("date", k)), IST).date(), "ratio": D(str(num)) / D(str(den)),
+                            "num": num, "den": den, "label": f"{num:g}-for-{den:g}"})
+    actions.sort(key=lambda a: a["date"])
     return {"price": D(str(last["close"])), "previous_close": None if previous is None else D(str(previous)),
-            "price_date": last["at"][:10], "splits": splits}
+            "price_date": last["at"][:10], "splits": [a["date"].isoformat() for a in actions], "actions": actions,
+            "price_note": history.get("price_note")}
 
 
 def sectors(*, fetcher):
@@ -342,6 +379,12 @@ def sectors(*, fetcher):
     return out
 
 
+def holdings_for_prices(source, lots):
+    if source["holdings"] is not None:
+        return source["holdings"]
+    return [{"symbol": s, "yahoo": stock(s)[1]} for s in sorted({l["symbol"] for l in lots})]
+
+
 def hhi_reading(value):
     if value is None:
         return "n/a"
@@ -354,7 +397,7 @@ def hhi_reading(value):
 
 # ---------------------------------------------------------------- review
 
-def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=request, clock=instant, sleep=time.sleep):
+def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=request, clock=instant, sleep=time.sleep, bonus=()):
     now = clock()
     today = now.date()
     rates = {**DEFAULT_RATES, **(rates or {})}
@@ -367,25 +410,19 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
     if tradebook is not None:
         notes += tradebook["notes"]
         lots += [{**x, "seq": x["seq"] + 1_000_000} for x in tradebook["lots"]]
-    matches, open_lots, unmatched, fifo_notes = fifo(lots) if lots else ([], [], [], [])
-    notes += fifo_notes
-    if source["holdings"] is None:
-        derived = {}
-        for l in open_lots:
-            d = derived.setdefault(l["symbol"], {"quantity": D(0), "cost": D(0)})
-            d["quantity"] += l["quantity"]
-            d["cost"] += l["quantity"] * l["price"]
-        holdings = [{"symbol": s, "yahoo": stock(s)[1], "quantity": d["quantity"], "average_price": d["cost"] / d["quantity"]}
-                    for s, d in sorted(derived.items())]
-        notes.append("Holdings derived from open FIFO lots in the tradebook; transfers, bonus/split and pre-tradebook buys are missing")
-    else:
-        holdings = source["holdings"]
-    if not holdings:
-        raise Block("INPUT: no open holdings to review")
-
+    if source["holdings"] is not None:
+        dated = {l["symbol"] for l in lots}
+        for n, h in enumerate(source["holdings"]):
+            if h.get("bought") and h["symbol"] not in dated:
+                lots.append({"symbol": h["symbol"], "date": h["bought"], "side": "BUY", "quantity": h["quantity"], "price": h["average_price"],
+                             "time": "", "seq": 2_000_000 + n})
+                if h.get("bought_approx"):
+                    notes.append(f"{h['symbol']}: purchase month only ({h['bought'].strftime('%Y-%m')}); the 1st of the month is assumed, so the "
+                                 "long-term date may be off by up to a month")
     errors, quotes, sector_map = {}, {}, None
+    symbols_for_prices = holdings_for_prices(source, lots)
     if prices:
-        for n, h in enumerate(holdings):
+        for n, h in enumerate(symbols_for_prices):
             if n:
                 sleep(0.3)
             try:
@@ -399,9 +436,57 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
     else:
         errors["prices"] = "--no-prices: values shown at average cost; no P&L, day change or sector data"
 
+
+    bonus = {s.strip().upper().replace(".NS", "") for s in bonus}
+    events = {s: [{"date": a["date"], "ratio": a["ratio"], "kind": "bonus" if s in bonus else "split", "label": a["label"], "num": a["num"], "den": a["den"]} for a in q["actions"]]
+              for s, q in quotes.items() if q.get("actions")}
+    matches, open_lots, unmatched, fifo_notes = fifo(lots, events) if lots else ([], [], [], [])
+    notes += fifo_notes
+    raw_open = {}
+    if lots and events:
+        for l in fifo(lots)[1]:
+            raw_open[l["symbol"]] = raw_open.get(l["symbol"], D(0)) + l["quantity"]
+    corporate = {}
+    for s, evs in events.items():
+        for e in evs:
+            # Indian convention: a 1:1 bonus gives one new share per share held, which Yahoo records as a 2-for-1 split.
+            text = (f"{e['num'] - e['den']:g}:{e['den']:g} bonus" if e["kind"] == "bonus"
+                    else f"{e['label']} share change (a {e['num'] - e['den']:g}:{e['den']:g} bonus or a {e['label']} split; treated as a split, use --bonus if it was a bonus)")
+            corporate.setdefault(s, []).append(f"{text} on {e['date'].isoformat()}")
+    if source["holdings"] is None:
+        derived = {}
+        for l in open_lots:
+            d = derived.setdefault(l["symbol"], {"quantity": D(0), "cost": D(0)})
+            d["quantity"] += l["quantity"]
+            d["cost"] += l["quantity"] * l["price"]
+        holdings = [{"symbol": s, "yahoo": stock(s)[1], "quantity": d["quantity"], "average_price": d["cost"] / d["quantity"]}
+                    for s, d in sorted(derived.items())]
+        notes.append("Holdings derived from open FIFO lots in the tradebook; transfers and pre-tradebook buys are missing; bonuses/splits from Yahoo are applied")
+    else:
+        holdings = source["holdings"]
+    if not holdings:
+        raise Block("INPUT: no open holdings to review")
+
+    adjusted_open = {}
+    for l in open_lots:
+        a = adjusted_open.setdefault(l["symbol"], {"quantity": D(0), "cost": D(0)})
+        a["quantity"] += l["quantity"]
+        a["cost"] += l["quantity"] * l["price"]
     rows = []
     for h in holdings:
         q, avg = h["quantity"], h["average_price"]
+        warning = None
+        if h["symbol"] in corporate:
+            fixed = adjusted_open.get(h["symbol"])
+            if fixed and h["symbol"] in raw_open and q == raw_open[h["symbol"]] and fixed["quantity"] != q:
+                notes.append(f"{h['symbol']}: adjusted for {'; '.join(corporate[h['symbol']])}: {qty(q)} shares at {inr(avg, 2)} "
+                             f"became {qty(fixed['quantity'])} at {inr(fixed['cost'] / fixed['quantity'], 2)} (same total cost)")
+                q, avg = fixed["quantity"], (q * avg) / fixed["quantity"]
+            elif not fixed:
+                warning = (f"{'; '.join(corporate[h['symbol']])}. If your quantity and average cost are from before that date, "
+                           f"multiply the quantity and divide the cost by the ratio; the P&L shown would otherwise be wrong."
+                           + (" Broker holdings exports are normally already adjusted." if source["kind"] != "holdings_v1" else
+                              " Give the purchase date (bought) so this can be applied automatically."))
         invested = q * avg
         quote = quotes.get(h["symbol"])
         value = q * quote["price"] if quote else None
@@ -415,11 +500,12 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
                      "pnl_pct": None if value is None or invested == 0 else (value - invested) / invested,
                      "day_change": day, "previous_value": None if day is None else value - day,
                      "weight_basis": value if value is not None else invested, "valued_at_cost": value is None,
-                     "sector": sector, "splits_recent": quote["splits"] if quote else []})
+                     "sector": sector, "splits_recent": quote["splits"] if quote else [], "corporate_action_warning": warning})
         if stale:
             notes.append(f"{h['symbol']}: latest price is from {quote['price_date']} (more than 7 days old)")
-        if quote and quote["splits"]:
-            notes.append(f"{h['symbol']}: split/bonus recorded on {', '.join(quote['splits'])}; check that quantity and average cost are adjusted")
+        if quote and quote.get("price_note"):
+            notes.append(f"{h['symbol']}: {quote['price_note']}")
+
     total_basis = sum((r["weight_basis"] for r in rows), D(0))
     for r in rows:
         r["weight"] = r["weight_basis"] / total_basis if total_basis else None
@@ -458,7 +544,9 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
                              key=lambda g: g["value"], reverse=True)
 
     tax_section = None
-    if lots:
+    lot_symbols = {l["symbol"] for l in lots}
+    undated = [r for r in rows if r["symbol"] not in lot_symbols and r["pnl"] is not None]
+    if lots or undated:
         price_of = {r["symbol"]: r["last_price"] for r in rows}
         in_fy = [m for m in matches if fy_start <= m["sell_date"] <= fy_end]
         realised = tax([m["gain"] for m in in_fy if m["term"] == "short"], [m["gain"] for m in in_fy if m["term"] == "long"], rates)
@@ -494,12 +582,17 @@ def review(source, tradebook=None, *, fy=None, rates=None, prices=True, fetcher=
                           "lots_without_price": sum(1 for l in open_out if l["term_today"] == t and l["unrealised_gain"] is None)}
                       for t in ("short", "long")}
         hypothetical = None
-        if fy_start <= today <= fy_end and any(unreal.values()):
-            combined = tax([m["gain"] for m in in_fy if m["term"] == "short"] + unreal["short"],
-                           [m["gain"] for m in in_fy if m["term"] == "long"] + unreal["long"], rates)
-            hypothetical = {"description": f"If every open lot with a price were sold at its last price, on top of the FY {fy_label} realised gains",
-                            "estimated_total_tax": combined["total_tax"], "estimated_additional_tax": f(combined["total_tax"] - realised["total_tax"]),
-                            "detail": combined}
+        if fy_start <= today <= fy_end and (any(unreal.values()) or undated):
+            st = [m["gain"] for m in in_fy if m["term"] == "short"] + unreal["short"]
+            lt = [m["gain"] for m in in_fy if m["term"] == "long"] + unreal["long"]
+            gains = [r["pnl"] for r in undated]
+            # Undated holdings could be short- or long-term: best case puts gains long-term and losses short-term; worst case the reverse.
+            best = tax(st + [g for g in gains if g < 0], lt + [g for g in gains if g > 0], rates)
+            worst = tax(st + [g for g in gains if g > 0], lt + [g for g in gains if g < 0], rates)
+            hypothetical = {"description": f"If every holding with a price were sold at its last price, on top of the FY {fy_label} realised gains",
+                            "estimated_total_tax": worst["total_tax"], "estimated_total_tax_low": best["total_tax"],
+                            "estimated_additional_tax": f(worst["total_tax"] - realised["total_tax"]),
+                            "undated_symbols": [r["symbol"] for r in undated], "detail": worst, "detail_best_case": best}
         tax_section = {"financial_year": fy_label, "fy_start": fy_start.isoformat(), "fy_end": fy_end.isoformat(),
                        "method": "FIFO per symbol; long-term when the sale date is more than 12 months after the purchase date",
                        "rates": {**rates, "basis": RATE_BASIS},
@@ -580,11 +673,15 @@ def markdown(r):
               "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"]
     for h in r["holdings"]:
         last = f"{inr(h['last_price'], 2)} ({h['price_date']}{' ⚠ stale' if h['price_stale'] else ''})" if h["last_price"] is not None else h["price_status"]
-        lines.append(f"| {h['symbol']} | {qty(h['quantity'])} | {inr(h['average_price'], 2)} | {last} | {inr(h['invested'])} | {inr(h['current_value'])} | "
+        lines.append(f"| {h['symbol']}{' ⚠' if h.get('corporate_action_warning') else ''} | {qty(h['quantity'])} | {inr(h['average_price'], 2)} | {last} | {inr(h['invested'])} | {inr(h['current_value'])} | "
                      f"{inr(h['pnl'])} | {pct(h['pnl_pct'])} | {pct(h['weight'], sign=False)}{' *' if h['valued_at_cost'] and priced else ''} | {h['sector'] or 'n/a'} |")
     if any(h["valued_at_cost"] for h in r["holdings"]) and priced:
         lines.append("")
         lines.append("\\* price unavailable; weighted at average cost, P&L not shown.")
+    flagged = [h for h in r["holdings"] if h.get("corporate_action_warning")]
+    if flagged:
+        lines += ["", "**⚠ Check before trusting these numbers**", ""]
+        lines += [f"- **{h['symbol']}**: {h['corporate_action_warning']}" for h in flagged]
     lines += ["", "## Concentration", "",
               f"Weights use {c['basis']}. Herfindahl index (sum of squared weights) is {num(c['herfindahl'], 3)}: {c['reading']}. "
               "Readings: below 0.10 diversified, 0.10–0.18 moderately concentrated, above 0.18 highly concentrated.", ""]
@@ -596,11 +693,15 @@ def markdown(r):
     x = r["tax"]
     if x:
         rt, rl = x["rates"], x["realised"]
+        has_lots = bool(x["realised_matches"] or x["open_lots"])
         lines += [f"## Capital-gains tax estimate — FY {x['financial_year']} ({x['fy_start']} to {x['fy_end']})", "",
                   f"Method: {x['method']}. {rt['basis']}", "",
-                  f"Rates used: STCG {pct(rt['stcg_rate'], sign=False)}, LTCG {pct(rt['ltcg_rate'], sign=False)} above {inr(rt['ltcg_exemption'])}, cess {pct(rt['cess_rate'], sign=False)}.", "",
-                  "### Realised this financial year", ""]
-        if x["realised_matches"]:
+                  f"Rates used: STCG {pct(rt['stcg_rate'], sign=False)}, LTCG {pct(rt['ltcg_rate'], sign=False)} above {inr(rt['ltcg_exemption'])}, cess {pct(rt['cess_rate'], sign=False)}.", ""]
+        if has_lots:
+            lines += ["### Realised this financial year", ""]
+        if not has_lots:
+            pass
+        elif x["realised_matches"]:
             lines += ["| Symbol | Bought | Sold | Qty | Buy | Sell | Days held | Term | Gain |", "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: |"]
             for m in x["realised_matches"][:60]:
                 lines.append(f"| {m['symbol']} | {m['buy_date']} | {m['sell_date']} | {qty(m['quantity'])} | {inr(m['buy_price'], 2)} | {inr(m['sell_price'], 2)} | "
@@ -609,7 +710,7 @@ def markdown(r):
                 lines.append(f"| … {len(x['realised_matches']) - 60} more in JSON output | | | | | | | | |")
         else:
             lines.append("No sales matched in this financial year.")
-        lines += ["", "| Line | Short-term | Long-term |", "| --- | ---: | ---: |",
+        realised_lines = ["", "| Line | Short-term | Long-term |", "| --- | ---: | ---: |",
                   f"| Gains | {inr(rl['short_term_gains'])} | {inr(rl['long_term_gains'])} |",
                   f"| Losses | {inr(-rl['short_term_losses'])} | {inr(-rl['long_term_losses'])} |",
                   f"| Short-term loss set off against long-term | | {inr(-rl['short_term_loss_set_off_against_long_term'])} |",
@@ -620,13 +721,15 @@ def markdown(r):
                   f"| Cess ({pct(rt['cess_rate'], 0, sign=False)} on tax) | {inr(rl['cess'])} | |",
                   f"| **Estimated tax on realised gains** | **{inr(rl['total_tax'])}** | |", "",
                   f"LTCG exemption remaining this FY (information): {inr(x['ltcg_exemption_remaining'])}. The exemption is shared with other s.112A gains outside this file, such as equity mutual funds.", ""]
-        if rl["unused_short_term_loss"] or rl["unused_long_term_loss"]:
-            lines += [f"Losses not absorbed in this report: short-term {inr(rl['unused_short_term_loss'])}, long-term {inr(rl['unused_long_term_loss'])} (carry-forward not modelled).", ""]
-        u = x["unrealised"]
-        lines += [f"### Unrealised on open lots (term as of {r['as_of'][:10]})", "", "| Term | Lots | Cost | Unrealised gain |", "| --- | ---: | ---: | ---: |"]
-        for term in ("short", "long"):
-            missing = f" ({u[term]['lots_without_price']} lot(s) without price excluded)" if u[term]["lots_without_price"] else ""
-            lines.append(f"| {term}-term | {u[term]['lots']} | {inr(u[term]['cost'])} | {inr(u[term]['gain'])}{missing} |")
+        if has_lots:
+            lines += realised_lines
+            if rl["unused_short_term_loss"] or rl["unused_long_term_loss"]:
+                lines += [f"Losses not absorbed in this report: short-term {inr(rl['unused_short_term_loss'])}, long-term {inr(rl['unused_long_term_loss'])} (carry-forward not modelled).", ""]
+            u = x["unrealised"]
+            lines += [f"### Unrealised on open lots (term as of {r['as_of'][:10]})", "", "| Term | Lots | Cost | Unrealised gain |", "| --- | ---: | ---: | ---: |"]
+            for term in ("short", "long"):
+                missing = f" ({u[term]['lots_without_price']} lot(s) without price excluded)" if u[term]["lots_without_price"] else ""
+                lines.append(f"| {term}-term | {u[term]['lots']} | {inr(u[term]['cost'])} | {inr(u[term]['gain'])}{missing} |")
         if x["open_lots"]:
             lines += ["", "| Symbol | Bought | Qty | Buy price | Term today | Long-term from | Unrealised gain |", "| --- | --- | ---: | ---: | --- | --- | ---: |"]
             for l in x["open_lots"][:60]:
@@ -635,8 +738,15 @@ def markdown(r):
                 lines.append(f"| … {len(x['open_lots']) - 60} more in JSON output | | | | | | |")
         h = x["hypothetical_sell_all"]
         if h:
-            lines += ["", f"Hypothetical, for information only: {h['description'][0].lower() + h['description'][1:]}, estimated FY tax would be {inr(h['estimated_total_tax'])} "
-                      f"({inr(h['estimated_additional_tax'])} more than on realised gains alone). This is arithmetic, not a suggestion to sell."]
+            low, high = h.get("estimated_total_tax_low", h["estimated_total_tax"]), h["estimated_total_tax"]
+            amount = inr(high) if low == high else f"between {inr(low)} and {inr(high)}"
+            lines += ["", f"**If you sold everything today** (hypothetical, for information only): {h['description'][0].lower() + h['description'][1:]}, "
+                      f"estimated FY tax would be **{amount}**. This is arithmetic, not a suggestion to sell."]
+            if h.get("undated_symbols") and low != high:
+                lines.append(f"The range is because the purchase dates of {', '.join(h['undated_symbols'])} are unknown: the low end assumes their gains are "
+                             "long-term and losses short-term, the high end the reverse. Give purchase dates (or a tradebook) to get one figure.")
+            elif h.get("undated_symbols"):
+                lines.append(f"Purchase dates of {', '.join(h['undated_symbols'])} are unknown, but they do not change this figure.")
         lines += ["", "### Not modelled", ""] + [f"- {item}" for item in x["not_modelled"]]
         lines += ["", x["note"], ""]
     gaps = [f"- {k}: {v}" for k, v in r["errors"].items()] + [f"- {n}" for n in r["notes"]]
@@ -656,6 +766,8 @@ def main(argv=None):
     p.add_argument("--ltcg-exemption", type=float, default=DEFAULT_RATES["ltcg_exemption"], help="default 125000 rupees per FY")
     p.add_argument("--cess-rate", type=float, default=DEFAULT_RATES["cess_rate"], help="default 0.04 health and education cess")
     p.add_argument("--no-prices", action="store_true", help="offline: no network; values at average cost")
+    p.add_argument("--bonus", action="append", default=[], metavar="SYMBOL",
+                   help="Treat this symbol's Yahoo split events as bonus issues (nil-cost new shares dated on the ex-date) instead of splits; repeatable")
     p.add_argument("--format", choices=["markdown", "json"], default="markdown")
     p.add_argument("--out", help="Write the report to a new file (refuses to overwrite)")
     a = p.parse_args(argv)
@@ -669,7 +781,7 @@ def main(argv=None):
         if tradebook is not None and tradebook["kind"] != "zerodha_tradebook_csv":
             raise Block("INPUT: --tradebook must be a Zerodha tradebook CSV")
         rates = {"stcg_rate": a.stcg_rate, "ltcg_rate": a.ltcg_rate, "ltcg_exemption": a.ltcg_exemption, "cess_rate": a.cess_rate}
-        report = review(source, tradebook, fy=a.fy, rates=rates, prices=not a.no_prices)
+        report = review(source, tradebook, fy=a.fy, rates=rates, prices=not a.no_prices, bonus=a.bonus)
     except Block as error:
         print(f"BLOCKED - {error}", file=sys.stderr)
         return 2

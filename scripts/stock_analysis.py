@@ -45,7 +45,42 @@ def daily_history(selected, *, fetcher, now, years=2):
     result = chart(raw, selected, "1d", now)
     meta = json.loads(raw)["chart"]["result"][0]["meta"]
     result["name"] = meta.get("longName") or meta.get("shortName") or selected
+    complete_latest_session(result, meta, now)
     return result
+
+
+def complete_latest_session(result, meta, now):
+    """Yahoo sometimes ships the newest daily bar with no close (seen just after midnight IST).
+
+    The chart parser rightly drops that bar, which would silently make yesterday look like the
+    latest session. Rebuild it from Yahoo's own last-trade quote when that quote belongs to a newer
+    session, and say so; if no usable quote exists, record the gap instead.
+    """
+    bars = result["bars"]
+    last_day = bars[-1]["at"][:10]
+    result["price_note"] = None
+    stamp, price = meta.get("regularMarketTime"), meta.get("regularMarketPrice")
+    quote_at = datetime.fromtimestamp(int(stamp), IST) if isinstance(stamp, (int, float)) else None
+    newer_missing = [d for d in result.get("missing_bars", []) if d[:10] > last_day]
+    if quote_at and quote_at <= now and quote_at.date().isoformat() > last_day and isinstance(price, (int, float)) and price > 0:
+        high = max(price, meta.get("regularMarketDayHigh") or price)
+        low = min(price, meta.get("regularMarketDayLow") or price)
+        open_ = min(max(bars[-1]["close"], low), high)  # Yahoo's quote has no open; previous close, kept inside the day's range
+        day = quote_at.date().isoformat()
+        bars.append({"at": f"{day}T09:15:00+05:30", "open": float(open_), "high": float(high), "low": float(low), "close": float(price),
+                     "volume": float(meta.get("regularMarketVolume") or 0), "from_quote": True})
+        result["missing_bars"] = [d for d in result.get("missing_bars", []) if d[:10] != day]
+        result["price_note"] = (f"Yahoo's daily bar for {day} had no close; using its last traded price ₹{price:,.2f} "
+                                f"at {quote_at.strftime('%H:%M')} IST and that day's high/low.")
+    elif newer_missing:
+        result["price_note"] = (f"The latest session ({newer_missing[-1][:10]}) has no price in Yahoo's data yet; "
+                                f"figures use the {last_day} close. Check a live quote before relying on levels.")
+    result["price_date"] = bars[-1]["at"][:10]
+
+
+def session_open(now):
+    """True during the regular NSE session on a weekday (holidays are not checked)."""
+    return now.weekday() < 5 and (9, 15) <= (now.hour, now.minute) < (15, 30)
 
 
 def news_request(url):
@@ -208,6 +243,41 @@ def value(series, name):
     return row["value"] if row else None
 
 
+def last_four_quarters(rows):
+    """The latest four quarterly values if they are consecutive quarters (about 91 days apart), else None."""
+    if len(rows) < 4:
+        return None
+    four = rows[-4:]
+    days = [datetime.fromisoformat(r["date"]).date() for r in four]
+    if any(not 75 <= (b - a).days <= 105 for a, b in zip(days, days[1:])):
+        return None
+    return four
+
+
+def check_eps(eps, quarterly, price):
+    """Cross-check the EPS used for P/E against the last four reported quarters.
+
+    Yahoo's trailing EPS is occasionally wrong (seen: Adani Enterprises -3,381.91 when its quarters sum to about +46),
+    and a single unusual quarter can make an accurate trailing figure misleading (one large loss inflating P/E).
+    Returns the EPS to use and plain-language flags.
+    """
+    flags = []
+    four = last_four_quarters(quarterly)
+    if not eps or not four:
+        return eps, flags
+    total = sum(r["value"] for r in four)
+    if eps["basis"] == "trailing 12 months" and eps["date"] == four[-1]["date"] and abs(eps["value"] - total) > 0.25 * max(abs(total), 0.01):
+        flags.append(f"Yahoo's trailing EPS ({eps['value']:,.2f}) does not match the sum of the last four quarters ({total:,.2f}); the quarterly sum is used.")
+        eps = {**eps, "value": total, "basis": "sum of last four quarters", "replaced": eps["value"]}
+    values = sorted(r["value"] for r in four)
+    typical = 4 * (values[1] + values[2]) / 2
+    if eps["date"] == four[-1]["date"] and typical > 0 and abs(eps["value"] - typical) > 0.5 * typical:
+        odd = max(four, key=lambda r: abs(r["value"] - typical / 4))
+        flags.append(f"One unusual quarter ({odd['date']}, EPS {odd['value']:,.2f}) distorts trailing earnings; "
+                     f"on four typical quarters (EPS about {typical:,.2f}) the P/E would be about {price / typical:,.1f}.")
+    return eps, flags
+
+
 def ratios(series, price, now, splits=None):
     out = {}
     # Use the most recent EPS. A stale trailing figure may predate a split/bonus that the annual series already reflects.
@@ -215,6 +285,7 @@ def ratios(series, price, now, splits=None):
     eps = max(candidates, key=lambda r: r["date"]) if candidates else None
     if eps:
         eps = {**eps, "basis": "trailing 12 months" if eps == latest(series, "trailingDilutedEPS") else "last financial year"}
+    eps, out["eps_flags"] = check_eps(eps, series.get("quarterlyDilutedEPS", []), price)
     out["split_after_statements"] = [d for d in (splits or []) if eps and d > eps["date"]]
     shares = value(series, "annualOrdinarySharesNumber")
     equity = value(series, "annualStockholdersEquity")
@@ -245,6 +316,8 @@ def ratios(series, price, now, splits=None):
     out["revenue_growth"] = rev_rows[-1]["value"] / rev_rows[-2]["value"] - 1 if len(rev_rows) >= 2 and rev_rows[-2]["value"] > 0 else None
     eps_rows = series.get("annualDilutedEPS", [])
     out["eps_growth"] = eps_rows[-1]["value"] / eps_rows[-2]["value"] - 1 if len(eps_rows) >= 2 and eps_rows[-2]["value"] > 0 else None
+    if out["eps_growth"] is not None and (out["eps_growth"] > 2 or out["eps_growth"] < -0.6):
+        out["eps_flags"].append(f"Annual EPS changed {out['eps_growth'] * 100:+.0f}% in a year; P/E, ROE and margins may include a one-off gain or loss.")
     if len(rev_rows) >= 4 and rev_rows[-4]["value"] > 0:
         out["revenue_cagr_3y"] = (rev_rows[-1]["value"] / rev_rows[-4]["value"]) ** (1 / 3) - 1
     else:
@@ -369,6 +442,8 @@ def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=ins
         raise Block(f"STOCK: no price history for {selected}. Check the NSE symbol (for example RELIANCE, TATAMOTORS, HDFCBANK), "
                     "or the BSE ticker with .BO (for example RELIANCE.BO); the public feed may also be temporarily unavailable") from None
     errors = {}
+    if history.get("price_note"):
+        errors["price"] = history["price_note"]
     try:
         benchmark = daily_history(BENCHMARK, fetcher=fetcher, now=now)
     except (Block, ValueError, KeyError, TypeError):
@@ -405,7 +480,8 @@ def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=ins
         except (Block, ValueError, KeyError, TypeError, OSError):
             errors["peers"] = "Peer comparison unavailable"
     headlines = gather_news(selected, history["name"], now, fetcher=fetcher, news_fetcher=news_fetcher, hours=news_hours)
-    return {"schema": "stock_analysis_v1", "symbol": selected, "name": history["name"], "as_of": now.isoformat(), "price_source": "Yahoo Finance daily chart (may be delayed ~15 min)",
+    return {"schema": "stock_analysis_v1", "symbol": selected, "name": history["name"], "as_of": now.isoformat(),
+            "price_note": history.get("price_note"), "session_open": session_open(now), "price_source": "Yahoo Finance daily chart (may be delayed ~15 min)",
             "fundamentals_source": "Yahoo Finance fundamentals timeseries (company filings as reported)",
             "technical": {k: v for k, v in tech.items() if k != "closes"}, "fundamentals": fund, "peers": comparison, "news": headlines,
             "_bars": history["bars"],
@@ -416,7 +492,9 @@ def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=ins
 def markdown(r):
     t, f, o = r["technical"], r["fundamentals"], r["outlook"]
     name = r["symbol"]
-    lines = [f"# {r['name']} ({name}) — stock analysis", "", f"As of {r['as_of'][:16].replace('T', ' ')} IST · latest daily bar {t['last_close_date']} (today's bar is still forming during market hours)", "",
+    lines = [f"# {r['name']} ({name}) — stock analysis", "", f"As of {r['as_of'][:16].replace('T', ' ')} IST · prices as of {t['last_close_date']}"
+             + (" (today's session is still trading; the latest price will change)" if r.get("session_open") and t["last_close_date"] == r["as_of"][:10] else ""), "",
+             *([f"> ⚠ {r['price_note']}", ""] if r.get("price_note") else []),
              f"> {r['disclaimer']}", "", "## Snapshot", "",
              f"**₹{num(t['last_close'])}** ({pct(t['day_change'], 2)} vs previous close ₹{num(t['previous_close'])})", "",
              "| Period | Stock | Nifty 50 | Difference |", "| --- | ---: | ---: | ---: |"]
@@ -447,12 +525,16 @@ def markdown(r):
                   f"| Revenue growth (last year) | {pct(f['revenue_growth'])} |", f"| Revenue CAGR (3 years) | {pct(f['revenue_cagr_3y'])} |",
                   f"| EPS growth (last year) | {pct(f['eps_growth'])} |",
                   f"| Latest quarter profit vs previous quarter | {pct(f['quarter_profit_change'])}" + (f" ({f['latest_quarter']['date']}{' ⚠ stale' if f['quarter_stale'] else ''})" if f["latest_quarter"] else "") + " |", ""]
+        for flag in f.get("eps_flags") or []:
+            lines += [f"⚠ {flag}", ""]
         if f.get("currency_note"):
             lines += [f"⚠ {f['currency_note']}", ""]
         if f["split_after_statements"]:
             lines += [f"⚠ Split/bonus on {', '.join(f['split_after_statements'])} came after the EPS date; per-share ratios (P/E, P/B) may not reflect it. Verify on the exchange filing.", ""]
         if f["bank_like"]:
-            lines += ["Looks like a bank or financial company: debt/equity, current ratio and operating margin are not meaningful; compare P/B, ROE and asset quality instead.", ""]
+            lines += ["Looks like a bank or financial company: debt/equity, current ratio and operating margin are not meaningful; compare P/B, ROE and asset quality instead. "
+                      "⚠ ROE and P/B here use Yahoo's book equity, which for some banks differs a lot from the net worth in the bank's own results "
+                      "(seen: HDFC Bank, Yahoo about ₹8.2 lakh crore against about ₹5.5 lakh crore reported). Check the bank's reported return on net worth before relying on either.", ""]
         band = f.get("pe_band")
         if band:
             where = "below its usual range" if band["percentile"] < 0.25 else "above its usual range" if band["percentile"] > 0.75 else "within its usual range"

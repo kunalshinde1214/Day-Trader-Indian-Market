@@ -87,12 +87,14 @@ def snapshot(symbol, *, fetcher=request, now=None):
     price = closes[-1]
     window = history["bars"][-250:]
     out = {"symbol": selected, "name": history["name"], "price": price, "price_date": history["bars"][-1]["at"][:10],
+           "price_note": history.get("price_note"),
            "return_1y": sa.ret(closes, 250) if len(closes) > 250 else (closes[-1] / closes[0] - 1 if len(closes) > 200 else None),
            "from_high": price / max(b["high"] for b in window) - 1, "rsi14": sa.rsi(closes)}
     try:
         f = sa.ratios(sa.fundamentals(selected, fetcher=fetcher, now=now), price, now)
         out.update({k: f.get(k) for k in ("pe", "pb", "roe", "net_margin", "operating_margin", "debt_to_equity", "revenue_growth",
                                           "eps_growth", "dividend_yield", "fcf_yield", "bank_like")})
+        out["eps_flags"] = f.get("eps_flags") or []
         out["market_cap_cr"] = f["market_cap"] / 1e7 if f.get("market_cap") else None
         out["eps_date"] = f["eps"]["date"] if f.get("eps") else None
     except (Block, ValueError, KeyError, TypeError):
@@ -184,14 +186,27 @@ def cell(field, value):
 
 
 def markdown(r, columns=("price", "market_cap_cr", "pe", "pb", "roe", "net_margin", "debt_to_equity", "revenue_growth", "return_1y")):
-    lines = [f"# Screen — {r['universe']}", "", f"As of {r['as_of'][:16].replace('T', ' ')} IST · filters: {', '.join(r['filters']) or 'none'}", "",
+    dates = sorted({x.get("price_date") for x in r["results"] if x.get("price_date")})
+    quoted = sum(1 for x in r["results"] if x.get("price_note"))
+    lines = [f"# Screen — {r['universe']}", "",
+             f"Run {r['as_of'][:16].replace('T', ' ')} IST · prices as of {' to '.join([dates[0], dates[-1]] if len(dates) > 1 else dates) or 'n/a'}"
+             + (f" ({quoted} from Yahoo's last-trade quote because the daily close was missing)" if quoted else "")
+             + f" · filters: {', '.join(r['filters']) or 'none'}", "",
              f"Evaluated {r['evaluated']} of {r['requested']}; matched {r['matched']}" + (f" (showing {len(r['results'])})" if r["truncated"] else "")
              + f"; missing data for a filter: {len(r['missing_data'])}; failed to load: {len(r['failed'])}.", "",
              "| Stock | " + " | ".join(FIELDS[c] for c in columns) + " |", "| --- |" + " ---: |" * len(columns)]
     for row in r["results"]:
-        lines.append(f"| {row['name'] or row['symbol']} ({row['symbol'].replace('.NS', '')}) | " + " | ".join(cell(c, row.get(c)) for c in columns) + " |")
+        mark = " ⚠" if row.get("eps_flags") else ""
+        lines.append(f"| {row['name'] or row['symbol']} ({row['symbol'].replace('.NS', '')}){mark} | " + " | ".join(cell(c, row.get(c)) for c in columns) + " |")
     if not r["results"]:
         lines.append("| No stock matched | " + " | ".join("" for _ in columns) + " |")
+    banks = [row["symbol"].replace(".NS", "") for row in r["results"] if row.get("bank_like")]
+    if banks and any(f.split("<")[0].split(">")[0].split("=")[0].strip() in ("roe", "pb") for f in r["filters"]):
+        lines += ["", f"⚠ Banks and finance companies ({', '.join(banks)}): ROE and P/B use Yahoo's book equity, which can differ a lot from the "
+                      "net worth in the bank's own results. Check reported return on net worth before relying on these filters."]
+    flagged = [row for row in r["results"] if row.get("eps_flags")]
+    if flagged:
+        lines += ["", "⚠ Earnings checks:"] + [f"- {row['symbol'].replace('.NS', '')}: {' '.join(row['eps_flags'])}" for row in flagged]
     if r["missing_data"]:
         lines += ["", "Missing data for a filter (not counted as a match or a fail): " + ", ".join(s.replace(".NS", "") for s in r["missing_data"][:30])]
     if r["failed"]:

@@ -69,6 +69,16 @@ Pass a tradebook either as `--input` (holdings are derived from open lots) or as
 
 These defaults apply to transfers on or after 23 July 2024 under the Finance (No. 2) Act 2024. Sales before that date in the selected FY trigger a warning (15% STCG; 10% LTCG above ₹1,00,000 applied then). The report also shows "LTCG exemption remaining this FY" as information; the exemption is shared with other s.112A gains outside the file, such as equity mutual funds.
 
+## Bonuses, splits and missing purchase dates
+
+A holding may carry `"bought": "YYYY-MM-DD"` or just `"YYYY-MM"` (the 1st of the month is assumed and flagged). A dated holding with no lots becomes one tax lot.
+
+Yahoo's split events from the last five years are applied inside FIFO on the ex-date, before that day's trades. By default an event is treated as a **split**: open lots are multiplied by the ratio and their cost divided, keeping the purchase date. With `--bonus SYMBOL` it is treated as a **bonus**: a new lot of (ratio − 1) × the open quantity is added at nil cost, dated on the ex-date, as Indian tax treats bonus shares. Yahoo records a 1:1 bonus as a 2-for-1 split and does not say which it was, so check the company announcement. Values and P&L are the same either way; only tax lots differ.
+
+If a holding's quantity equals its lots before the event, it is converted to today's units and a note says so. A holding with no date that had an event gets a ⚠ in the table and an explanation under it (broker exports are normally already adjusted). Demergers, mergers and rights issues are not applied.
+
+When some priced holdings have no purchase date, the "if you sold everything today" tax is a range: the low end treats their gains as long-term and losses as short-term, the high end the reverse.
+
 ## Not modelled
 
 - Surcharge.

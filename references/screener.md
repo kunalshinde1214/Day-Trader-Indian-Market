@@ -31,6 +31,10 @@ A stock with no value for a filtered field is listed under "missing data", not c
 
 `stock_analysis.py` shows the stock's P/E over up to five years: price on each session divided by the latest annual diluted EPS that had been published by then (each EPS is used from 60 days after its financial year end). It reports the low, the 25th–75th percentile range, the median, the high and where today's P/E sits. It is skipped when financials were currency-converted, because today's exchange rate would distort past values. A P/E below its history can reflect lower expected growth, not only cheapness.
 
+## Data checks
+
+Each stock's trailing EPS is cross-checked against its last four consecutive quarters. If Yahoo's trailing figure differs from their sum by more than 25%, the sum is used and flagged; if one quarter makes trailing EPS differ from four typical quarters by more than half, the P/E is flagged with the typical-quarter P/E; and an annual EPS change above +200% or below −60% is flagged as a possible one-off. Flagged stocks get ⚠ in the table and a note under it. When banks or finance companies appear in a screen filtered on ROE or P/B, a note warns that Yahoo's book equity can differ a lot from the net worth in the bank's own results. The header shows the price date; if Yahoo's latest daily close was missing, the last-trade quote is used and counted in the header.
+
 ## Limits
 
 Yahoo's financial data can be stale, restated or missing, especially for smaller companies. Ratios are from reported annual figures and the latest trailing EPS. Nothing here is a recommendation or authorizes an order.

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.1 — 18 November 2026
+
+Trust fixes found by testing the skill as ordinary users would.
+
+- **Stale prices:** when Yahoo's newest daily bar has no close (seen just after midnight IST), the reports no longer silently fall back to the previous day. The session is rebuilt from Yahoo's last-trade quote and labelled, or the gap is stated. Stock analysis, the screener and the portfolio review show the price date; "still trading" appears only during market hours.
+- **Bonuses and splits in the portfolio review:** Yahoo's split events are applied to dated holdings and lots (split by default; `--bonus SYMBOL` adds nil-cost bonus lots dated on the ex-date, as Indian tax treats them). Holdings take an optional `bought` date (a month is enough). Holdings that cannot be adjusted get a ⚠ in the table. A pre-bonus HDFC Bank holding now shows about −1% instead of −50%.
+- **EPS cross-check:** trailing EPS is compared with the last four quarters. Wrong trailing figures are replaced by the quarterly sum (Adani Enterprises: Yahoo −3,381.91 against +46.55), one-quarter distortions are flagged with a typical-quarter P/E (HPCL), and annual EPS jumps above +200% or below −60% are flagged (JSW Steel). Flags appear in stock analysis and the screener.
+- **Tax with missing dates:** the "if you sold everything today" estimate is a best-to-worst range naming the holdings whose dates would narrow it, instead of silently ₹0.
+- **Banks:** ROE and P/B carry a warning that Yahoo's book equity can differ a lot from the bank's reported net worth (HDFC Bank: about ₹8.2 lakh crore on Yahoo against about ₹5.5 lakh crore reported).
+- 19 regression tests, each checked against a deliberately broken version of the fix.
+
 ## 1.2.0 — 18 November 2026
 
 - Add a stock screener (`scripts/screener.py`, skill `stock-screener`) over Nifty 50, Next 50, 500, midcap 150, smallcap 250 and 13 sector indices, with filters and sorting on P/E, P/B, ROE, margins, debt/equity, growth, yields, market cap, 1-year return, distance from high and RSI. Stocks with missing data or failed loads are listed, never counted as matches.

@@ -14,7 +14,7 @@ How to answer:
 1. Turn the request into a universe and filters. Universes: `nifty50`, `niftynext50`, `nifty500`, `midcap150`, `smallcap250`, and sectors `bank`, `psubank`, `it`, `pharma`, `healthcare`, `auto`, `fmcg`, `metal`, `realty`, `energy`, `oilgas`, `media`, `consumerdurables`; or `--symbols` for the user's own list. Fields: `pe`, `pb`, `roe`, `net_margin`, `operating_margin`, `debt_to_equity`, `revenue_growth`, `eps_growth`, `dividend_yield`, `fcf_yield`, `market_cap_cr`, `return_1y`, `from_high`, `rsi14`, `price`. Percent fields accept `roe>15` or `roe>15%`.
 2. Say which filters you used when the request was vague ("cheap" → for example `pe<15`), so the user can change them.
 3. Nifty 500 takes a few minutes (about 1,000 requests); prefer a smaller universe unless the user asks for the whole market.
-4. Report how many stocks were evaluated, matched, missing data and failed. Missing data is not a pass.
+4. Report how many stocks were evaluated, matched, missing data and failed, and the price date. Missing data is not a pass. Mention every ⚠ earnings check next to the stock, and the bank equity warning when screening banks on ROE or P/B.
 5. A match is a filter result, not a recommendation. For banks and finance companies, debt/equity and margins are not meaningful; say so if they are filtered on. Offer to run `stock-analysis` on any name the user wants to look at further.
 
 Research and paper workflows only. Missing data is a gap, not an all-clear. Nothing here places an order.
