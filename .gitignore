@@ -22,3 +22,4 @@ dist/
 *.sqlite-wal
 *.sqlite-shm
 *.zip
+.playwright-mcp/

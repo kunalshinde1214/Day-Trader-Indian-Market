@@ -20,6 +20,8 @@ Created by **Kunal Shinde**. Source-available and free for personal use. Public 
 
 | Ask the skill | What it prepares |
 | --- | --- |
+| “Show the Nifty option chain: PCR, max pain and where OI is building.” | Chain around the money with OI, OI change, IV and delta; PCR, max pain, OI walls, build-up, expected move and India VIX |
+| “What's the payoff of a 25800/26000 – 25000/24800 iron condor?” | Net premium, max profit and loss, breakevens, position Greeks and a shaded payoff chart |
 | “Analyse Reliance. What data is missing?” | Trend, relative returns, available financial ratios, linked news and historical return ranges |
 | “Give me today’s Nifty, Sensex and Bank Nifty briefing.” | Completed-bar context, reference levels and conditional scenarios |
 | “What changed in Indian-market news?” | Source-linked headlines, timestamps and disclosure candidates |
@@ -38,7 +40,7 @@ Requires **Claude Code**, **Git** and **Python 3.10+** installed. For a first-ti
 claude plugin marketplace add kunalshinde1214/Day-Trader-Indian-Market && claude plugin install india-day-trader@kunal-india-trading
 ```
 
-This registers the marketplace and installs all 16 plugin skills for your user account. The install step runs only if marketplace registration succeeds. Open a new Claude Code session after installation. It does not configure brokerage credentials or enable live trading.
+This registers the marketplace and installs all 17 plugin skills for your user account. The install step runs only if marketplace registration succeeds. Open a new Claude Code session after installation. It does not configure brokerage credentials or enable live trading.
 
 <details>
 <summary>Windows PowerShell 5.1, or marketplace already added?</summary>
@@ -68,7 +70,7 @@ Then ask naturally, or use a namespaced command:
 /india-day-trader:nifty
 ```
 
-There are **16 plugin skills**: eleven trading-workflow roles, four daily aliases and one-stock analysis. See the [command reference](references/commands.md). For other skill-compatible hosts, download the release ZIP, unpack `india-day-trader`, and follow that host’s skill installation process. Claude plugin installation is not a universal installer for other hosts.
+There are **17 plugin skills**: eleven trading-workflow roles, four daily aliases, one-stock analysis and F&O analytics. See the [command reference](references/commands.md). For other skill-compatible hosts, download the release ZIP, unpack `india-day-trader`, and follow that host’s skill installation process. Claude plugin installation is not a universal installer for other hosts.
 
 ### Python CLI
 
@@ -106,6 +108,7 @@ A separate opt-in [mixed cash-entry workflow](references/mixed-inventory-entries
 
 | Capability | Available now | Boundary |
 | --- | --- | --- |
+| F&O analytics | Option chain, OI and build-up, PCR, max pain, IV and Greeks (Black-76), futures basis, India VIX, multi-leg payoff with SVG chart | End-of-day NSE data by default; live chains come from your broker connector |
 | Stock research | Price context, Nifty comparison, technicals, available ratios and news | Source availability and financial-statement coverage vary |
 | Daily briefings | India daily, Nifty, Sensex, Bank Nifty; pre-open / intraday / close modes | Public feeds can be delayed; membership and breadth are partial |
 | Scanning & paper plans | Six scanners and custom levels at one/five minutes; replay, sizing and risk checks | Regular-session rules; pre-open/regime and broader special-session models pending |

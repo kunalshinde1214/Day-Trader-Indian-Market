@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 — 17 November 2026
+
+- Add F&O analytics (`scripts/fno.py`, plugin skill `fno-analysis`): option chain around the money with OI, OI change, IV and delta; put-call ratio by OI and volume; max pain; OI support/resistance; long/short build-up; ATM IV, put-call skew and expected move; futures basis; India VIX percentile.
+- Implied volatility and Greeks use Black-76 on a put-call-parity forward (NSE options are European); untraded strikes are never given an IV from stale prices.
+- Multi-leg strategy payoff for options and futures: net premium, maximum profit and loss (unlimited or price-to-zero cases labelled), breakevens, position Greeks and a shaded SVG chart.
+- Data from NSE's free end-of-day F&O bhavcopy, walking back over holidays; live chains from a broker connector through an `fno_chain_v1` input file.
+- 15 offline tests, including IV round-trips, parity, max pain, build-up and exact iron-condor arithmetic.
+
 ## 1.0.0 — 17 November 2026
 
 - Complete the skill's scope: data the scripts do not bundle (BSE filings and BSE-only stocks, results commentary, concalls, macro and RBI/SEBI events, breaking news) is now fetched at request time through web research with source, URL and date ([web research](references/web-research.md)).
