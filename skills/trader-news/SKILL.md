@@ -13,4 +13,6 @@ For `/india-news` or a market-wide briefing, use `python "${CLAUDE_PLUGIN_ROOT}/
 
 Report new items, failed sources and publication timestamps. Read the linked story before describing a headline as fact.
 
+The feeds above cover NSE and a few news sources. For BSE announcements, a specific company or event, or anything in the last few hours, search the web and read the story or filing; cite source and date ([web research](../../references/web-research.md)).
+
 Research and paper workflows only. Missing data is a gap, not an all-clear. Nothing here places an order.

@@ -11,4 +11,6 @@ Primary route: `python "${CLAUDE_PLUGIN_ROOT}/scripts/trader.py" size --workdir 
 
 Require approved personal limits, sourced fees, exact master and margin evidence. Public quotes cannot establish account funds or margin clearance.
 
+Funds, margin and charges may be read from the user's connected broker connector ([broker connectors](../../references/broker-connectors.md)); name it and the read time.
+
 Research and paper workflows only. Missing data is a gap, not an all-clear. Nothing here places an order.

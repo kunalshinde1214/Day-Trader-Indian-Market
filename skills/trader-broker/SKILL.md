@@ -11,4 +11,6 @@ Primary route: `python "${CLAUDE_PLUGIN_ROOT}/scripts/trader.py" ticket --workdi
 
 Read references/execution.md before preparing live.py actions. Both exact-action confirmations must be operated by the human. Never type them, automate stdin, retry ambiguous orders or treat this skill invocation as trade authorization.
 
+If the user has connected their broker's own connector, use it to read account, positions, funds and quotes for the ticket. Do not place, modify or cancel orders through it on your own; follow [broker connectors](../../references/broker-connectors.md).
+
 Research and paper workflows only. Missing data is a gap, not an all-clear. Nothing here places an order.

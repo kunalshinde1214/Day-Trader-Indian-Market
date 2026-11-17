@@ -29,7 +29,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(one["sha256"],two["sha256"])
             with zipfile.ZipFile(a) as z:
                 manifest=json.loads(z.read('india-day-trader/RELEASE-MANIFEST.json'))
-                self.assertFalse(manifest['full_specification_complete'])
+                self.assertTrue(manifest['skill_scope_complete']);self.assertFalse(manifest['authenticated_broker_acceptance']);self.assertFalse(manifest['live_enabled_by_default'])
                 for name,digest in manifest['files'].items():
                     self.assertEqual(hashlib.sha256(z.read('india-day-trader/'+name)).hexdigest(),digest)
             with self.assertRaises(FileExistsError):package(a)

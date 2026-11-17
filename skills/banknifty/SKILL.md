@@ -13,4 +13,6 @@ For a specified closing-report date, use `--collect-close --session YYYY-MM-DD` 
 
 Use --collect-kite or --input for configured sourced inputs. Show feed age, calendar basis and missing coverage. Never substitute --demo for unavailable real data or infer an executable contract from index levels.
 
+Then search the web for what the script does not collect: overnight global cues, GIFT Nifty, FII/DII flows, RBI/SEBI or macro events today, bank results and RBI actions, and the main reasons the index moved. Cite each source with its date and keep it apart from the script's numbers ([web research](../../references/web-research.md)).
+
 Research and paper workflows only. Missing data is a gap, not an all-clear. Nothing here places an order.

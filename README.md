@@ -6,13 +6,13 @@
 
 [![Offline validation](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml/badge.svg)](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-244b3f)
-![Public alpha](https://img.shields.io/badge/Release-public_alpha-bb702b)
+![Release 1.0.0](https://img.shields.io/badge/Release-1.0.0-2b6cbb)
 
-[Install](#install) · [See the workflow](#from-question-to-research) · [Feature matrix](#what-is-implemented) · [Download 0.10.1](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.1-carry-protection-alpha) · [Documentation](#go-deeper)
+[Install](#install) · [See the workflow](#from-question-to-research) · [Feature matrix](#what-is-implemented) · [Download 1.0.0](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.0.0) · [Documentation](#go-deeper)
 
 Created by **Kunal Shinde**. Source-available and free for personal use. Public research needs **no brokerage account or API key**. Broker workflows use **your own account**, with credentials kept locally.
 
-**New in 0.10.1:** resumable NSE announcement history, trade-inclusive inventory reconciliation, short MIS entries alongside existing inventory, Dhan basket margins, fill and collateral stress scenarios, and carry-aware protection. See [0.10.1 scope](references/development-progress.md).
+**Also in 1.0.0 (from 0.10.1):** resumable NSE announcement history, trade-inclusive inventory reconciliation, short MIS entries alongside existing inventory, Dhan basket margins, fill and collateral stress scenarios, and carry-aware protection. See [0.10.1 scope](references/development-progress.md).
 
 ## From question to research
 
@@ -72,7 +72,7 @@ There are **16 plugin skills**: eleven trading-workflow roles, four daily aliase
 
 ### Python CLI
 
-Clone the repository, or open the folder from the [release ZIP](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.1-carry-protection-alpha):
+Clone the repository, or open the folder from the [release ZIP](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.0.0):
 
 ```bash
 git clone https://github.com/kunalshinde1214/Day-Trader-Indian-Market.git india-day-trader
@@ -84,46 +84,46 @@ python scripts/daily.py india-daily --collect-public
 
 The `--demo` command uses **fictional demo data**. The last two fetch public data and need internet access. Use `python3` on macOS/Linux or `py` on Windows if `python` is unavailable. Core CLI workflows use the Python standard library; optional streaming and document-extraction paths have [additional requirements](references/operations.md).
 
-For a ZIP install, download both release assets into the same folder. Before extracting, run `sha256sum -c india-day-trader-0.10.1-carry-protection-alpha.zip.sha256` on Linux, or `shasum -a 256 -c india-day-trader-0.10.1-carry-protection-alpha.zip.sha256` on macOS. In Windows PowerShell, run `Get-FileHash .\india-day-trader-0.10.0-market-workflows-alpha.zip -Algorithm SHA256` and compare the hash with the `.sha256` file. Extract the ZIP, open its `india-day-trader` folder, then run the Python commands above.
+For a ZIP install, download both release assets into the same folder. Before extracting, run `sha256sum -c india-day-trader-1.0.0.zip.sha256` on Linux, or `shasum -a 256 -c india-day-trader-1.0.0.zip.sha256` on macOS. In Windows PowerShell, run `Get-FileHash .\india-day-trader-1.0.0.zip -Algorithm SHA256` and compare the hash with the `.sha256` file. Extract the ZIP, open its `india-day-trader` folder, then run the Python commands above.
 
 ## What is implemented
 
-**New in 0.10.0:** Angel One and FYERS reducing carry exits, stops and cancellation, broader public NSE research, one-minute variants of all scanner rules, and expanded depth/cost/margin research. See the [release scope](references/release-status.md). Implementation is not authenticated broker or production acceptance.
+**New in 1.0.0:** the skill now combines its scripts with **live web research** (BSE and NSE filings, results, concalls, macro and RBI/SEBI events, "why did it move") and with **your own broker connector**, so nothing has to be bundled for BSE or for your broker. See [web research](references/web-research.md) and [broker connectors](references/broker-connectors.md). Earlier releases added Angel One/FYERS carry orders, one-minute scanner variants and depth/cost/margin research ([release scope](references/release-status.md)).
 
 The release also includes [sourced inventory reconciliation](references/inventory-book.md) for T1, pledged, funded and corporate-action lots. This is accounting support, not live trading permission for those holdings. Track the remaining areas in the [ordered completion checklist](references/completion-tracker.md).
 
-A separate opt-in [mixed cash-entry workflow](references/mixed-inventory-entries.md) supports long MIS entries alongside supported long CNC/MIS exposure, with combined risk and exact margin checks. Broader mixed-entry variants remain unfinished.
+A separate opt-in [mixed cash-entry workflow](references/mixed-inventory-entries.md) supports MIS entries, including opt-in shorts, alongside long CNC and signed MIS exposure, with combined risk and exact margin checks.
 
-[Automatic NSE exchange observations](references/exchange-coverage.md) now collect dated surveillance indicators and the separate F&O ban report, including in repeated public collection. BSE coverage and verified effective-session clearance remain unfinished.
+[Automatic NSE exchange observations](references/exchange-coverage.md) collect dated surveillance indicators and the F&O ban report. BSE notices are read through web research.
 
-[Historical evidence workflows](references/historical-evidence.md) now support sourced constituent intervals, ISIN-based changes and split/bonus reconstruction of explicitly raw daily prices. They enforce information cutoffs and retain source hashes; complete automatic history and independent source verification remain unfinished.
+[Historical evidence workflows](references/historical-evidence.md) now support sourced constituent intervals, ISIN-based changes and split/bonus reconstruction of explicitly raw daily prices. They enforce information cutoffs and retain source hashes.
 
-[Announcement backfill](references/announcement-history.md) adds bounded NSE historical discovery, readable headline reports, multiple official attachments, symbol-plus-ISIN matching and Indian inline-XBRL number formats. It does not claim complete filing coverage or independently verified financial figures.
+[Announcement backfill](references/announcement-history.md) adds bounded NSE historical discovery, readable headline reports, multiple official attachments, symbol-plus-ISIN matching and Indian inline-XBRL number formats. BSE filings are read through web research; neither route claims complete coverage.
 
-[Dated closing reports](references/closing-context.md) add public NSE Nifty/Bank Nifty closes, EQ breadth and separately dated FII/DII and GIFT context to the daily commands. BSE closing coverage, macro feeds and independent publication/finality verification remain unfinished.
+[Dated closing reports](references/closing-context.md) add public NSE Nifty/Bank Nifty closes, EQ breadth and separately dated FII/DII and GIFT context to the daily commands. BSE closes and macro events come from web research at report time.
 
-**0.10.1 public alpha** includes the following (0.10.1 additions are listed above and in its [scope](references/development-progress.md)). “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
+**1.0.0** includes the following. “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
 
 | Capability | Available now | Boundary |
 | --- | --- | --- |
 | Stock research | Price context, Nifty comparison, technicals, available ratios and news | Source availability and financial-statement coverage vary |
 | Daily briefings | India daily, Nifty, Sensex, Bank Nifty; pre-open / intraday / close modes | Public feeds can be delayed; membership and breadth are partial |
 | Scanning & paper plans | Six scanners and custom levels at one/five minutes; replay, sizing and risk checks | Regular-session rules; pre-open/regime and broader special-session models pending |
-| News & filings | RSS discovery, bounded NSE backfill, attachment discovery, supported XBRL and filing backlog | BSE/history coverage and independent financial-fact verification incomplete |
+| News & filings | RSS discovery, bounded NSE backfill, attachment discovery, supported XBRL and filing backlog; BSE and anything else via web research | Web facts are cited research, never risk-check evidence |
 | Repeated collection | Bounded foreground runs, saved reports, shared backlog and stop latch | No automatic service installation; partial sources stay partial |
-| Broker data | Kite, Upstox, Dhan, Angel One and FYERS adapters | User login, entitlements and account-specific checks required |
+| Broker data | Your broker's own connector (e.g. Zerodha Kite, Upstox, Dhan, Groww) or the built-in Kite, Upstox, Dhan, Angel One and FYERS adapters | You connect and verify your own account |
 | Carry accounting | Supported subsets across five broker collectors | T1, pledged, MTF and unresolved adjustments block |
 | Carry reducing orders | **All five brokers**: supported carry exits, stop-limits and cancellation | Human-operated; unsupported inventory remains blocked |
-| Mixed entries | Long MIS cash entry alongside supported long CNC/MIS exposure | Disabled by default; no new carry, short, derivative or restricted-inventory entries |
-| Risk models | Depth stress; five-broker cash depth; quantity-dependent replay costs; Kite/Upstox/Angel/FYERS basket prefixes/scenarios/grids | Dhan/FYERS depth research-only; Dhan baskets, broader collateral stress, calibrated impact and queue/fill simulation pending |
-| Protection | Experimental single-instrument intraday runner, explicitly human-armed and bounded | Disabled by default; not production-accepted or guaranteed to flatten |
+| Mixed entries | MIS cash entries (opt-in shorts) alongside long CNC and signed MIS exposure | Disabled by default; no new carry, derivative or restricted-inventory entries |
+| Risk models | Depth stress; five-broker cash depth and basket margins; quantity-dependent replay costs; passive-fill and collateral stress scenarios | Scenarios use your stated assumptions; they are not calibrated predictions |
+| Protection | Intraday and carry-aware runners with group coordination, explicitly human-armed, expiring and action-capped | Disabled by default; only cancels or reduces; fills are never guaranteed |
 | User setup | Disabled profiles, read-only probes and acceptance-evidence inventory | Each user supplies and verifies their own environment |
 
 The paper workflow is **scan → plan → replay → size → risk → ticket**. Replay supports independent, contiguous-block and whole-session sampling; quantity grids explore explicit partial-fill combinations rather than assuming every basket fills together.
 
 ## Your account. Your controls.
 
-The publisher does not supply a trading account. Public research works without one. To prepare your own broker workflow:
+The publisher does not supply a trading account. Public research works without one. The easiest way to add yours is your broker's own connector in Claude's connector settings; the skill uses it to read your holdings, positions, funds and quotes, and never places orders through it on its own ([broker connectors](references/broker-connectors.md)). To use the built-in adapters instead:
 
 ```bash
 python scripts/user_setup.py --broker upstox --account-id YOUR_NONSECRET_ACCOUNT_ID --out trader/live-profile.json
@@ -135,7 +135,7 @@ Ordinary execution requires two human confirmations and fresh checks. The separa
 
 ## Release evidence, not performance claims
 
-The published 0.10.1 checkpoint has **984 passing offline tests**, including simulated broker responses and failure cases. Release validation checks Python syntax, JSON, local links and an explicit packaging allowlist. GitHub CI tests Python **3.10, 3.12 and 3.13**; the [release](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v0.10.1-carry-protection-alpha) includes a ZIP and SHA-256 checksum. Published CI results do not validate later local edits.
+The published 1.0.0 release has **984 passing offline tests**, including simulated broker responses and failure cases. Release validation checks Python syntax, JSON, local links and an explicit packaging allowlist. GitHub CI tests Python **3.10, 3.12 and 3.13**; the [release](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.0.0) includes a ZIP and SHA-256 checksum. Published CI results do not validate later local edits.
 
 ```bash
 python scripts/release.py --check
@@ -147,12 +147,12 @@ Offline tests do **not** prove live broker acceptance, profitability or producti
 
 | Explore | Documentation |
 | --- | --- |
-| Research | [Daily reports](references/daily.md) · [News](references/india-news.md) · [Public workflows](references/public-workflows.md) |
+| Research | [Daily reports](references/daily.md) · [News](references/india-news.md) · [Public workflows](references/public-workflows.md) · [Web research](references/web-research.md) · [Broker connectors](references/broker-connectors.md) |
 | Trading logic | [Setup definitions](references/setups.md) · [Execution](references/execution.md) · [Risk/data expansion](references/india-expansion.md) |
 | Carry execution | [Kite](references/mixed-inventory-exits.md) · [Upstox](references/upstox-execution.md) · [Dhan](references/dhan-execution.md) · [Angel/FYERS](references/angel-fyers-execution.md) |
 | Project | [Changelog](CHANGELOG.md) · [Requirements](references/requirements.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) |
 
-**Still on the roadmap:** broader restricted-inventory and carry-entry variants; comprehensive BSE/calendar/surveillance/filing coverage; independent historical and financial-fact verification; calibrated execution models; special-session/pre-open/regime models; production protection and remaining broker compatibility. Dhan baskets, explicit stress/fill scenarios and carry/group protection were [added in 0.10.1](references/development-progress.md). See the [ordered completion checklist](references/completion-tracker.md). User account acceptance is separate from this engineering roadmap.
+**Scope:** the skill is complete for its purpose: research, daily reports, analysis and paper trading, with web research and your own broker filling what scripts cannot bundle. Optional future enhancements (calibrated execution models, pre-open/regime models, extra inventory types) are listed in the [completion checklist](references/completion-tracker.md). Each user validates their own broker connection.
 
 ## License & responsible use
 

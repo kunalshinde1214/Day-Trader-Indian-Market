@@ -11,4 +11,6 @@ Primary route: `python "${CLAUDE_PLUGIN_ROOT}/scripts/research.py" disclosures -
 
 Announcements are discovery candidates, not parsed trades. Publication date is not transaction date. Normalize reviewed PIT/SAST/pledge/bulk/block facts with data.py whales; never infer insider motives.
 
+For BSE filings, press-reported bulk/block deals and shareholding-pattern changes, search bseindia.com, nseindia.com and the company's filings, then normalize reviewed facts the same way ([web research](../../references/web-research.md)).
+
 Research and paper workflows only. Missing data is a gap, not an all-clear. Nothing here places an order.

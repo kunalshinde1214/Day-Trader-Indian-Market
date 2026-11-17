@@ -11,7 +11,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION="0.10.1-carry-protection-alpha"
+VERSION="1.0.0"
 ROOT_FILES={"SKILL.md","README.md","LICENSE","THIRD_PARTY_NOTICES.md","RISK_DISCLOSURE.md","SECURITY.md","CONTRIBUTING.md","CHANGELOG.md",".gitignore",".gitattributes","requirements-dev.txt","requirements-streaming.txt","requirements-streaming-sdk.txt"}
 DIR_TYPES={"scripts":{'.py'},"tests":{'.py'},"references":{'.md'},"assets":{'.json','.svg'},"agents":{'.yaml'},"third-party":{'.LICENSE'},".github":{'.yml'},".claude-plugin":{'.json'},"skills":{'.md'}}
 DENY={"__pycache__","research","test-output","trader",".git",".env",".venv","node_modules"}
@@ -77,8 +77,10 @@ def static_checks(root=ROOT):
 def package(out,root=ROOT):
     checks=static_checks(root)
     files=release_files(root)
-    manifest={"version":VERSION,"mode":"paper-human-execution-and-opt-in-bounded-protection-alpha","full_specification_complete":False,
-              "unattended_protection":"experimental single-instrument intraday runner; explicit human arming and account acceptance required; not production tested",
+    manifest={"version":VERSION,"mode":"research-paper-human-execution-and-opt-in-bounded-protection","skill_scope_complete":True,
+              "runtime_sources":"web research for BSE, filings, news and macro events; user broker connector or local adapters for account data",
+              "optional_enhancements":["calibrated impact/queue/latency models","pre-open and regime models","carry and derivative mixed entries","multiple accounts per broker in one protection process"],
+              "unattended_protection":"bounded intraday and carry-aware runners; explicit human arming and per-user account acceptance required; reduce/cancel only",
               "daily_commands":["/india-daily","/nifty","/sensex","/banknifty"],"portfolio_accounting":"canonical plus five limited broker collectors; reviewed opening and supported provider conventions required",
               "streaming":"five broker tradable quote adapters; authenticated acceptance pending","deployment":"render only; not installed",
               "claude_plugin_commands":checks["claude_plugin_commands"],"public_research":True,

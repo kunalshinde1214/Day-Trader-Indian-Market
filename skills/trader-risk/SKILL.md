@@ -11,4 +11,6 @@ Primary route: `python "${CLAUDE_PLUGIN_ROOT}/scripts/trader.py" risk --workdir 
 
 Preserve account/plan binding, freshness, restrictions, events and unresolved-order locks. Never substitute public research outputs for reconciled account evidence.
 
+Account, position and margin reads may come from the user's connected broker connector ([broker connectors](../../references/broker-connectors.md)). Web-sourced events or calendars are research only and cannot clear a risk check until the user reviews and saves them.
+
 Research and paper workflows only. Missing data is a gap, not an all-clear. Nothing here places an order.

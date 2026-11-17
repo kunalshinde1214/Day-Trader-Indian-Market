@@ -13,4 +13,6 @@ For feed-driven discovery, follow [the results and filing workflow](../../refere
 
 Preserve entity, reporting dimensions, period, units and unsupported facts. Use --url for an official selected attachment. Never invent metrics or treat headlines as financial results.
 
+If the official XBRL is not reachable, or the user asks about commentary, guidance or a concall, search the company's investor-relations page and exchange filings. Label numbers taken from a PDF or article as unverified unless they match the XBRL ([web research](../../references/web-research.md)).
+
 Research and paper workflows only. Missing data is a gap, not an all-clear. Nothing here places an order.

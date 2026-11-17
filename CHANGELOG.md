@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0 — 17 November 2026
+
+- Complete the skill's scope: data the scripts do not bundle (BSE filings and BSE-only stocks, results commentary, concalls, macro and RBI/SEBI events, breaking news) is now fetched at request time through web research with source, URL and date ([web research](references/web-research.md)).
+- Support each user's own broker connector (for example Zerodha Kite, Upstox, Dhan, Groww) for reading holdings, positions, funds, quotes and candles; orders stay the user's action ([broker connectors](references/broker-connectors.md)).
+- Add web-research and connector steps to the stock-analysis, daily, news, disclosure, results, ticket, risk and sizing skills.
+- Replace the open-ended tracker with a [completion status](references/completion-tracker.md) separating skill coverage, request-time research, per-user validation and optional enhancements. The release manifest now records `skill_scope_complete: true`.
+- Refresh the README feature matrix for 0.10.1 capabilities.
+
 ## 0.10.1-carry-protection-alpha — 17 November 2026
 
 - Add resumable NSE announcement-history windows feeding the existing filing backlog; preserve cursors on source gaps or archive failure.

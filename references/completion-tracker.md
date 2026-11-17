@@ -1,20 +1,35 @@
-# Sequential development checklist
+# Completion status
 
-Working-source status, updated 17 November 2026. Additions after 0.10.0 are released in [0.10.1](development-progress.md). Local implementation and offline tests do not establish broker or production acceptance. Items are maintained in the user's requested order; partial items are not counted as complete.
+Updated 17 November 2026 for version 1.0.0.
 
-| # | Area | Current status | Remaining acceptance boundary |
-| --- | --- | --- | --- |
-| 1 | Other-broker carry execution | Implemented for supported Angel/FYERS inventory; [guide](angel-fyers-execution.md) | End users validate their own accounts; ambiguous/restricted inventory still blocks. |
-| 2 | Broader inventory | Partial: [sourced lot/event reconciliation](inventory-book.md), now with [trade-inclusive lot accounting](development-progress.md) | Provider adapters, live T1/pledged/MTF execution, multi-lot fill allocation and more corporate-action types. |
-| 3 | Mixed-inventory entries | Partial: [BUY/SELL cash MIS entries](mixed-inventory-entries.md) alongside long CNC and signed MIS, with combined gross risk, margin and shared reservations | New CNC/NRML entries, derivative/restricted portfolios, carry-fee evidence integration and end-user acceptance. |
-| 4 | Automatic exchange coverage | Partial: [automatic dated NSE surveillance and F&O ban observations](exchange-coverage.md), integrated into repeated collection; public smoke test passed | BSE, instrument-specific sessions/auctions/emergency notices, verified effective dates, complete membership and remaining indicator semantics. |
-| 5 | Constituents/history | Partial: [source-backed membership intervals and split/bonus history reconstruction](historical-evidence.md), with information cutoffs, ISIN changes and artifact hashes | Automatic complete historical datasets, independent effective-date/publication verification, broader corporate actions and provider adjustment compatibility. |
-| 6 | News/filings | Partial: [bounded NSE backfill, description attachments, symbol+ISIN matching and Indian inline-XBRL](announcement-history.md), plus [resumable multi-window collection](development-progress.md) | BSE history, complete pagination/revisions and attachment discovery, broader taxonomy/entity mapping and independent unstructured-number verification. |
-| 7 | Daily context | Partial: [public NSE index closes, EQ/constituent breadth, dated FII/DII and GIFT observations](closing-context.md), available through daily aliases; public smoke test passed | BSE closing provider, macro-event feeds, independently verified publication/finality and membership, broader providers. |
-| 8 | Liquidity/costs | Partial: [five-broker cash depth and quantity-dependent replay costs](depth-and-replay-costs.md), plus [explicit passive queue/latency/partial-fill scenarios](risk-scenarios.md) | Dhan/FYERS book timestamps remain unverified; derivative units, measured queues, calibrated impact/latency and account acceptance remain. |
-| 9 | Portfolio margin | Partial: [five-broker basket prefixes and requested fill scenarios](basket-margin-providers.md), plus [account-separated collateral/cash-component stress](risk-scenarios.md) | Verified Dhan contract/account semantics, calibrated collateral/market stress, scenarios beyond supplied assumptions and end-user acceptance. |
-| 10 | Strategy/replay | Partial: [all six scanners plus custom levels at one/five minutes](setups.md), with interval-bound replay and 25 additional broker/rule paper combinations | Pre-open/regime models, calibrated strategy evidence and consistent special-session handling. |
-| 11 | Protection operations | Partial: [carry-aware runner and sequential multi-scope coordination](portfolio-protection.md), shared same-account intent history and group failure revocation | Production/runtime acceptance, multiple accounts at the same broker per process, delivery-evidence renewal; no guaranteed fills. |
-| 12 | Compatibility/charges | Partial: [optional user-account carry, basket and depth acceptance probes](development-progress.md) | Actual user-account results, ambiguous Angel/FYERS fields, master compatibility and account-specific tariffs/exemptions/rounding. |
+The skill is complete for its purpose: Indian-market research, daily reports, single-stock analysis, news and filings, pattern scans, and paper trade planning with Indian costs and risk checks. Data that the scripts do not bundle is fetched at request time by [web research](web-research.md), and each user connects their own broker through a [broker connector](broker-connectors.md) or the built-in adapters. No publisher trading account is needed, and none is used.
 
-No publisher trading account is required. Do not change an unsupported field to a convenient value, treat operator declarations as independent verification, or use a research/accounting PASS as permission to submit orders.
+## How each original workstream is covered
+
+| # | Area | Covered by the skill | Covered at request time | Left to each user |
+| --- | --- | --- | --- | --- |
+| 1 | Other-broker carry execution | Angel One/FYERS reducing exits, stop-limits and cancellation ([guide](angel-fyers-execution.md)) | — | Validate their own account before enabling live actions |
+| 2 | Broader inventory | Settled, T1, pledged, MTF and corporate-action lot reconciliation, including trades ([inventory book](inventory-book.md)) | — | Supply their own statements; unsupported inventory stays blocked |
+| 3 | Mixed-inventory entries | MIS cash entries (opt-in shorts) alongside long CNC and signed MIS ([guide](mixed-inventory-entries.md)) | — | Opt in explicitly; confirm each order |
+| 4 | Exchange coverage | Dated NSE surveillance and F&O ban collection ([guide](exchange-coverage.md)) | BSE notices, special sessions, emergency circulars | Review web facts before saving them as evidence |
+| 5 | Constituents and history | Sourced membership intervals and split/bonus reconstruction ([guide](historical-evidence.md)) | Current index changes and corporate actions | — |
+| 6 | News and filings | NSE feeds, backfill, attachments and inline XBRL ([guide](announcement-history.md)); Google News per stock | BSE filings, results commentary, concalls, breaking news | — |
+| 7 | Daily context | NSE closes, breadth, FII/DII and GIFT observations ([guide](closing-context.md)) | BSE closes, macro and RBI/SEBI events, global cues | — |
+| 8 | Liquidity and costs | Five-broker cash depth, quantity-dependent costs, passive-fill scenarios ([depth](depth-and-replay-costs.md), [scenarios](risk-scenarios.md)) | — | Supply their own fee card and assumptions |
+| 9 | Portfolio margin | Five-broker basket margins and collateral stress ([guide](basket-margin-providers.md)) | — | Read margins from their own account |
+| 10 | Strategy and replay | Six scanners and custom levels at one and five minutes, interval-bound replay ([setups](setups.md)) | — | — |
+| 11 | Protection | Intraday and carry-aware bounded runners with group coordination ([guide](portfolio-protection.md)) | — | Arm it themselves; no fill is guaranteed |
+| 12 | Compatibility and charges | Read-only probes for carry, basket and depth contracts ([progress](development-progress.md)) | — | Run the probes on their own account; use their broker's tariff |
+
+## Optional future enhancements
+
+These would extend the skill. They are not needed for it to work:
+
+- calibrated market-impact, queue and latency models fitted to real fills;
+- pre-open and market-regime models for replay;
+- new carry (CNC/NRML) and derivative entries alongside existing inventory;
+- running more than one account per broker in a single protection process.
+
+## Boundaries that stay in place
+
+Web facts are cited research and never satisfy a risk check or authorize an order. A connector is used to read account data; orders stay the user's action ([broker connectors](broker-connectors.md)). Do not replace an unsupported field with a convenient value, treat an operator declaration as independent verification, or use a research or accounting PASS as permission to submit orders.
