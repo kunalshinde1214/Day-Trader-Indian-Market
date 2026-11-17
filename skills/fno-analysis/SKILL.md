@@ -1,6 +1,6 @@
 ---
 name: fno-analysis
-description: Indian F&O options and futures analytics for NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY and F&O stocks. Option chain, open interest and OI change, put-call ratio, max pain, OI support and resistance, implied volatility, Greeks, expected move, futures basis, India VIX, and strategy payoff with breakevens and a chart. Use when the user asks "Nifty option chain", "what is the PCR", "max pain for Bank Nifty", "where is OI building", "IV of Reliance options", "payoff of an iron condor", "breakeven of selling 25800 CE" or types /fno-analysis.
+description: Indian F&O options and futures analytics for NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY and F&O stocks. Option chain, open interest and OI change, put-call ratio, max pain, OI support and resistance, implied volatility, Greeks, expected move, futures basis, India VIX, and strategy payoff with breakevens and a chart. Use when the user asks "Nifty option chain", "what is the PCR", "max pain for Bank Nifty", "where is OI building", "IV of Reliance options", "payoff of an iron condor", "breakeven of selling 25800 CE" or in Hinglish "Nifty ka option chain dikhao" and "Bank Nifty max pain kya hai", or types /fno-analysis.
 ---
 
 # fno-analysis

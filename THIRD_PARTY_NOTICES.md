@@ -10,3 +10,5 @@ India Day Trader contains adaptations of **day-trader-skill** by **Jake Schincar
 Broker APIs and market data remain subject to their providers' terms, permissions and data licenses. A software license is not permission to redistribute exchange data or another provider's credentials.
 
 The local `research/` archive contains user-supplied source documents and extracted text. Their redistribution rights have not been established. They are excluded from the intended GitHub package via `.gitignore`; keep them outside any release ZIP as well. They are not automatically relicensed under the project license.
+
+`tests/fixtures/real/` holds a few dozen rows excerpted from public NSE files and Yahoo Finance responses recorded on 17 November 2026, kept only so the test suite can check that the parsers still read the providers' real formats. They are not a dataset, carry no redistribution licence from those providers, and must not be used as market data.

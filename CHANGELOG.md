@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0 — 18 November 2026
+
+- Add a stock screener (`scripts/screener.py`, skill `stock-screener`) over Nifty 50, Next 50, 500, midcap 150, smallcap 250 and 13 sector indices, with filters and sorting on P/E, P/B, ROE, margins, debt/equity, growth, yields, market cap, 1-year return, distance from high and RSI. Stocks with missing data or failed loads are listed, never counted as matches.
+- Add a portfolio review (`scripts/holdings_review.py`, skill `portfolio-review`): holdings from a broker connector, Zerodha CSV or JSON; P&L, weights, sector exposure and concentration; FIFO capital gains from a tradebook with STCG 20% and LTCG 12.5% above ₹1,25,000 as labelled, adjustable defaults; items not modelled are listed.
+- Stock analysis now shows sector peers (smallest NSE sectoral index, ranked by market cap, with group medians), a five-year P/E band, and an optional one-year SVG price chart (`--chart`).
+- Fix: companies reporting financials in US dollars (for example Infosys) had P/E and P/B overstated about 90 times; money values are now converted at today's USD/INR rate and labelled.
+- The news briefing ranks NSE announcements as material, notable or routine using the exchange subject line, hides routine filings (fund NAVs, analyst-meet notices, newspaper copies) unless `--include-routine`, and prints UTF-8 correctly on Windows.
+- Answers follow the user's language, including Hindi and Hinglish, while keeping figures and market terms intact.
+- Add tests against small recorded excerpts of real Yahoo and NSE responses; fix a template placeholder in the stock-analysis skill.
+
 ## 1.1.0 — 17 November 2026
 
 - Add F&O analytics (`scripts/fno.py`, plugin skill `fno-analysis`): option chain around the money with OI, OI change, IV and delta; put-call ratio by OI and volume; max pain; OI support/resistance; long/short build-up; ATM IV, put-call skew and expected move; futures basis; India VIX percentile.

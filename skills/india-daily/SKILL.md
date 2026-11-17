@@ -1,6 +1,6 @@
 ---
 name: india-daily
-description: Combined daily Indian market report comparing Nifty 50, Sensex and Bank Nifty. Use when the user asks "how is the Indian market today", "market update", "daily market report", "what did the market do" or types /india-daily.
+description: Combined daily Indian market report comparing Nifty 50, Sensex and Bank Nifty. Use when the user asks "how is the Indian market today", "market update", "daily market report", "aaj market kaisa hai", "what did the market do" or types /india-daily.
 ---
 
 # india-daily

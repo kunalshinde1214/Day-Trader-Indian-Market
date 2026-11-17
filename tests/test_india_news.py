@@ -53,3 +53,40 @@ class NewsTests(unittest.TestCase):
         r=collect(['nse-sast'],fetcher=lambda u:body,clock=lambda:NOW)
         self.assertEqual(r['records'][0]['publication_time_raw'],'10-Nov-2026 08:30')
         self.assertFalse(r['records'][0]['timezone_verified'])
+
+
+DIGEST=('<rss><channel>'
+  '<item><title>Alpha Ltd</title><link>https://example.com/a</link><pubDate>Tue, 10 Nov 2026 03:00:00 GMT</pubDate>'
+  '<description>Alpha Ltd has informed the Exchange about Copy of Newspaper Publication |SUBJECT: Copy of Newspaper Publication</description></item>'
+  '<item><title>Beta Ltd</title><link>https://example.com/b</link><pubDate>Tue, 10 Nov 2026 02:00:00 GMT</pubDate>'
+  '<description>Beta Ltd has informed the Exchange about receipt of a 500 MW order |SUBJECT: Bagging/Receiving of orders/contracts</description></item>'
+  '<item><title>Gamma Ltd</title><link>https://example.com/c</link><pubDate>Tue, 10 Nov 2026 04:00:00 GMT</pubDate>'
+  '<description>Gamma Ltd has informed the Exchange about General Updates |SUBJECT: General Updates</description></item>'
+  '<item><title>Delta ETF</title><link>https://example.com/d</link><pubDate>Tue, 10 Nov 2026 04:30:00 GMT</pubDate>'
+  '<description>NAV |SUBJECT: Declaration of NAV</description></item>'
+  '</channel></rss>').encode()
+
+
+class DigestTests(unittest.TestCase):
+    def report(self):
+        return collect(['nse-announcements'],fetcher=lambda u:DIGEST,clock=lambda:NOW)
+
+    def test_subjects_are_ranked(self):
+        levels={r['headline']:r['importance'] for r in self.report()['records']}
+        self.assertEqual(levels,{'Alpha Ltd':'routine','Beta Ltd':'material','Gamma Ltd':'notable','Delta ETF':'routine'})
+
+    def test_digest_hides_routine_and_leads_with_material(self):
+        text=markdown(self.report())
+        self.assertNotIn('Alpha Ltd',text);self.assertNotIn('Delta ETF',text)
+        self.assertIn('routine filings hidden: 2',text)
+        self.assertLess(text.index('Beta Ltd'),text.index('Gamma Ltd'))  # material before newer notable item
+        self.assertIn('Beta Ltd — Bagging/Receiving of orders/contracts',text)
+        self.assertIn('receipt of a 500 MW order',text)
+
+    def test_include_routine_shows_everything(self):
+        text=markdown(self.report(),include_routine=True)
+        for name in ('Alpha Ltd','Beta Ltd','Gamma Ltd','Delta ETF'):self.assertIn(name,text)
+
+    def test_items_without_subject_stay_visible(self):
+        r=collect(['et-markets'],fetcher=lambda u:BODY,clock=lambda:NOW)
+        self.assertEqual(r['records'][0]['importance'],'notable');self.assertIn('Company profit rises',markdown(r))

@@ -1,6 +1,6 @@
 ---
 name: india-day-trader
-description: Indian stock market research and paper trading. Use for any question about an NSE/BSE stock (analysis, P/E and ratios, news, trend, where it may go), daily Nifty, Sensex and Bank Nifty reports, F&O option chains (OI, PCR, max pain, IV, Greeks, strategy payoff), Indian market news, pattern scans, entry/exit planning, backtest replay, position sizing in rupees and lots, promoter/insider disclosures, and Kite, Upstox, Dhan, Angel One or FYERS paper workflows. Combines its scripts with live web research (BSE and NSE filings, results, macro events) and the user's own broker connector. Triggers include "analyse Reliance", "how is Nifty today", "market news", "scan for breakouts", "position size for this trade". Research commands never submit orders; separate live workflows require explicit authorization.
+description: Indian stock market research and paper trading. Use for any question about an NSE/BSE stock (analysis, P/E and ratios, news, trend, where it may go), daily Nifty, Sensex and Bank Nifty reports, stock screens, portfolio P&L and capital-gains estimates, F&O option chains (OI, PCR, max pain, IV, Greeks, strategy payoff), Indian market news, pattern scans, entry/exit planning, backtest replay, position sizing in rupees and lots, promoter/insider disclosures, and Kite, Upstox, Dhan, Angel One or FYERS paper workflows. Combines its scripts with live web research (BSE and NSE filings, results, macro events) and the user's own broker connector. Triggers include "analyse Reliance", "Reliance ka analysis karo", "Nifty aaj kaisa hai", "how is Nifty today", "market news", "scan for breakouts", "position size for this trade". Research commands never submit orders; separate live workflows require explicit authorization.
 ---
 
 # India day trader
@@ -13,6 +13,8 @@ Research and paper-trading tools for Indian markets, adapted from Jake Schincari
 | --- | --- | --- |
 | One stock: analysis, ratios, valuation, news, trend, "where is it going" | `scripts/stock_analysis.py SYMBOL` | the answering rules in [stock analysis](skills/stock-analysis/SKILL.md) |
 | F&O: option chain, OI, PCR, max pain, IV, Greeks, futures basis, strategy payoff | `scripts/fno.py chain\|expiries\|payoff SYMBOL` | [F&O analytics](references/fno.md) and the answering rules in [fno-analysis](skills/fno-analysis/SKILL.md) |
+| Screen stocks: "Nifty 50 stocks with ROE > 20 and P/E < 25", cheapest IT stocks, high-yield PSU banks | `scripts/screener.py --universe U --where FILTER --sort FIELD` | [screener](references/screener.md) and [stock-screener](skills/stock-screener/SKILL.md) |
+| Own portfolio: P&L, concentration, sectors, capital-gains tax estimate | `scripts/holdings_review.py --input FILE [--tradebook FILE]` | [holdings review](references/holdings-review.md) and [portfolio-review](skills/portfolio-review/SKILL.md) |
 | Market today, Nifty, Sensex, Bank Nifty (`/india-daily`, `/nifty`, `/sensex`, `/banknifty`) | `scripts/daily.py india-daily\|nifty\|sensex\|banknifty --collect-public` | [daily reports](references/daily.md) |
 | Dated Nifty/Bank Nifty closes, closing breadth, FII/DII and GIFT observations | `scripts/daily.py india-daily --collect-close --session YYYY-MM-DD` | [closing context](references/closing-context.md); separate source dates, stale observations and missing Sensex coverage stay explicit |
 | Market-wide news (`/india-news`) | `scripts/india_news.py` | [news workflow](references/india-news.md) |
@@ -44,6 +46,7 @@ Pass daily commands without the leading slash (`daily.py nifty`): Git Bash on Wi
 ## How to answer
 
 - Answer the user's question first, in plain language, then show supporting numbers with their source and date.
+- Reply in the user's language. If they write in Hindi (Devanagari) or Hinglish (Hindi in Latin script, e.g. "Reliance ka analysis karo", "Nifty aaj kaisa hai"), answer the same way. Translate the explanation, not the data: keep numbers, tickers, dates, ₹ amounts and terms such as P/E, ROE, OI, PCR, IV and stop-loss in their usual form, and use the Indian lakh/crore wording people expect. Script output stays in English.
 - Keep facts, rule matches and opinions separate. A pattern match is not a recommendation. Never give a price target or buy/sell call; explain what the data shows on both sides.
 - Show what is missing. Report requested, processed and missing symbols, feed age, and whether prices are live quotes or completed candles. Missing or stale data is a gap, never an all-clear.
 - Never replace unavailable real data with the demo, and never describe demo output as current data or performance evidence. Use `--demo` only when the user asks for a demonstration and label it.

@@ -2,6 +2,16 @@
 
 Daily briefings now support `/india-daily`, `/nifty`, `/sensex` and `/banknifty` through `scripts/daily.py`. See [daily reports](daily.md) for one-command Kite collection and offline examples. For broker trade imports, provisional-fee reserves, supervised polling and opt-in webhook delivery, see [account/service operations](account-service.md).
 
+## Screener and portfolio review
+
+```text
+python scripts/screener.py --universe nifty50 --where "roe>15" --where "pe<25" --sort roe
+python scripts/holdings_review.py --input holdings.json
+python scripts/holdings_review.py --input holdings.csv --tradebook tradebook.csv --fy 2026-27
+```
+
+See [screener](screener.md) and [holdings review](holdings-review.md).
+
 ## F&O analytics
 
 Option chain, OI, PCR, max pain, IV/Greeks, futures basis and strategy payoff: see [F&O analytics](fno.md).

@@ -5,6 +5,7 @@ and a statistical outlook. Research only: no orders, no recommendation, no
 price target. Every figure carries its source date so stale data stays visible.
 """
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 import json
 import math
@@ -69,14 +70,41 @@ def fundamentals(selected, *, fetcher, now):
     raw = fetcher("https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"
                   + urllib.parse.quote(selected, safe="") + "?" + query)
     data = json.loads(raw)
-    series = {}
+    series, currencies = {}, set()
     for result in data["timeseries"]["result"]:
         name = result["meta"]["type"][0]
         rows = [r for r in result.get(name) or [] if r and isinstance(r.get("reportedValue", {}).get("raw"), (int, float))]
+        if "SharesNumber" not in name:
+            currencies |= {r.get("currencyCode") or "INR" for r in rows}
         rows = [{"date": r["asOfDate"], "value": float(r["reportedValue"]["raw"])} for r in rows if math.isfinite(r["reportedValue"]["raw"])]
         if rows:
             series[name] = sorted(rows, key=lambda r: r["date"])
+    foreign = currencies - {"INR"}
+    if series and foreign:
+        # Some companies (e.g. Infosys) report in USD; prices are in rupees, so convert money values at today's rate.
+        if len(foreign) > 1 or len(currencies) > 1:
+            raise Block("STOCK: financial statements mix currencies; ratios omitted")
+        currency = foreign.pop()
+        rate = fx_rate(currency, fetcher=fetcher)
+        for name, rows in series.items():
+            if "SharesNumber" not in name:
+                series[name] = [{**r, "value": r["value"] * rate} for r in rows]
+        series["_currency"] = {"reported": currency, "rate": rate, "note": f"Financials reported in {currency}; converted at today's rate ₹{rate:,.2f} per {currency}, so past figures are approximate."}
     return series
+
+
+def fx_rate(currency, *, fetcher):
+    if not re.fullmatch(r"[A-Z]{3}", currency or ""):
+        raise Block("STOCK: unknown reporting currency")
+    try:
+        raw = fetcher(f"https://query1.finance.yahoo.com/v8/finance/chart/{currency}INR=X?range=5d&interval=1d")
+        meta = json.loads(raw)["chart"]["result"][0]["meta"]
+    except (Block, ValueError, KeyError, IndexError, TypeError):
+        raise Block(f"STOCK: {currency}/INR rate unavailable; ratios omitted") from None
+    rate = meta.get("regularMarketPrice")
+    if meta.get("currency") != "INR" or not isinstance(rate, (int, float)) or not 0 < rate < 100000:
+        raise Block(f"STOCK: {currency}/INR rate unavailable; ratios omitted")
+    return float(rate)
 
 
 # ---------- technical helpers ----------
@@ -236,7 +264,7 @@ def ratios(series, price, now, splits=None):
 
 def outlook(tech):
     """Empirical forward-return ranges from this stock's own history, plus conditional levels."""
-    closes = tech["closes"]
+    closes = tech["closes"][-505:]
     price = closes[-1]
     ranges = {}
     for label, n in (("1 week", 5), ("1 month", 21), ("3 months", 63)):
@@ -305,11 +333,38 @@ def gather_news(selected, name, now, *, fetcher, news_fetcher, hours):
             "note": "Headlines only; open the story before treating it as fact. Search results can include unrelated or promotional items."}
 
 
-def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=instant, news_hours=168):
+PEER_FIELDS = ("market_cap_cr", "pe", "pb", "roe", "net_margin", "revenue_growth", "return_1y")
+
+
+def peer_comparison(selected, own, *, fetcher, now, show=6):
+    from screener import peers_for, snapshot
+    group = peers_for(selected, fetcher=fetcher)
+    if not group["peers"]:
+        return {"basis": group["basis"], "rows": [], "medians": {}}
+
+    def one(member):
+        try:
+            return snapshot(member["symbol"], fetcher=fetcher, now=now)
+        except (Block, ValueError, KeyError, TypeError, OSError):
+            return None
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        rows = [r for r in pool.map(one, group["peers"]) if r]
+    everyone = rows + [own]
+    medians = {}
+    for field in PEER_FIELDS:
+        values = sorted(r[field] for r in everyone if r.get(field) is not None)
+        if values:
+            medians[field] = statistics.median(values)
+    ranked = sorted(rows, key=lambda r: -(r.get("market_cap_cr") or 0))
+    return {"basis": group["basis"], "group_size": group.get("group_size"), "evaluated": len(everyone), "capped": group.get("capped", False),
+            "truncated": len(ranked) > show, "rows": ranked[:show], "own": own, "medians": medians}
+
+
+def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=instant, news_hours=168, peers=True):
     selected = normalize(raw_symbol)
     now = clock()
     try:
-        history = daily_history(selected, fetcher=fetcher, now=now)
+        history = daily_history(selected, fetcher=fetcher, now=now, years=5)
     except (Block, ValueError, KeyError, TypeError):
         raise Block(f"STOCK: no price history for {selected}. Check the NSE symbol (for example RELIANCE, TATAMOTORS, HDFCBANK), "
                     "or the BSE ticker with .BO (for example RELIANCE.BO); the public feed may also be temporarily unavailable") from None
@@ -331,13 +386,29 @@ def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=ins
             raise Block("STOCK: no financial statements returned")
         splits = sorted(datetime.fromtimestamp(int(s["date"]), IST).date().isoformat() for s in (history.get("corporate_actions") or {}).get("splits", {}).values())
         fund = ratios(series, tech["last_close"], now, splits)
+        from screener import pe_band
+        fund["currency_note"] = series.get("_currency", {}).get("note")
+        # Today's FX rate would distort past P/E, so the history band is shown only for rupee-reported financials.
+        fund["pe_band"] = None if "_currency" in series else pe_band(history["bars"], series.get("annualDilutedEPS", []))
     except (Block, ValueError, KeyError, TypeError):
         fund = None
         errors["fundamentals"] = "Financial statements unavailable from the public feed; ratios omitted"
+    comparison = None
+    if peers:
+        own = {"symbol": selected, "name": history["name"], "price": tech["last_close"], "return_1y": tech["returns"]["1Y"],
+               **({"market_cap_cr": fund["market_cap"] / 1e7 if fund.get("market_cap") else None,
+                   **{k: fund.get(k) for k in ("pe", "pb", "roe", "net_margin", "revenue_growth")}} if fund else {})}
+        try:
+            comparison = peer_comparison(selected, own, fetcher=fetcher, now=now)
+            if not comparison["rows"]:
+                errors["peers"] = f"No peer group found ({comparison['basis']})"
+        except (Block, ValueError, KeyError, TypeError, OSError):
+            errors["peers"] = "Peer comparison unavailable"
     headlines = gather_news(selected, history["name"], now, fetcher=fetcher, news_fetcher=news_fetcher, hours=news_hours)
     return {"schema": "stock_analysis_v1", "symbol": selected, "name": history["name"], "as_of": now.isoformat(), "price_source": "Yahoo Finance daily chart (may be delayed ~15 min)",
             "fundamentals_source": "Yahoo Finance fundamentals timeseries (company filings as reported)",
-            "technical": {k: v for k, v in tech.items() if k != "closes"}, "fundamentals": fund, "news": headlines,
+            "technical": {k: v for k, v in tech.items() if k != "closes"}, "fundamentals": fund, "peers": comparison, "news": headlines,
+            "_bars": history["bars"],
             "outlook": outlook(tech), "errors": errors, "warning": WARNING, "disclaimer": DISCLAIMER,
             "execution_eligible": False, "submitted": False}
 
@@ -376,12 +447,35 @@ def markdown(r):
                   f"| Revenue growth (last year) | {pct(f['revenue_growth'])} |", f"| Revenue CAGR (3 years) | {pct(f['revenue_cagr_3y'])} |",
                   f"| EPS growth (last year) | {pct(f['eps_growth'])} |",
                   f"| Latest quarter profit vs previous quarter | {pct(f['quarter_profit_change'])}" + (f" ({f['latest_quarter']['date']}{' ⚠ stale' if f['quarter_stale'] else ''})" if f["latest_quarter"] else "") + " |", ""]
+        if f.get("currency_note"):
+            lines += [f"⚠ {f['currency_note']}", ""]
         if f["split_after_statements"]:
             lines += [f"⚠ Split/bonus on {', '.join(f['split_after_statements'])} came after the EPS date; per-share ratios (P/E, P/B) may not reflect it. Verify on the exchange filing.", ""]
         if f["bank_like"]:
             lines += ["Looks like a bank or financial company: debt/equity, current ratio and operating margin are not meaningful; compare P/B, ROE and asset quality instead.", ""]
+        band = f.get("pe_band")
+        if band:
+            where = "below its usual range" if band["percentile"] < 0.25 else "above its usual range" if band["percentile"] > 0.75 else "within its usual range"
+            lines += ["### Valuation history", "",
+                      f"P/E over the last {band['years']} years: low {num(band['min'], 1)}, typical {num(band['p25'], 1)}–{num(band['p75'], 1)} "
+                      f"(median {num(band['median'], 1)}), high {num(band['max'], 1)}. Today {num(band['current'], 1)}, "
+                      f"higher than {band['percentile'] * 100:.0f}% of past sessions — {where}.", "",
+                      f"Basis: {band['basis']}. A low P/E versus history can reflect lower expected growth, not only cheapness.", ""]
     else:
         lines += [r["errors"].get("fundamentals", "Unavailable"), ""]
+    c = r.get("peers")
+    if c and c["rows"]:
+        cols = (("market_cap_cr", "Mkt cap ₹ cr"), ("pe", "P/E"), ("pb", "P/B"), ("roe", "ROE"), ("net_margin", "Net margin"),
+                ("revenue_growth", "Revenue growth"), ("return_1y", "1Y return"))
+        show = lambda k, v: "n/a" if v is None else f"{v:,.0f}" if k == "market_cap_cr" else f"{v:.1f}" if k in ("pe", "pb") else pct(v, sign=k in ("revenue_growth", "return_1y"))
+        lines += ["## Peers", "", f"Group: {c['basis']} — {c.get('group_size')} stocks" + ("; the largest by market cap are shown" if c.get("truncated") else "")
+                  + f"; medians use all {c.get('evaluated')} that loaded" + (" (group capped at 40)" if c.get("capped") else "") + ".", "",
+                  "| Company | " + " | ".join(h for _, h in cols) + " |", "| --- |" + " ---: |" * len(cols),
+                  f"| **{r['name']}** | " + " | ".join(f"**{show(k, c['own'].get(k))}**" for k, _ in cols) + " |"]
+        for row in c["rows"]:
+            lines.append(f"| {row['name']} | " + " | ".join(show(k, row.get(k)) for k, _ in cols) + " |")
+        lines += ["| Group median | " + " | ".join(show(k, c["medians"].get(k)) for k, _ in cols) + " |", "",
+                  "Peers are chosen from NSE index membership, not business similarity; check that each one is a fair comparison.", ""]
     lines += ["## News (last 7 days)", ""]
     if r["news"]["items"]:
         lines += [f"- {n['published_at'][:16].replace('T', ' ')} — [{n['headline']}]({n['url']})" + (f" · {n['outlet']}" if n.get("outlet") else "") for n in r["news"]["items"]]
@@ -400,8 +494,50 @@ def markdown(r):
     lines += ["", o["method"], ""]
     if r["errors"]:
         lines += ["## Data gaps", ""] + [f"- {v}" for v in r["errors"].values()] + [""]
-    lines.append(f"Sources: {r['price_source']}; {r['fundamentals_source']}; Google News, Yahoo and NSE news feeds. {r['warning']}")
+    lines.append(f"Sources: {r['price_source']}; {r['fundamentals_source']}; NSE index constituent lists; Google News, Yahoo and NSE news feeds. {r['warning']}")
     return "\n".join(lines) + "\n"
+
+
+def svg_price_chart(r):
+    """One-year closing price with 50/200-day averages, 52-week range and 20-day support/resistance."""
+    bars = r["_bars"]
+    closes = [b["close"] for b in bars]
+    def avg(n):
+        return [None if i + 1 < n else sum(closes[i + 1 - n:i + 1]) / n for i in range(len(closes))]
+    s50, s200 = avg(50), avg(200)
+    keep = min(250, len(closes))
+    xs = list(range(keep))
+    cl, a50, a200 = closes[-keep:], s50[-keep:], s200[-keep:]
+    t = r["technical"]
+    values = [v for v in cl + a50 + a200 if v is not None] + [t["support"], t["resistance"]]
+    lo, hi = min(values) * 0.98, max(values) * 1.02
+    w, h, left, right, top, bottom = 760, 380, 72, 110, 64, 40
+    X = lambda i: left + i / max(1, keep - 1) * (w - left - right)
+    Y = lambda v: h - bottom - (v - lo) / (hi - lo) * (h - top - bottom)
+    def path(series):
+        pts = [(X(i), Y(v)) for i, v in enumerate(series) if v is not None]
+        return " ".join(f"{'M' if k == 0 else 'L'}{x:.1f},{y:.1f}" for k, (x, y) in enumerate(pts))
+    def level(v, label, colour):
+        return (f'<line x1="{left}" y1="{Y(v):.1f}" x2="{w - right}" y2="{Y(v):.1f}" stroke="{colour}" stroke-dasharray="5 4"/>'
+                f'<text x="{w - right + 6}" y="{Y(v) + 4:.1f}" fill="{colour}">{label} {v:,.0f}</text>')
+    first, last = bars[-keep]["at"][:10], bars[-1]["at"][:10]
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" role="img" aria-label="{r['name']} one-year price chart">
+<g font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">
+<rect width="{w}" height="{h}" fill="#ffffff"/>
+<text x="{left}" y="22" font-size="15" font-weight="600" fill="#111827">{r['name']} ({r['symbol']}) · last close ₹{t['last_close']:,.2f}</text>
+<text x="{left}" y="40" font-size="12" fill="#4b5563"><tspan fill="#111827">━ close</tspan>   <tspan fill="#2563eb">━ 50-day avg</tspan>   <tspan fill="#d97706">━ 200-day avg</tspan>   · {first} to {last} · trend: {t['trend']}</text>
+{level(t['resistance'], '20d high', '#15803d')}
+{level(t['support'], '20d low', '#b91c1c')}
+<path d="{path(a200)}" fill="none" stroke="#d97706" stroke-width="1.5"/>
+<path d="{path(a50)}" fill="none" stroke="#2563eb" stroke-width="1.5"/>
+<path d="{path(cl)}" fill="none" stroke="#111827" stroke-width="1.8"/>
+<text x="{left - 8}" y="{Y(hi) + 10:.1f}" text-anchor="end" fill="#6b7280">{hi:,.0f}</text>
+<text x="{left - 8}" y="{Y(lo):.1f}" text-anchor="end" fill="#6b7280">{lo:,.0f}</text>
+<text x="{left}" y="{h - bottom + 16}" fill="#6b7280">{first}</text>
+<text x="{w - right}" y="{h - bottom + 16}" text-anchor="end" fill="#6b7280">{last}</text>
+</g>
+</svg>
+"""
 
 
 def main(argv=None):
@@ -410,13 +546,22 @@ def main(argv=None):
     p.add_argument("--format", choices=["markdown", "json"], default="markdown")
     p.add_argument("--news-hours", type=int, default=168)
     p.add_argument("--out", help="Write the report to a new file")
+    p.add_argument("--no-peers", action="store_true", help="Skip the peer comparison (faster)")
+    p.add_argument("--chart", help="Write a one-year SVG price chart to a new file")
     a = p.parse_args(argv)
     try:
-        report = analyse(a.symbol, news_hours=a.news_hours)
+        if a.chart and Path(a.chart).exists():
+            raise Block("STOCK: chart file exists; choose a new path")
+        report = analyse(a.symbol, news_hours=a.news_hours, peers=not a.no_peers)
+        if a.chart:
+            Path(a.chart).parent.mkdir(parents=True, exist_ok=True)
+            Path(a.chart).write_text(svg_price_chart(report), encoding="utf-8")
+            report["chart"] = a.chart
     except Block as error:
         print(f"BLOCKED - {error}", file=sys.stderr)
         return 2
-    text = json.dumps(report, indent=2, ensure_ascii=False) if a.format == "json" else markdown(report)
+    public = {k: v for k, v in report.items() if not k.startswith("_")}
+    text = json.dumps(public, indent=2, ensure_ascii=False) if a.format == "json" else markdown(report)
     if a.out:
         out = Path(a.out)
         if out.exists():
