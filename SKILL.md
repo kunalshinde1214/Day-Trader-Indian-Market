@@ -16,7 +16,7 @@ Use Python 3.10+: run `python`, or `python3` (macOS/Linux) or `py` (Windows). Co
 | Options and futures: chain, OI, PCR, max pain, IV, strategy payoff | [fno](skills/fno/SKILL.md) |
 | Finding stocks: fundamental screens or chart-pattern scans | [screener](skills/screener/SKILL.md) |
 | Their own holdings: P&L, concentration, bonuses, tax | [portfolio](skills/portfolio/SKILL.md) |
-| The market today: Nifty, Sensex, Bank Nifty | [market](skills/market/SKILL.md) |
+| The market today: Nifty, Sensex, Bank Nifty (also `/india-day-trader:nifty`, `:sensex`, `:banknifty`, `:india-daily`) | [market](skills/market/SKILL.md) |
 | News and announcements | [news](skills/news/SKILL.md) |
 | Planning a paper trade: entry, stop, replay, size, risk | [trade-plan](skills/trade-plan/SKILL.md) |
 | Their broker account, tickets, alerts | [broker](skills/broker/SKILL.md) |

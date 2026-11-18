@@ -1,5 +1,7 @@
 # Release status — 17 November 2026
 
+**1.4.0, 18 November 2026:** fixes from the second round of user testing: the daily commands are back, daily reports show the day's change and work on Windows, renamed symbols such as TATAMOTORS are explained, screens are repeatable, P/E is compared like with like, a simple position sizer needs no broker setup, and F&O expiries are labelled weekly/monthly with a next-session move.
+
 **1.3.0, 18 November 2026:** easier to use: 8 skills instead of 19, a short core skill with broker and live-order material moved to [advanced tools](advanced.md), answer-first `--summary` modes, answer templates for common questions, business peers in stock analysis, demerger flags in the portfolio review, and day-over-day, probability and today-value views in F&O.
 
 **1.2.1, 18 November 2026:** trust fixes from user testing: the latest price is no longer silently a day old, bonuses and splits are applied in the portfolio review, Yahoo's EPS is cross-checked against quarterly figures, missing purchase dates give a tax range instead of ₹0, and bank ROE/P/B carry a warning.
@@ -10,7 +12,7 @@
 
 **1.0.0, 17 November 2026:** completes the skill's scope by adding [web research](web-research.md) for BSE, filings, news and macro events, and [broker connectors](broker-connectors.md) for each user's own account. It includes 0.10.1's [history, inventory, risk and protection work](development-progress.md). Release validation passed **984 offline tests**. The 0.10.0 feature description below still applies.
 
-Version: **1.3.0**. Complete for its purpose; optional future enhancements and per-user broker validation are listed in the [completion status](completion-tracker.md). See also the [feature matrix](../README.md#what-is-implemented). The sections below describe the 0.10.0 baseline that 1.0.0 builds on.
+Version: **1.4.0**. Complete for its purpose; optional future enhancements and per-user broker validation are listed in the [completion status](completion-tracker.md). See also the [feature matrix](../README.md#what-is-implemented). The sections below describe the 0.10.0 baseline that 1.0.0 builds on.
 
 ## Included in this release
 
@@ -49,6 +51,6 @@ Users supply broker login, API permissions and entitlements, delivery authorizat
 
 ## Distribution
 
-Build with `python scripts/release.py --out dist/india-day-trader-1.3.0.zip`. The command refuses overwrite and does not skip tests. The manifest records `skill_scope_complete: true`, the optional enhancements, `authenticated_broker_acceptance: false` and `live_enabled_by_default: false`.
+Build with `python scripts/release.py --out dist/india-day-trader-1.4.0.zip`. The command refuses overwrite and does not skip tests. The manifest records `skill_scope_complete: true`, the optional enhancements, `authenticated_broker_acceptance: false` and `live_enabled_by_default: false`.
 
-The [1.3.0 release page](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.3.0) provides the ZIP, checksum and scope notes. Original contributions remain source-available for personal use; third-party MIT rights remain intact.
+The [1.4.0 release page](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.4.0) provides the ZIP, checksum and scope notes. Original contributions remain source-available for personal use; third-party MIT rights remain intact.

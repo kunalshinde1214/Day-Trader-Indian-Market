@@ -189,13 +189,14 @@ class DailyTests(unittest.TestCase):
     def test_extreme_prices_block_without_invalid_json_or_division_by_zero(self):
         for value in ("1e-999", "1e999"):
             with self.subTest(value=value):
-                self.b, self.now = demo()
+                self.b, self.now = demo(); del self.item()["history"]  # exercise the price path, not the history cross-check
                 self.item()["previous"].update({k: value for k in ("open", "high", "low", "close")})
                 result = self.result("nifty")
                 self.assertEqual(result["status"], "BLOCKED")
                 json.dumps(result, allow_nan=False)
 
     def test_unrepresentable_percentage_blocks_index(self):
+        del self.item()["history"]
         self.item()["previous"].update({k: "1e-300" for k in ("open", "high", "low", "close")})
         self.item()["quote"] = {"source": "test", "as_of": self.now.isoformat(), "value": "1e300"}
         self.assertEqual(self.result("nifty")["status"], "BLOCKED")

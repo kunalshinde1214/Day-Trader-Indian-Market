@@ -166,7 +166,7 @@ def collect(session, *, selected=None, membership=None, fetcher=fetch, clock=ins
     for key in selected:
         row = result.get('index_report', {}).get('indices', {}).get(key)
         if row is None:
-            result['indices'][key] = {'status': 'UNAVAILABLE', 'reason': 'No matching index in this NSE closing source'}; continue
+            result['indices'][key] = {'status': 'UNAVAILABLE', 'reason': SENSEX_REASON if key == 'sensex' else 'No matching index in this NSE closing source'}; continue
         result['indices'][key] = {**row, 'status': 'OBSERVED', 'constituent_breadth': None}
         if membership is not None and key in membership and cash is not None:
             try:
@@ -188,26 +188,100 @@ def collect(session, *, selected=None, membership=None, fetcher=fetch, clock=ins
     return result
 
 
-def markdown(result):
-    lines = ['# Indian closing context', '', 'Requested report session: ' + result['session'],
-             'Retrieved: ' + result['as_of'], '', 'Published observations with separate dates; research only.', '',
-             '| Index | Published close | Change | Status |', '| --- | ---: | ---: | --- |']
+LABELS = {'nifty': 'Nifty 50', 'sensex': 'Sensex', 'banknifty': 'Bank Nifty'}
+SENSEX_ROUTE = 'python scripts/daily.py sensex --collect-public'
+SENSEX_REASON = ('Sensex is a BSE index and is not in the NSE closing report used here. '
+                 'For Sensex use `' + SENSEX_ROUTE + '` (Yahoo public data; not an official BSE feed).')
+
+
+def sensex_notice(session, clock=instant):
+    """Plain explanation for a Sensex-only closing request; no NSE request is made because it cannot cover Sensex."""
+    day = date.fromisoformat(session)
+    if day.isoformat() != session: raise Block('CLOSING: exact YYYY-MM-DD session required')
+    return {'schema': 'india_closing_context_v1', 'session': session, 'as_of': clock().isoformat(), 'status': 'UNAVAILABLE',
+            'indices': {'sensex': {'status': 'UNAVAILABLE', 'reason': SENSEX_REASON}}, 'coverage': [],
+            'alternative_command': SENSEX_ROUTE, 'missing_coverage': ['BSE/Sensex closing provider'],
+            'full_market_coverage': False, 'execution_eligible': False, 'submitted': False}
+
+
+def _day(value):
+    d = date.fromisoformat(str(value)[:10]); return f"{d.day} {d:%b}"
+
+
+def _long_day(value):
+    d = date.fromisoformat(str(value)[:10]); return f"{d:%a} {d.day} {d:%b} {d.year}"
+
+
+def _signed(value, suffix=''):
+    return f"{value:+,.2f}{suffix}"
+
+
+def _index_line(key, row):
+    name = LABELS.get(key, key)
+    if row['status'] != 'OBSERVED':
+        return name + ': ' + (SENSEX_REASON if key == 'sensex' else row.get('reason', 'unavailable'))
+    return (f"{name} ({_day(row['session'])}): {row['close']:,.2f}, {_signed(row['points_change'])} ({_signed(row['change_pct'], '%')}); "
+            f"range {row['low']:,.2f}-{row['high']:,.2f}.")
+
+
+def _gift_text(g):
+    freshness = 'STALE, older than 3 minutes' if g['freshness'] == 'STALE' else 'recent'
+    return (f"GIFT Nifty futures ({_day(g['as_of'])} {g['as_of'][11:16]} IST, {freshness}; expiry {g['expiry']}): {g['value']:,.2f}, "
+            f"{_signed(g['change_points'])} ({_signed(g['change_pct'], '%')}). Not the domestic spot index.")
+
+
+def _flow_text(f):
+    values = '; '.join(f"{k} net ₹{v['net_crore']:,.2f} crore" for k, v in f['values'].items())
+    text = f"FII/DII ({_day(f['trading_date'])}): {values}."
+    if not f['matches_requested_session']: text += ' These flows belong to a different date from the requested closing report.'
+    return text
+
+
+def markdown(result, brief=False):
+    if 'alternative_command' in result:
+        return '\n'.join([f"# Sensex close - {_long_day(result['session'])}", '', SENSEX_REASON, '',
+                          'The NSE closing route covers Nifty 50 and Bank Nifty, plus NSE breadth, FII/DII and GIFT Nifty context: '
+                          f"`python scripts/daily.py india-daily --collect-close --session {result['session']}`."]) + '\n'
+    flows, gift = result.get('institutional_flows'), result.get('gift')
+    if brief:
+        lines = [f"**Market close - {_long_day(result['session'])}** (NSE published data; research only)"]
+        lines += ['- ' + _index_line(k, r) for k, r in result['indices'].items()]
+        if 'nse_eq_breadth' in result:
+            b = result['nse_eq_breadth']; lines.append(f"- NSE shares (all EQ): {b['advancing']:,} up, {b['declining']:,} down, {b['unchanged']:,} unchanged.")
+        if flows: lines.append('- ' + _flow_text(flows))
+        if gift: lines.append('- ' + _gift_text(gift))
+        lines.append('- Notes: release time and finality unverified. Run without --brief for sources and coverage.')
+        return '\n'.join(lines) + '\n'
+    lines = [f"# Market close - {_long_day(result['session'])}", '',
+             f"Session {result['session']}; retrieved {_day(result['as_of'])} {result['as_of'][11:16]} IST. "
+             'Published NSE observations, each with its own date; research only.', '',
+             '| Index | Close | Change | Change % | Day range |', '| --- | ---: | ---: | ---: | --- |']
     for key, row in result['indices'].items():
-        change = str(row['change_pct'])+'%' if 'change_pct' in row else 'unavailable'
-        lines.append(f"| {key} | {row.get('close', 'unavailable')} | {change} | {row['status']} |")
+        if row['status'] == 'OBSERVED':
+            lines.append(f"| {LABELS.get(key, key)} | {row['close']:,.2f} | {_signed(row['points_change'])} | {_signed(row['change_pct'], '%')} | "
+                         f"{row['low']:,.2f}-{row['high']:,.2f} |")
+        else:
+            lines.append(f"| {LABELS.get(key, key)} | {'not in NSE report' if key == 'sensex' else 'not collected'} | | | |")
+    if 'sensex' in result['indices'] and result['indices']['sensex']['status'] != 'OBSERVED': lines += ['', SENSEX_REASON]
     if 'nse_eq_breadth' in result:
-        b = result['nse_eq_breadth']; lines += ['', f"Observed NSE EQ breadth: {b['advancing']} advancing, {b['declining']} declining, {b['unchanged']} unchanged.", b['scope'] + '.']
-    if 'institutional_flows' in result:
-        f = result['institutional_flows']; lines += ['', 'FII/DII observation date: ' + f['trading_date'] + '; release time and finality unverified.']
-        lines += [f"- {k}: net ₹{v['net_crore']:,.2f} crore." for k, v in f['values'].items()]
-        if not f['matches_requested_session']: lines.append('These flows belong to a different date from the requested closing report.')
-    if 'gift' in result:
-        g = result['gift']; lines += ['', f"GIFT Nifty futures: {g['value']:,.2f}; {g['freshness']}; source time {g['as_of']}; expiry {g['expiry']}.", g['timezone_basis'] + '.']
-    lines += ['', 'Sources:']
-    for key in ('index_report', 'cash_report', 'institutional_flows', 'gift'):
-        if key in result: lines.append(f"- [{key}]({result[key]['source']})")
-    lines += ['', 'Coverage:'] + [f"- {r['component']}: {r['status']}" for r in result['coverage']]
-    lines += ['', 'Remaining coverage:'] + ['- ' + gap for gap in result['missing_coverage']]
+        b = result['nse_eq_breadth']
+        lines += ['', f"NSE breadth (all EQ shares in the {_day(result['session'])} bhavcopy): {b['advancing']:,} advancing, "
+                      f"{b['declining']:,} declining, {b['unchanged']:,} unchanged. Not index membership."]
+    for key, row in result['indices'].items():
+        cb = row.get('constituent_breadth')
+        if cb: lines.append(f"{LABELS.get(key, key)} members: {cb['advancing']} advancing, {cb['declining']} declining, {cb['unchanged']} unchanged "
+                            f"({cb['observed']}/{cb['expected']} observed; membership unverified).")
+    if flows: lines += ['', _flow_text(flows)]
+    if gift: lines += ['', _gift_text(gift)]
+    lines += ['', '## Data notes', '']
+    sources = [f"[{name}]({result[key]['source']})" for key, name in (('index_report', 'NSE index closes'), ('cash_report', 'NSE bhavcopy'),
+               ('institutional_flows', 'NSE FII/DII'), ('gift', 'NSE market status')) if key in result]
+    if sources: lines.append('- Sources: ' + ', '.join(sources) + '.')
+    failed = [r['component'].replace('_', ' ') for r in result['coverage'] if r['status'] != 'COLLECTED']
+    if failed: lines.append('- Not collected this run: ' + ', '.join(failed) + '.')
+    if flows: lines.append('- FII/DII observation date ' + flows['trading_date'] + '; release time and finality unverified.')
+    if gift: lines.append('- GIFT Nifty time: ' + gift['timezone_basis'] + '.')
+    lines.append('- Not covered: ' + '; '.join(result['missing_coverage']) + '.')
     return '\n'.join(lines) + '\n'
 
 
@@ -215,19 +289,34 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__); parser.add_argument('--session', required=True)
     parser.add_argument('--indices', nargs='+', choices=['nifty', 'sensex', 'banknifty']); parser.add_argument('--membership')
     parser.add_argument('--format', choices=['json', 'markdown'], default='markdown'); parser.add_argument('--out', required=True)
+    parser.add_argument('--brief', action='store_true', help='Short answer-first markdown')
     args = parser.parse_args(argv)
+    # Only collection and input validation become BLOCKED; rendering errors are not disguised as data gaps.
     try:
         from trader import read
         out = Path(args.out)
         if out.exists(): raise Block('OUTPUT: choose a new file')
-        result = collect(args.session, selected=args.indices, membership=read(args.membership) if args.membership else None)
-        rendered = json.dumps(result, indent=2, allow_nan=False) if args.format == 'json' else markdown(result)
+        if args.indices == ['sensex']:
+            result = sensex_notice(args.session)
+        else:
+            result = collect(args.session, selected=args.indices, membership=read(args.membership) if args.membership else None)
+    except Block as exc:
+        print('BLOCKED: ' + str(exc)); return 2
+    except OSError:
+        print('BLOCKED: membership file unavailable'); return 2
+    except UnicodeError:
+        raise
+    except (ValueError, KeyError, TypeError):
+        print('BLOCKED: invalid closing context request'); return 2
+    rendered = json.dumps(result, indent=2, allow_nan=False) if args.format == 'json' else markdown(result, brief=args.brief)
+    try:
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open('x', encoding='utf-8') as stream: stream.write(rendered)
-        print(json.dumps({'status': result['status'], 'submitted': False}))
-        return 0 if any(i['status'] == 'OBSERVED' for i in result['indices'].values()) else 2
-    except (Block, ValueError, KeyError, TypeError, OSError):
-        print('BLOCKED: invalid closing context request'); return 2
+    except OSError:
+        print('BLOCKED: could not create the output file'); return 2
+    print(json.dumps({'status': result['status'], 'submitted': False}))
+    if 'alternative_command' in result: print('Sensex is not in the NSE closing report; use: ' + SENSEX_ROUTE)
+    return 0 if any(i['status'] == 'OBSERVED' for i in result['indices'].values()) else 2
 
 
 if __name__ == '__main__': raise SystemExit(main())

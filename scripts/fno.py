@@ -187,6 +187,77 @@ def expiries(contracts, trade_date):
     return sorted({c["expiry"] for c in contracts if c["kind"] in {"CE", "PE"} and c["expiry"] > trade_date})
 
 
+WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+TRADING_DAYS = 252
+MOVED_NOTE = "probably for a holiday — check the exchange circular"
+
+
+def last_weekday(month_key, weekday):
+    """Last date in the month 'YYYY-MM' falling on `weekday` (0 = Monday)."""
+    year, month = int(month_key[:4]), int(month_key[5:7])
+    day = (date(year + month // 12, month % 12 + 1, 1) - timedelta(days=1))
+    return day - timedelta(days=(day.weekday() - weekday) % 7)
+
+
+def expiry_calendar(contracts, trade_date):
+    """Label each listed option expiry weekly or monthly from the data itself, and flag moved ones.
+
+    Monthly: the expiry that a futures contract shares in that calendar month, else the last option expiry of the month.
+    Every other expiry in the month is weekly; an underlying with one expiry per month has no weeklies. The usual expiry
+    weekday is the one most expiries agree with (weeklies on that weekday, monthlies on its last occurrence in the month);
+    an expiry off that pattern is marked moved — usually because the normal day is an exchange holiday."""
+    listed = expiries(contracts, trade_date)
+    futures = {c["expiry"] for c in contracts if c["kind"] == "FUT" and c["expiry"] > trade_date}
+    by_month = {}
+    for e in listed:
+        by_month.setdefault(e[:7], []).append(e)
+    monthly = set()
+    for month, items in by_month.items():
+        shared = sorted(f for f in futures if f in items)
+        monthly.add(shared[-1] if shared else items[-1])
+    has_weeklies = any(len(items) > 1 for items in by_month.values())
+    fits = lambda e, w: (date.fromisoformat(e) == last_weekday(e[:7], w)) if e in monthly else date.fromisoformat(e).weekday() == w
+    score = lambda w: sum(fits(e, w) for e in listed)
+    usual = max(range(5), key=lambda w: (score(w), -w)) if listed else None
+    if usual is not None and score(usual) == 0:
+        usual = None  # nothing follows a pattern (e.g. a single, moved expiry): do not guess
+    rows = []
+    for e in listed:
+        day = date.fromisoformat(e)
+        kind = "monthly" if e in monthly else "weekly"
+        moved = usual is not None and not fits(e, usual)
+        normal = None
+        if moved:
+            normal = last_weekday(e[:7], usual) if kind == "monthly" else day + timedelta(days=(usual - day.weekday()) % 7)
+            if kind == "weekly" and normal - day > timedelta(days=3):
+                normal = day - timedelta(days=(day.weekday() - usual) % 7)
+        rows.append({"expiry": e, "type": kind, "weekday": WEEKDAYS[day.weekday()], "moved": moved,
+                     "usual_date": normal.isoformat() if normal else None})
+    return {"expiries": rows, "has_weeklies": has_weeklies, "usual_weekday": WEEKDAYS[usual] if usual is not None else None}
+
+
+def expiry_text(item, usual_weekday):
+    """'monthly, Monday — moved from Tuesday 2026-11-24, probably for a holiday — check the exchange circular'."""
+    if not item:
+        return "type unknown"
+    text = f"{item['type']}, {item['weekday']}"
+    if item["moved"]:
+        text += f" — moved from {usual_weekday} {item['usual_date']}, {MOVED_NOTE}"
+    return text
+
+
+def one_day_move(spot, iv):
+    """One-sigma move over the next trading session from the ATM IV: spot × IV × √(1/252).
+
+    The IV is annualised on calendar time; dividing its variance over 252 trading days spreads weekend and holiday
+    variance across sessions, the usual convention for a next-session range."""
+    if not iv or not spot:
+        return None
+    move = spot * iv * math.sqrt(1 / TRADING_DAYS)
+    return {"points": move, "pct": move / spot, "low": spot - move, "high": spot + move, "iv": iv,
+            "basis": f"ATM IV × √(1/{TRADING_DAYS}), one trading session; about 68% of outcomes if the IV is right — {PROB_LABEL}"}
+
+
 def max_pain(strikes, calls, puts):
     best = None
     for s in strikes:
@@ -218,16 +289,35 @@ def implied_forward(calls, puts, spot, years, rate):
     return pairs[len(pairs) // 2], "put-call parity at traded strikes near the money"
 
 
-def analyse_chain(contracts, selected, *, expiry=None, as_of=None, rate=DEFAULT_RATE, width=12, source="NSE F&O bhavcopy"):
+def analyse_chain(contracts, selected, *, expiry=None, kind=None, as_of=None, rate=DEFAULT_RATE, width=12, source="NSE F&O bhavcopy"):
     trade_date = contracts[0]["trade_date"]
     as_of = as_of or datetime.combine(date.fromisoformat(trade_date), dtime(15, 30), IST)
     live = contracts[0]["settle"] is None  # --input chains carry one expiry and may be read on expiry day itself
     available = sorted({c["expiry"] for c in contracts if c["kind"] in {"CE", "PE"}}) if live else expiries(contracts, trade_date)
     if not available:
         raise Block("FNO: no live option expiries in the data")
+    calendar = None if live else expiry_calendar(contracts, trade_date)
+    if kind:
+        if calendar is None:
+            raise Block("FNO: --weekly/--monthly need the exchange bhavcopy; an --input chain carries one expiry")
+        typed = [x["expiry"] for x in calendar["expiries"] if x["type"] == kind]
+        if not typed:
+            raise Block(f"FNO: {selected} has no weekly expiries in this data — it lists one expiry per month, so every contract is a "
+                        f"monthly (NSE stopped weekly contracts on its indices other than NIFTY in Nov 2024). Nearest monthly: "
+                        f"{next(x['expiry'] for x in calendar['expiries'] if x['type'] == 'monthly')}")
+        if expiry and expiry != typed[0]:
+            raise Block("FNO: use --expiry or --weekly/--monthly, not both")
+        expiry = typed[0]
     chosen = expiry or available[0]
     if chosen not in available:
         raise Block(f"FNO: expiry {chosen} not available; choose from {', '.join(available[:8])}")
+    info = next((x for x in calendar["expiries"] if x["expiry"] == chosen), None) if calendar else None
+    if info:
+        expiry_note = f"Expiry {chosen} is a {expiry_text(info, calendar['usual_weekday'])}."
+        if not calendar["has_weeklies"]:
+            expiry_note += f" {selected} has no weekly expiries in this data (one expiry per month)."
+    else:
+        expiry_note = "Single-expiry input chain: weekly or monthly cannot be told from the data."
     opts = [c for c in contracts if c["expiry"] == chosen and c["kind"] in {"CE", "PE"} and c["strike"]]
     calls = {c["strike"]: c for c in opts if c["kind"] == "CE"}
     puts = {c["strike"]: c for c in opts if c["kind"] == "PE"}
@@ -282,6 +372,11 @@ def analyse_chain(contracts, selected, *, expiry=None, as_of=None, rate=DEFAULT_
     return {
         "schema": "fno_chain_report_v1", "underlying": selected, "source": source, "data_date": trade_date, "as_of": as_of.isoformat(),
         "expiry": chosen, "expiries": available[:8], "days_to_expiry": round(years * 365, 2), "spot": spot, "lot_size": lot,
+        "expiry_type": info["type"] if info else None, "expiry_weekday": WEEKDAYS[date.fromisoformat(chosen).weekday()],
+        "expiry_moved": bool(info and info["moved"]), "expiry_usual_date": info["usual_date"] if info else None,
+        "expiry_note": expiry_note, "has_weeklies": calendar["has_weeklies"] if calendar else None,
+        "usual_expiry_weekday": calendar["usual_weekday"] if calendar else None,
+        "expiry_calendar": calendar["expiries"][:8] if calendar else None,
         "forward": forward, "forward_basis": forward_basis, "rate_assumption": rate, "atm_strike": atm,
         "pcr_oi": put_oi / call_oi if call_oi else None, "pcr_volume": put_vol / call_vol if call_vol else None,
         "call_oi": call_oi, "put_oi": put_oi, "call_oi_change": sum(c["oi_change"] for c in calls.values()),
@@ -289,7 +384,7 @@ def analyse_chain(contracts, selected, *, expiry=None, as_of=None, rate=DEFAULT_
         "max_pain": max_pain(strikes, calls, puts), "resistance_oi": resistance, "support_oi": support,
         "atm_iv": atm_iv, "skew_put_minus_call": skew, "straddle": straddle,
         "expected_move": straddle, "expected_move_iv": spot * atm_iv * math.sqrt(years) if atm_iv else None,
-        "range_1sd": one_sd_range(forward, atm_iv, years),
+        "range_1sd": one_sd_range(forward, atm_iv, years), "one_day_move": one_day_move(spot, atm_iv),
         "call_oi_breakdown": oi_breakdown(calls), "put_oi_breakdown": oi_breakdown(puts), "future": fut,
         "chain": [r for r in rows if r["strike"] in window], "otm_note": "IV uses traded closes only; untraded strikes show no IV.",
         "disclaimer": DISCLAIMER, "execution_eligible": False, "submitted": False,
@@ -633,7 +728,7 @@ def svg_chart(report, result):
 </defs>
 <g font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="11">
 <rect width="{w}" height="{h}" fill="#ffffff"/>
-<text x="{left}" y="22" font-size="15" font-weight="600" fill="#111827">{report['underlying']} · expiry {report['expiry']} · payoff at expiry{' and today' if today else ''}</text>
+<text x="{left}" y="22" font-size="15" font-weight="600" fill="#111827">{report['underlying']} · expiry {report['expiry']}{' (' + report['expiry_type'] + (', moved' if report.get('expiry_moved') else '') + ')' if report.get('expiry_type') else ''} · payoff at expiry{' and today' if today else ''}</text>
 <text x="{left}" y="40" font-size="12" fill="#4b5563">{legs} · lot {result['lot_size']} · ₹, excluding costs · data {report['data_date']}</text>
 {legend}
 <path d="{area}" fill="#16a34a" fill-opacity="0.14" clip-path="url(#gain)"/>
@@ -720,12 +815,37 @@ def dod_section(r):
     return lines + ["", f"{dod['note']} ATM IV and max pain are recomputed for each day with the same method.", ""]
 
 
+def expiry_tag(r):
+    """Short type label for headers: 'monthly, Monday — moved …' or '' when the type is unknown (input chains)."""
+    if not r.get("expiry_type"):
+        return ""
+    text = f"{r['expiry_type']}, {r['expiry_weekday']}"
+    if r.get("expiry_moved"):
+        text += f" — moved from {r['usual_expiry_weekday']} {r['expiry_usual_date']}, {MOVED_NOTE}"
+    return f" ({text})"
+
+
+def expiry_list_text(r):
+    if not r.get("expiry_calendar"):
+        return ", ".join(r["expiries"])
+    return ", ".join(f"{x['expiry']} ({x['type']}{', moved from ' + x['usual_date'] if x['moved'] else ''})" for x in r["expiry_calendar"])
+
+
+def one_day_text(m):
+    if not m:
+        return "n/a"
+    d = 0 if m["high"] >= 1000 else 2
+    return f"±{fmt(m['points'])} ({pct(m['pct'], 2)}): {fmt(m['low'], d)} – {fmt(m['high'], d)}"
+
+
 def chain_markdown(r, vix=None):
     lot = r["lot_size"]
     rng = r.get("range_1sd")
-    lines = [f"# {r['underlying']} options — expiry {r['expiry']}", "",
-             f"Data: {r['source']} for {r['data_date']} · {r['days_to_expiry']:.1f} days to expiry · lot size {lot}", "",
-             f"> {r['disclaimer']}", "", "## Summary", "",
+    lines = [f"# {r['underlying']} options — expiry {r['expiry']}{expiry_tag(r)}", "",
+             f"Data: {r['source']} for {r['data_date']} · {r['days_to_expiry']:.1f} days to expiry · lot size {lot}", ""]
+    if r.get("expiry_moved") or r.get("has_weeklies") is False or r.get("expiry_type") is None:
+        lines += [f"{r['expiry_note']}", ""]
+    lines += [f"> {r['disclaimer']}", "", "## Summary", "",
              "| Measure | Value |", "| --- | ---: |",
              f"| Spot | {fmt(r['spot'])} |",
              f"| Forward ({r['forward_basis']}) | {fmt(r['forward'])} |",
@@ -735,6 +855,7 @@ def chain_markdown(r, vix=None):
              f"| ATM strike / ATM IV | {fmt(r['atm_strike'], 0)} / {pct(r['atm_iv'])} |",
              f"| ATM straddle (expected move to expiry) | ±{fmt(r['straddle'])} ({pct(r['straddle'] / r['spot'] if r['straddle'] else None)}) |",
              f"| IV-implied 1-sigma move to expiry | ±{fmt(r['expected_move_iv'])} |",
+             f"| Next-session 1-sigma move and range (ATM IV × √(1/{TRADING_DAYS}); {PROB_LABEL}) | {one_day_text(r.get('one_day_move'))} |",
              f"| 68% implied range at expiry (±1 SD, lognormal; {PROB_LABEL}) | {fmt(rng[0], 0) + ' – ' + fmt(rng[1], 0) if rng else 'n/a'} |",
              f"| Put-minus-call skew (5% wings) | {pct(r['skew_put_minus_call'])} |",
              f"| Call OI / change (contracts) | {contracts_text(r['call_oi'], lot)} / {signed_contracts(r['call_oi_change'], lot)} |",
@@ -767,9 +888,12 @@ def chain_markdown(r, vix=None):
         strike = f"**{fmt(row['strike'], 0)}**" if row["strike"] == r["atm_strike"] else fmt(row["strike"], 0)
         lines.append(f"| {cell(c, 'oi')} | {cell(c, 'oi_change')} | {cell(c, 'iv') if c else ''} | {cell(c, 'close') if c else ''} | {cell(c, 'delta') if c else ''} | {strike} | "
                      f"{cell(p, 'delta') if p else ''} | {cell(p, 'close') if p else ''} | {cell(p, 'iv') if p else ''} | {cell(p, 'oi_change')} | {cell(p, 'oi')} |")
-    lines += ["", f"Other expiries: {', '.join(r['expiries'])}", "",
+    lines += ["", f"Expiries: {expiry_list_text(r)}" + (f" · usual expiry day {r['usual_expiry_weekday']}" if r.get("usual_expiry_weekday") else ""), "",
               f"Method: Black-76 on the forward, rate assumption {pct(r['rate_assumption'])}. {r['otm_note']} The 68% range is a risk-neutral "
-              f"lognormal at the ATM IV ({PROB_LABEL}). End-of-day data; use a broker connector chain (--input) for live prices.", ""]
+              f"lognormal at the ATM IV ({PROB_LABEL}). The next-session move is spot × ATM IV × √(1/{TRADING_DAYS}) (one trading "
+              "day; the IV is annualised on calendar time, so weekend variance is spread over sessions). Weekly/monthly comes from the "
+              "listed expiries: the one sharing the futures expiry (or the last of the month) is the monthly. "
+              "End-of-day data; use a broker connector chain (--input) for live prices.", ""]
     return "\n".join(lines)
 
 
@@ -784,7 +908,7 @@ def extreme_text(p, key):
 
 
 def payoff_markdown(r, p):
-    lines = [f"# {r['underlying']} strategy payoff — expiry {r['expiry']}", "",
+    lines = [f"# {r['underlying']} strategy payoff — expiry {r['expiry']}{expiry_tag(r)}", "",
              f"Data: {r['source']} for {r['data_date']} · spot {fmt(r['spot'])} · lot size {p['lot_size']}", "",
              f"> {r['disclaimer']}", "", "| Leg | Price used | IV | Units |", "| --- | ---: | ---: | ---: |"]
     for l in p["legs"]:
@@ -822,6 +946,8 @@ def chain_summary(r, vix=None):
     ok = dod["status"] == "ok"
     change = lambda key: dod["metrics"][key]["change"] if ok else None
     return {"schema": "fno_chain_summary_v1", "underlying": r["underlying"], "expiry": r["expiry"], "days_to_expiry": r["days_to_expiry"],
+            **{k: r.get(k) for k in ("expiry_type", "expiry_weekday", "expiry_moved", "expiry_usual_date", "usual_expiry_weekday",
+                                     "has_weeklies", "expiry_note", "one_day_move")},
             "data_date": r["data_date"], "source": r["source"], "spot": r["spot"], "forward": r["forward"], "lot_size": r["lot_size"],
             "pcr_oi": r["pcr_oi"], "pcr_oi_change": change("pcr_oi"), "max_pain": r["max_pain"], "max_pain_change": change("max_pain"),
             "atm_iv": r["atm_iv"], "atm_iv_change": change("atm_iv"), "previous_date": dod.get("previous_date"),
@@ -841,12 +967,16 @@ def chain_summary_markdown(s):
     move = (f"±{fmt(s['expected_move'])} ({pct(s['expected_move'] / s['spot'])}) by ATM straddle" if s["expected_move"] else
             f"±{fmt(s['expected_move_iv'])} (IV-implied)" if s["expected_move_iv"] else "n/a")
     rng = s["range_1sd"]
-    lines = [f"**{s['underlying']} options, expiry {s['expiry']} ({s['days_to_expiry']:.1f} days)** — data {s['data_date']} ({short_source(s['source'])})",
-             f"- Spot {fmt(s['spot'])} · forward {fmt(s['forward'])}",
+    kind = f"{s['expiry_type']}, " if s.get("expiry_type") else ""
+    lines = [f"**{s['underlying']} options, expiry {s['expiry']} ({kind}{s['days_to_expiry']:.1f} days)** — data {s['data_date']} ({short_source(s['source'])})"]
+    if s.get("expiry_moved") or s.get("has_weeklies") is False:
+        lines.append(f"- {s['expiry_note']}")
+    lines += [f"- Spot {fmt(s['spot'])} · forward {fmt(s['forward'])}",
              f"- PCR (OI) {fmt(s['pcr_oi'])}{vs(s['pcr_oi_change'], signed(s['pcr_oi_change']))}",
              f"- Max pain {fmt(s['max_pain'], 0)}{vs(s['max_pain_change'], signed(s['max_pain_change'], 0))}",
              f"- ATM IV {pct(s['atm_iv'])}{vs(s['atm_iv_change'], signed(s['atm_iv_change'] * 100 if s['atm_iv_change'] is not None else None, 1) + ' pts')}",
-             f"- Expected move to expiry {move}" + (f"; 68% implied range {fmt(rng[0], 0)}–{fmt(rng[1], 0)}" if rng else "")]
+             f"- Expected move to expiry {move}" + (f"; 68% implied range {fmt(rng[0], 0)}–{fmt(rng[1], 0)}" if rng else ""),
+             f"- Next session 1-sigma move {one_day_text(s.get('one_day_move'))} (ATM IV × √(1/{TRADING_DAYS}); {PROB_LABEL})"]
     if s["vix"]:
         lines.append(f"- India VIX {vix_line(s['vix'])}" + (f" — {s['vix']['note']}" if s["vix"].get("note") else ""))
     lines += [f"- Call OI walls above spot: {', '.join(fmt(k, 0) for k in s['resistance_oi']) or 'n/a'} · put OI walls below spot: "
@@ -861,6 +991,7 @@ def chain_summary_markdown(s):
 def payoff_summary(r, p):
     pr = p["probabilities"]
     return {"schema": "fno_payoff_summary_v1", "underlying": r["underlying"], "expiry": r["expiry"], "data_date": r["data_date"],
+            "expiry_type": r.get("expiry_type"), "expiry_moved": r.get("expiry_moved"), "expiry_note": r.get("expiry_note"),
             "source": r["source"], "spot": r["spot"], "atm_iv": r["atm_iv"], "expected_move": r["straddle"],
             "legs": [{k: l[k] for k in ("side", "type", "strike", "lots", "price", "units")} for l in p["legs"]], "lot_size": p["lot_size"],
             "net_premium": p["net_premium"], "max_profit": p["max_profit"], "max_loss": p["max_loss"], "extreme_at_zero": p["extreme_at_zero"],
@@ -876,7 +1007,8 @@ def payoff_summary_markdown(s):
         (", ".join(fmt(b) for b in s["breakevens"]) or "none in range")
     extreme = lambda key: "unlimited" if s[key] is None else fmt(s[key]) + (" (only at zero)" if s["extreme_at_zero"]["profit" if key == "max_profit" else "loss"] else "")
     rng = s["range_1sd"]
-    lines = [f"**{s['underlying']} payoff, expiry {s['expiry']}** — data {s['data_date']} ({short_source(s['source'])})",
+    kind = (f" ({s['expiry_type']}" + (", moved — " + MOVED_NOTE if s.get("expiry_moved") else "") + ")") if s.get("expiry_type") else ""
+    lines = [f"**{s['underlying']} payoff, expiry {s['expiry']}{kind}** — data {s['data_date']} ({short_source(s['source'])})",
              f"- Legs: {legs} (lot {s['lot_size']})",
              f"- Spot {fmt(s['spot'])} · ATM IV {pct(s['atm_iv'])} · ATM straddle ±{fmt(s['expected_move'])}",
              f"- Net premium {'received' if s['net_premium'] > 0 else 'paid'} ₹{fmt(abs(s['net_premium']))}",
@@ -893,6 +1025,22 @@ def payoff_summary_markdown(s):
     return "\n".join(lines)
 
 
+def expiries_markdown(result):
+    lines = [f"{result['underlying']} option expiries after {result['data_date']}:"]
+    details = result.get("expiry_details")
+    if not details:
+        return lines[0] + " " + ", ".join(result["expiries"]) + "\n"
+    lines += [f"- {x['expiry']} — {expiry_text(x, result['usual_expiry_weekday'])}" for x in details]
+    usual = (f"usual expiry day {result['usual_expiry_weekday']}" if result["usual_expiry_weekday"] else
+             "usual expiry day not clear from these dates")
+    if result["has_weeklies"]:
+        lines.append(f"{usual[0].upper() + usual[1:]}. Monthly = the expiry shared with the futures contract "
+                     "(or the last of the month); the others are weeklies.")
+    else:
+        lines.append(f"No weekly expiries: the data lists one expiry per month for {result['underlying']}, so each is a monthly ({usual}).")
+    return "\n".join(lines) + "\n"
+
+
 def public(report):
     return {k: v for k, v in report.items() if not k.startswith("_")}
 
@@ -903,7 +1051,13 @@ def main(argv=None, *, fetcher=request, clock=instant):
     for name in ("chain", "expiries", "payoff"):
         s = sub.add_parser(name)
         s.add_argument("symbol", help="NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY or an F&O stock such as RELIANCE")
-        s.add_argument("--expiry", help="YYYY-MM-DD; default nearest")
+        if name == "expiries":
+            s.add_argument("--expiry", help=argparse.SUPPRESS)
+        else:
+            pick = s.add_mutually_exclusive_group()
+            pick.add_argument("--expiry", help="YYYY-MM-DD; default nearest")
+            pick.add_argument("--weekly", dest="kind", action="store_const", const="weekly", help="Nearest weekly expiry (blocks if none listed)")
+            pick.add_argument("--monthly", dest="kind", action="store_const", const="monthly", help="Nearest monthly expiry")
         s.add_argument("--date", help="Bhavcopy trading date YYYY-MM-DD; default latest available")
         s.add_argument("--input", help="fno_chain_v1 JSON, e.g. from a broker connector")
         s.add_argument("--rate", type=float, default=DEFAULT_RATE, help="Annual risk-free rate assumption (default 0.065)")
@@ -931,10 +1085,13 @@ def main(argv=None, *, fetcher=request, clock=instant):
             source = "NSE F&O bhavcopy " + source
         if a.command == "expiries":
             trade = contracts[0]["trade_date"]
-            result = {"underlying": selected, "data_date": trade, "expiries": expiries(contracts, trade)}
-            text = json.dumps(result, indent=2) if a.format == "json" else f"{selected} option expiries after {trade}: " + ", ".join(result["expiries"]) + "\n"
+            cal = expiry_calendar(contracts, trade) if not a.input else None
+            result = {"underlying": selected, "data_date": trade, "expiries": expiries(contracts, trade),
+                      "expiry_details": cal["expiries"] if cal else None, "has_weeklies": cal["has_weeklies"] if cal else None,
+                      "usual_expiry_weekday": cal["usual_weekday"] if cal else None}
+            text = json.dumps(result, indent=2) if a.format == "json" else expiries_markdown(result)
         else:
-            report = analyse_chain(contracts, selected, expiry=a.expiry, as_of=as_of, rate=a.rate,
+            report = analyse_chain(contracts, selected, expiry=a.expiry, kind=a.kind, as_of=as_of, rate=a.rate,
                                    width=getattr(a, "strikes", 12), source=source)
             if a.command == "chain":
                 vix = None

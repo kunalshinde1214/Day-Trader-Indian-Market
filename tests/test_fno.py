@@ -493,5 +493,136 @@ class FnoImprovementTests(unittest.TestCase):
             self.assertEqual(run_cli(["payoff", "NIFTY", *SPREAD, "--chart", str(chart)], FakeFeeds())[0], 2)  # never overwrites
 
 
+def contract(expiry, kind="CE", symbol_trade=TRADE):
+    return {"kind": kind, "expiry": expiry, "strike": None if kind == "FUT" else 25000.0, "close": 100.0, "prev_close": 90.0,
+            "settle": 100.0, "oi": 1.0, "oi_change": 0.0, "volume": 1.0, "lot_size": LOT, "spot": SPOT, "trade_date": symbol_trade}
+
+
+# Bank Nifty style: one expiry a month on the last Tuesday; 24 Nov 2026 and 26 Jan 2027 are holidays, so those move to Monday.
+MONTHLY_ONLY = ["2026-11-23", "2026-12-29", "2027-01-25", "2027-02-23"]
+# Nifty style: weekly Tuesdays plus the monthly (shared with the future) on the last Tuesday; 15 Dec moved to Monday 14 Dec.
+WEEKLY = ["2026-11-23", "2026-12-01", "2026-12-08", "2026-12-14", "2026-12-22", "2026-12-29", "2027-01-25"]
+WEEKLY_FUTS = ["2026-11-23", "2026-12-29", "2027-01-25"]
+
+
+def option_rows(expiries, symbol="NIFTY"):
+    """Bhavcopy rows (one ATM call and put per expiry) for the extra expiries."""
+    out = []
+    for e in expiries:
+        for kind in ("CE", "PE"):
+            out.append(row(TckrSymb=symbol, FinInstrmTp="IDO", XpryDt=e, StrkPric="25000.00", OptnTp=kind, ClsPric=300, PrvsClsgPric=290,
+                           SttlmPric=300, OpnIntrst=650, ChngInOpnIntrst=0, TtlTradgVol=10))
+    return out
+
+
+def fut_rows(expiries):
+    return [row(FinInstrmTp="IDF", XpryDt=e, ClsPric=25100, PrvsClsgPric=25000, SttlmPric=25100, OpnIntrst=650, ChngInOpnIntrst=0,
+                TtlTradgVol=10) for e in expiries]
+
+
+class ExpiryTypeTests(unittest.TestCase):
+    def test_monthly_only_underlying_has_no_weeklies_and_moved_expiries_are_flagged(self):
+        cal = fno.expiry_calendar([contract(e) for e in MONTHLY_ONLY], TRADE)
+        self.assertFalse(cal["has_weeklies"])
+        self.assertEqual(cal["usual_weekday"], "Tuesday")
+        self.assertEqual([(x["type"], x["moved"], x["usual_date"]) for x in cal["expiries"]],
+                         [("monthly", True, "2026-11-24"), ("monthly", False, None), ("monthly", True, "2027-01-26"), ("monthly", False, None)])
+
+    def test_weekly_underlying_labels_the_monthly_from_the_futures_expiry(self):
+        contracts = [contract(e) for e in WEEKLY] + [contract(e, "FUT") for e in WEEKLY_FUTS]
+        cal = fno.expiry_calendar(contracts, TRADE)
+        self.assertTrue(cal["has_weeklies"])
+        self.assertEqual(cal["usual_weekday"], "Tuesday")
+        types = {x["expiry"]: (x["type"], x["moved"], x["usual_date"]) for x in cal["expiries"]}
+        self.assertEqual(types["2026-12-29"], ("monthly", False, None))
+        self.assertEqual(types["2026-12-08"], ("weekly", False, None))
+        self.assertEqual(types["2026-12-14"], ("weekly", True, "2026-12-15"))
+        self.assertEqual(types["2026-11-23"], ("monthly", True, "2026-11-24"))
+        # Without futures the last expiry of the month is the monthly.
+        no_futs = {x["expiry"]: x["type"] for x in fno.expiry_calendar([contract(e) for e in WEEKLY], TRADE)["expiries"]}
+        self.assertEqual((no_futs["2026-12-29"], no_futs["2026-12-22"]), ("monthly", "weekly"))
+
+    def test_single_expiry_does_not_guess_a_move(self):
+        cal = fno.expiry_calendar([contract(EXPIRY)], TRADE)
+        self.assertEqual((cal["usual_weekday"], cal["expiries"][0]["moved"], cal["expiries"][0]["type"]), (None, False, "monthly"))
+
+    def test_chain_header_summary_and_selectors(self):
+        contracts = fno.parse_bhavcopy(bhavcopy(extra=option_rows(MONTHLY_ONLY[1:])), "NIFTY")
+        r = fno.analyse_chain(contracts, "NIFTY", rate=RATE)
+        self.assertEqual((r["expiry"], r["expiry_type"], r["expiry_moved"], r["has_weeklies"]), (EXPIRY, "monthly", True, False))
+        text = fno.chain_markdown(r)
+        self.assertIn(f"# NIFTY options — expiry {EXPIRY} (monthly, Monday — moved from Tuesday 2026-11-24, probably for a holiday — "
+                      "check the exchange circular)", text)
+        self.assertIn("NIFTY has no weekly expiries in this data (one expiry per month)", text)
+        self.assertIn("2026-11-23 (monthly, moved from 2026-11-24), 2026-12-29 (monthly)", text)
+        with self.assertRaisesRegex(Block, "no weekly expiries in this data .* Nearest monthly: 2026-11-23"):
+            fno.analyse_chain(contracts, "NIFTY", kind="weekly", rate=RATE)
+        self.assertEqual(fno.analyse_chain(contracts, "NIFTY", kind="monthly", rate=RATE)["expiry"], EXPIRY)
+        weekly = fno.parse_bhavcopy(bhavcopy(extra=option_rows(WEEKLY[1:]) + fut_rows(WEEKLY_FUTS[1:])), "NIFTY")
+        w = fno.analyse_chain(weekly, "NIFTY", kind="weekly", rate=RATE)
+        self.assertEqual((w["expiry"], w["expiry_type"], w["expiry_moved"]), ("2026-12-01", "weekly", False))
+        p = fno.payoff(r, [fno.parse_leg("BUY:CE:25000:1")])
+        self.assertIn("expiry 2026-11-23 (monthly, Monday — moved", fno.payoff_markdown(r, p))
+        self.assertIn("(monthly, moved)", fno.svg_chart(r, p))
+
+    def test_cli_expiries_and_weekly_flag(self):
+        feed = lambda url: bhavcopy(extra=option_rows(MONTHLY_ONLY[1:])) if TRADE.replace("-", "") in url else (_ for _ in ()).throw(Block("x"))
+        code, text = run_cli(["expiries", "NIFTY"], feed)
+        self.assertEqual(code, 0)
+        self.assertIn("- 2026-11-23 — monthly, Monday — moved from Tuesday 2026-11-24, probably for a holiday", text)
+        self.assertIn("- 2026-12-29 — monthly, Tuesday", text)
+        self.assertIn("No weekly expiries: the data lists one expiry per month for NIFTY", text)
+        code, raw = run_cli(["expiries", "NIFTY", "--format", "json"], feed)
+        data = json.loads(raw)
+        self.assertEqual(data["expiries"][:2], ["2026-11-23", "2026-12-29"])
+        self.assertFalse(data["has_weeklies"])
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            self.assertEqual(fno.main(["chain", "NIFTY", "--weekly", "--no-vix", "--no-compare"], fetcher=feed, clock=lambda: NOW), 2)
+        self.assertIn("no weekly expiries", err.getvalue())
+        code, text = run_cli(["chain", "NIFTY", "--monthly", "--no-vix", "--no-compare", "--summary"], feed)
+        self.assertIn(f"expiry {EXPIRY} (monthly, ", text)
+        self.assertIn("- Expiry 2026-11-23 is a monthly, Monday — moved from Tuesday 2026-11-24", text)
+
+    def test_input_chain_type_is_unknown(self):
+        rows = [{"type": k, "strike": 25000, "last": 200, "oi": 1, "volume": 1} for k in ("CE", "PE")]
+        data = {"schema": "fno_chain_v1", "underlying": "NIFTY", "as_of": f"{TRADE}T12:00:00+05:30", "spot": SPOT, "lot_size": LOT,
+                "expiry": EXPIRY, "rows": rows}
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "c.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            contracts, source, as_of = fno.load_input(path, "NIFTY")
+            r = fno.analyse_chain(contracts, "NIFTY", as_of=as_of, rate=RATE, source=source)
+            self.assertIsNone(r["expiry_type"])
+            self.assertIn("cannot be told", r["expiry_note"])
+            with self.assertRaisesRegex(Block, "need the exchange bhavcopy"):
+                fno.analyse_chain(contracts, "NIFTY", kind="monthly", as_of=as_of, rate=RATE, source=source)
+
+
+class OneDayMoveTests(unittest.TestCase):
+    def test_one_day_move_is_spot_times_iv_over_root_252(self):
+        r = report()
+        m = r["one_day_move"]
+        expected = SPOT * r["atm_iv"] * math.sqrt(1 / 252)
+        self.assertAlmostEqual(m["points"], expected, places=9)
+        self.assertAlmostEqual(m["pct"], r["atm_iv"] / math.sqrt(252), places=12)
+        self.assertEqual((m["low"], m["high"]), (SPOT - m["points"], SPOT + m["points"]))
+        self.assertAlmostEqual(m["points"], 25000 * 0.15 / math.sqrt(252), delta=25000 * 0.002 / math.sqrt(252))  # ATM IV ~15%
+        self.assertIn("√(1/252)", m["basis"])
+        self.assertIsNone(fno.one_day_move(SPOT, None))
+        text = fno.chain_markdown(r)
+        self.assertIn(f"| Next-session 1-sigma move and range (ATM IV × √(1/252); {fno.PROB_LABEL}) | ±{fno.fmt(expected)} "
+                      f"({fno.pct(m['pct'], 2)}): {fno.fmt(SPOT - expected, 0)} – {fno.fmt(SPOT + expected, 0)} |", text)
+
+    def test_summary_carries_the_one_day_move(self):
+        code, text = run_cli(["chain", "NIFTY", "--summary", "--no-vix"], FakeFeeds())
+        self.assertEqual(code, 0)
+        self.assertRegex(text, r"- Next session 1-sigma move ±2[0-9]{2}\.[0-9]{2} \(0\.9[0-9]%\): 24,7[0-9]{2} – 25,2[0-9]{2} \(ATM IV × √\(1/252\)")
+        code, raw = run_cli(["chain", "NIFTY", "--summary", "--format", "json", "--no-vix"], FakeFeeds())
+        data = json.loads(raw)
+        self.assertAlmostEqual(data["one_day_move"]["points"], data["spot"] * data["atm_iv"] / math.sqrt(252), places=6)
+        self.assertEqual(data["expiry_type"], "monthly")
+
+
 if __name__ == "__main__":
     unittest.main()

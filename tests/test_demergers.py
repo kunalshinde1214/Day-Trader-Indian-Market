@@ -251,6 +251,43 @@ class ApplyTests(unittest.TestCase):
         self.assertEqual([(l["quantity"], l["price"]) for l in open_lots], [(Decimal(10), Decimal("345.9600")), (Decimal(10), Decimal(420))])
 
 
+class OrderAndDemergedSharesTests(unittest.TestCase):
+    """Notes give the corporate events in date order; the summary says whether the demerged shares are held."""
+
+    def reliance(self, **kw):
+        from test_buy_price_check import Feed as BarFeed, flat
+        feed = BarFeed({"RELIANCE": (flat(date(2022, 1, 3), date(2026, 11, 17), 1150.0, 1260.0), [(date(2024, 10, 28), 2, 1)])})
+        doc = holdings_doc([{"symbol": "RELIANCE", "quantity": 30, "average_price": 2400, "bought": "2023-01"}])
+        return run(doc, feed=feed, **kw)
+
+    def test_demerger_then_bonus_note_is_in_date_order_with_correct_costs(self):
+        r = self.reliance(apply_demergers=True)
+        rel = row(r, "RELIANCE")
+        self.assertEqual((rel["quantity"], rel["average_price"]), (60.0, 1143.84))
+        note = next(n for n in r["notes"] if n.startswith("RELIANCE: 30 shares"))
+        self.assertIn("30 shares at ₹2,400.00 (cost ₹72,000), adjusted in date order: JIOFIN demerger (record date 2023-07-20", note)
+        self.assertIn("cost ₹72,000 became ₹68,630 (30 shares, ₹2,287.68 a share); then 1:1 bonus on 2024-10-28: 30 shares became 60 "
+                      "(₹1,143.84 a share, the new shares at nil cost; total cost unchanged at ₹68,630)", note)
+        self.assertIn("Result: 60 shares at ₹1,143.84 (cost ₹68,630).", note)
+        self.assertLess(note.index("JIOFIN demerger"), note.index("1:1 bonus"))
+        self.assertFalse(any("same total cost" in n for n in r["notes"]))  # the contradictory one-line note is gone
+        self.assertFalse(any("average cost ₹1,200.00 became" in n for n in r["notes"]))
+        plain = self.reliance()  # without --apply-demergers only the bonus changed the holding
+        self.assertTrue(any("30 shares at ₹2,400.00 became 60 at ₹1,200.00 (same total cost)" in n for n in plain["notes"]))
+
+    def test_summary_says_whether_demerged_shares_are_held(self):
+        missing = hr.summary(run(holdings_doc(ITC_DATED)))
+        self.assertIn("- **Demerged shares**: ITCHOTELS (100 expected from ITC) is not in your holdings — check your demat account; "
+                      "the value and P&L above exclude them", missing)
+        held = hr.summary(run(holdings_doc(ITC_DATED + [{"symbol": "ITCHOTELS", "quantity": 100, "average_price": 0}])))
+        self.assertIn("- **Demerged shares**: ITCHOTELS (100 held, from ITC) is in your holdings", held)
+        undated = hr.summary(run(holdings_doc([{"symbol": "ITC", "quantity": 250, "average_price": 400}])))
+        self.assertIn("ITCHOTELS (25 expected if your ITC was bought before 2025-01-06) is not in your holdings", undated)
+        self.assertNotIn("Demerged shares", hr.summary(run(holdings_doc([{"symbol": "TCS", "quantity": 5, "average_price": 3400}]))))
+        w = row(run(holdings_doc(ITC_DATED)), "ITC")["demerger_warning"]
+        self.assertIn("ITCHOTELS is not in this file; check your demat account for these shares", w)
+
+
 class SummaryTests(unittest.TestCase):
     HOLDINGS = [{"symbol": "ITC", "quantity": 1000, "average_price": 400, "bought": "2024-06"},
                 {"symbol": "RELIANCE", "quantity": 20, "average_price": 2400, "bought": "2023-01"},

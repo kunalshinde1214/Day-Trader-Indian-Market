@@ -1,0 +1,133 @@
+{
+  "schema": "symbol_aliases_v1",
+  "description": "NSE trading symbols that no longer trade, mapped to the symbol(s) that replaced them. Used by scripts/stock_analysis.py and scripts/screener.py only after the old symbol fails to load (or its history has stopped), so a symbol that NSE later reuses is not redirected. 'date' is the first trading day under the new symbol; for mergers and demergers it is the record date or the date the old symbol stopped trading, as stated in 'reason'. Add entries only from an exchange circular, the company's own filing or a broker bulletin that quotes the circular.",
+  "checked": "2026-11-18",
+  "aliases": [
+    {
+      "old": "TATAMOTORS",
+      "kind": "demerger",
+      "date": "2025-10-14",
+      "reason": "Tata Motors demerged its commercial-vehicle business (record date 14 Oct 2025, 1 TMCV share per share held); the remaining passenger-vehicle company was renamed and trades as TMPV from 24 Oct 2025.",
+      "successors": [
+        {"symbol": "TMPV", "what": "Tata Motors Passenger Vehicles Ltd: passenger cars, EVs and Jaguar Land Rover (the original listed company, renamed)"},
+        {"symbol": "TMCV", "what": "Tata Motors Ltd (formerly TML Commercial Vehicles): trucks and buses, listed 12 Nov 2025"}
+      ],
+      "source": "https://zerodha.com/marketintel/bulletin/431402/change-in-stock-name-and-symbol-for-tata-motors-ltd",
+      "also": ["https://nsearchives.nseindia.com/content/circulars/CMPT70934.pdf", "https://nsearchives.nseindia.com/content/circulars/CML71208.pdf"]
+    },
+    {
+      "old": "TATAMTRDVR",
+      "kind": "conversion",
+      "date": "2024-08-30",
+      "reason": "Tata Motors 'A' ordinary (DVR) shares were cancelled for 7 ordinary shares per 10 DVR (last trading day 29 Aug 2024); those ordinary shares now trade as TMPV after the 2025 demerger, which also gave TMCV shares.",
+      "successors": [
+        {"symbol": "TMPV", "what": "Tata Motors Passenger Vehicles Ltd, the ordinary shares the DVRs became (renamed from TATAMOTORS in Oct 2025)"}
+      ],
+      "source": "https://zerodha.com/marketintel/bulletin/388195/suspension-of-trading-in-tata-motors-limited-tatamtrdvr"
+    },
+    {
+      "old": "ZOMATO",
+      "kind": "rename",
+      "date": "2025-04-09",
+      "reason": "Zomato Ltd renamed Eternal Ltd; NSE symbol changed to ETERNAL.",
+      "successors": [{"symbol": "ETERNAL", "what": "Eternal Ltd (formerly Zomato)"}],
+      "source": "https://community.upstox.com/t/important-announcement-change-in-name-and-symbol-of-zomato-limited/8769"
+    },
+    {
+      "old": "MCDOWELL-N",
+      "kind": "rename",
+      "date": "2024-06-07",
+      "reason": "United Spirits changed its NSE symbol from MCDOWELL-N to UNITDSPR (company name unchanged).",
+      "successors": [{"symbol": "UNITDSPR", "what": "United Spirits Ltd"}],
+      "source": "https://zerodha.com/marketintel/bulletin/380304/change-in-stock-name-and-symbol-for-united-spirits-limited"
+    },
+    {
+      "old": "GMRINFRA",
+      "kind": "rename",
+      "date": "2024-12-11",
+      "reason": "GMR Airports Infrastructure Ltd renamed GMR Airports Ltd; NSE symbol changed to GMRAIRPORT.",
+      "successors": [{"symbol": "GMRAIRPORT", "what": "GMR Airports Ltd"}],
+      "source": "https://nsearchives.nseindia.com/content/circulars/CML65429.pdf"
+    },
+    {
+      "old": "IBULHSGFIN",
+      "kind": "rename",
+      "date": "2024-07-26",
+      "reason": "Indiabulls Housing Finance renamed Sammaan Capital Ltd; NSE symbol changed to SAMMAANCAP.",
+      "successors": [{"symbol": "SAMMAANCAP", "what": "Sammaan Capital Ltd (formerly Indiabulls Housing Finance)"}],
+      "source": "https://zerodha.com/marketintel/bulletin/385030/change-in-stock-name-and-symbol-for-indiabulls-housing-finance-limited"
+    },
+    {
+      "old": "ADANITRANS",
+      "kind": "rename",
+      "date": "2023-08-24",
+      "reason": "Adani Transmission renamed Adani Energy Solutions; NSE symbol changed to ADANIENSOL.",
+      "successors": [{"symbol": "ADANIENSOL", "what": "Adani Energy Solutions Ltd (formerly Adani Transmission)"}],
+      "source": "https://zerodha.com/marketintel/bulletin/358161/change-in-stock-name-and-symbol-for-adani-transmission-limited"
+    },
+    {
+      "old": "HDFC",
+      "kind": "merger",
+      "date": "2023-07-13",
+      "reason": "HDFC Ltd merged into HDFC Bank (42 HDFCBANK shares per 25 HDFC; last trading day 12 Jul 2023).",
+      "successors": [{"symbol": "HDFCBANK", "what": "HDFC Bank Ltd, which absorbed HDFC Ltd"}],
+      "source": "https://zerodha.com/marketintel/bulletin/354440/suspension-of-trading-hdfc-limited"
+    },
+    {
+      "old": "IDFC",
+      "kind": "merger",
+      "date": "2024-10-10",
+      "reason": "IDFC Ltd merged into IDFC First Bank (155 IDFCFIRSTB shares per 100 IDFC; last trading day 9 Oct 2024).",
+      "successors": [{"symbol": "IDFCFIRSTB", "what": "IDFC First Bank Ltd, which absorbed IDFC Ltd"}],
+      "source": "https://zerodha.com/marketintel/bulletin/392076/suspension-of-trading-idfc-limited"
+    },
+    {
+      "old": "LTIM",
+      "kind": "rename",
+      "date": "2026-02-27",
+      "reason": "LTIMindtree rebranded as LTM; NSE symbol changed from LTIM to LTM.",
+      "successors": [{"symbol": "LTM", "what": "LTM Ltd (formerly LTIMindtree)"}],
+      "source": "https://nsearchives.nseindia.com/corporate/vinodn_23022026185614_CML72948.pdf"
+    },
+    {
+      "old": "LTI",
+      "kind": "rename",
+      "date": "2022-12-05",
+      "reason": "Larsen & Toubro Infotech became LTIMindtree (symbol LTIM) after absorbing Mindtree, and LTIM became LTM on 27 Feb 2026.",
+      "successors": [{"symbol": "LTM", "what": "LTM Ltd (formerly LTIMindtree, formerly L&T Infotech)"}],
+      "source": "https://zerodha.com/marketintel/bulletin/338815/change-in-stock-name-and-symbol-for-lt-infotech-limited"
+    },
+    {
+      "old": "MINDTREE",
+      "kind": "merger",
+      "date": "2022-11-23",
+      "reason": "Mindtree merged into L&T Infotech (73 shares per 100 Mindtree; last trading day 22 Nov 2022); that company now trades as LTM.",
+      "successors": [{"symbol": "LTM", "what": "LTM Ltd (formerly LTIMindtree)"}],
+      "source": "https://tradingqna.com/t/suspension-of-trading-in-shares-of-mindtree-on-account-of-merger-with-l-t-infotech/139314"
+    },
+    {
+      "old": "PEL",
+      "kind": "merger",
+      "date": "2025-09-23",
+      "reason": "Piramal Enterprises merged into Piramal Finance (1:1, record date 23 Sep 2025); Piramal Finance listed as PIRAMALFIN on 7 Nov 2025.",
+      "successors": [{"symbol": "PIRAMALFIN", "what": "Piramal Finance Ltd, which absorbed Piramal Enterprises"}],
+      "source": "https://nsearchives.nseindia.com/content/circulars/CML71189.pdf"
+    },
+    {
+      "old": "WELSPUNIND",
+      "kind": "rename",
+      "date": "2023-12-14",
+      "reason": "Welspun India renamed Welspun Living; NSE symbol changed to WELSPUNLIV.",
+      "successors": [{"symbol": "WELSPUNLIV", "what": "Welspun Living Ltd (formerly Welspun India)"}],
+      "source": "https://www.angelone.in/announcements/market/w-ef-14-dec-new-identity-for-welspun-india-ltd"
+    },
+    {
+      "old": "AMARAJABAT",
+      "kind": "rename",
+      "date": "2023-10-27",
+      "reason": "Amara Raja Batteries renamed Amara Raja Energy & Mobility; NSE symbol changed to ARE&M.",
+      "successors": [{"symbol": "ARE&M", "what": "Amara Raja Energy & Mobility Ltd (formerly Amara Raja Batteries)"}],
+      "source": "https://www.angelone.in/announcements/market/w-ef-27-oct-new-identity-for-amara-raja-energy-mobility-ltd"
+    }
+  ]
+}

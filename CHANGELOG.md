@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4.0 — 18 November 2026
+
+Fixes from the second round of user testing.
+
+- **Daily commands restored:** `/india-day-trader:nifty`, `:sensex`, `:banknifty` and `:india-daily` are back (1.3.0 had folded them into `market`). Docs no longer call bare `/nifty` a registered command.
+- **Daily reports:** each index shows the last close and the day's change with dates; India Daily opens with a comparison table and India VIX; plain-language, dated headlines; a real `--brief`; after the close the official daily close is used when Yahoo has it; the NSE closing route works on Windows (it failed on the ₹ sign); Sensex is labelled as Yahoo data with a clear note on the closing route; closed days name the last session and the command for its closing report.
+- **Stock analysis:** renamed and demerged symbols are explained from a sourced alias list (TATAMOTORS → TMPV and TMCV, ZOMATO → ETERNAL, and others); price history is cut at a demerger so ranges and P/E bands are not polluted; P/E is compared on the same basis as its history band; one 1-year return definition everywhere; bull and bear levels in order; placeholder symbols and REIT units excluded from peers; a weak-quarter note on trailing EPS.
+- **Screener:** retries transient failures and separates "failed to load" from "missing data", so repeated screens agree; `nifty100`, `nifty200` and several universes at once; 12-month dividend yield per share with special dividends flagged; any filtered or sorted field is shown as a column.
+- **Simple position sizer:** `scripts/position_size.py` answers "how many shares for ₹X risk with this stop" with Indian charges, exposure and margin, with no broker setup. The `trade-plan` skill starts there.
+- **F&O:** expiries labelled weekly or monthly from the data, holiday-moved expiries flagged, `--weekly`/`--monthly` selectors, and a next-session one-standard-deviation move for "kal kya lagta hai".
+- **Portfolio review:** typed buy prices checked against that period's trading range; a sourced list of 14 bonus issues applied automatically (`--split` to override); demerged shares the user should hold are named in the summary; corporate-action notes list steps in date order.
+- **Skills:** guidance for Tata Motors' two successors, shareholding and pledge data via exchange filings, and asking for option strikes rather than choosing them.
+
 ## 1.3.0 — 18 November 2026
 
 Easier to use, and the remaining issues from the user-testing review.

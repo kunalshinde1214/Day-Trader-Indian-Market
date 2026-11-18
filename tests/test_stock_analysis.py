@@ -8,7 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from core import Block, instant
-from stock_analysis import analyse, markdown, normalize, ratios, rsi
+from stock_analysis import analyse, check_eps, markdown, normalize, outlook, ratios, rsi, summary
 
 NOW = instant("2026-11-13T16:00:00+05:30")
 
@@ -181,6 +181,56 @@ class StockAnalysisTests(unittest.TestCase):
         f = ratios({"annualNetIncome": [{"date": "2026-03-31", "value": 5.0}]}, 100.0, NOW)
         self.assertIsNone(f["pe"])
         self.assertIsNone(f["market_cap"])
+
+
+class ReportFixTests(unittest.TestCase):
+    TECH = {"trend": "mixed / sideways", "rsi14": 45.0, "closes": [100.0] * 300, "close_dates": [f"d{k}" for k in range(300)],
+            "resistance": 1469.0, "resistance_60d": 1780.1, "high_52w": 1780.1, "support": 1350.6, "support_60d": 1172.8, "sma200": 1310.42}
+
+    def test_bear_levels_descend_and_bull_levels_ascend(self):
+        o = outlook(self.TECH)
+        self.assertEqual(o["bear_levels"], [1310.42, 1172.8])  # nearest first (HCL, 18 Nov 2026)
+        self.assertLess(o["bear_case"].index("1,310.42"), o["bear_case"].index("1,172.80"))
+        self.assertEqual(o["bull_levels"], [1780.1])  # 60-day and 52-week highs merged, not listed twice
+        self.assertIn("60-day high and 52-week high", o["bull_case"])
+        o = outlook({**self.TECH, "resistance_60d": 1600.0})
+        self.assertEqual(o["bull_levels"], [1600.0, 1780.1])
+
+    def test_outlook_states_the_years_actually_used(self):
+        o = outlook(self.TECH)
+        self.assertIn("over the last 1.2 years (300 sessions from d0)", o["method"])
+        self.assertNotIn("~2 years", o["method"])
+        r = run(Feed())
+        self.assertIn("over the last 2.0 years (505 sessions", r["outlook"]["method"])
+
+    def test_summary_compares_pe_on_the_band_basis(self):
+        r = run(Feed())
+        band, f = r["fundamentals"]["pe_band"], r["fundamentals"]
+        self.assertAlmostEqual(band["current"], f["pe"] * 12.5 / 11.0)  # band uses annual EPS 11, headline uses trailing 12.5
+        text = summary(r)
+        self.assertIn(f"Valuation: P/E {f['pe']:,.1f} (trailing 12 months); on latest annual EPS {band['current']:,.1f} vs its usual", text)
+        report = markdown(r)
+        self.assertIn(f"Today {band['current']:,.1f} on the same basis", report)
+        self.assertIn("uses trailing 12 months EPS, so it is not compared with this range", report)
+        self.assertIn("| P/E (trailing 12 months) |", report)
+
+
+class WeakQuarterTests(unittest.TestCase):
+    def quarters(self, *values):
+        dates = ("2025-09-30", "2025-12-31", "2026-03-31", "2026-06-30", "2026-09-30")[-len(values):]
+        return [{"date": d, "value": v} for d, v in zip(dates, values)]
+
+    def test_depressed_quarter_is_mentioned_when_last_year_was_normal(self):
+        eps, flags = check_eps({"date": "2026-09-30", "value": 40.4, "basis": "trailing 12 months"}, self.quarters(16.0, 16.8, 13.2, 11.4, -4.4 + 3.4), 300)
+        self.assertEqual(len(flags), 1)
+        self.assertIn("weak quarter (2026-09-30", flags[0])
+        self.assertEqual(eps["value"], 40.4)  # only mentioned, never replaced
+
+    def test_seasonal_or_unverifiable_weak_quarter_is_not_flagged(self):
+        trailing = {"date": "2026-09-30", "value": 30.0, "basis": "trailing 12 months"}
+        self.assertEqual(check_eps(trailing, self.quarters(2.0, 10.0, 9.0, 9.0, 2.0), 300)[1], [])  # weak a year ago too
+        self.assertEqual(check_eps(trailing, self.quarters(10.0, 9.0, 9.0, 2.0), 300)[1], [])  # no year-ago quarter
+        self.assertEqual(check_eps(trailing, self.quarters(10.0, 10.0, 9.0, 9.0, 8.0), 300)[1], [])  # nothing depressed
 
 
 if __name__ == "__main__":

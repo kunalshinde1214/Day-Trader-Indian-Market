@@ -13,11 +13,13 @@ python scripts/holdings_review.py --input holdings.json --format json --out repo
 python scripts/holdings_review.py --input holdings.json --stcg-rate 0.20 --ltcg-rate 0.125 --ltcg-exemption 125000 --cess-rate 0.04
 python scripts/holdings_review.py --input holdings.json --summary            # short answer-first block
 python scripts/holdings_review.py --input holdings.json --apply-demergers    # apply published demerger cost splits
+python scripts/holdings_review.py --input holdings.json --split RELIANCE     # treat a listed bonus as a split instead
+python scripts/holdings_review.py --input holdings.json --bonus SYMBOL       # treat an unlisted Yahoo split event as a bonus
 ```
 
 `--out` writes a new file and refuses to overwrite one. Errors print `BLOCKED - ...` on stderr and exit 2.
 
-`--summary` prints about ten lines instead of the full report: value and P&L (₹ and %), day change, best and worst holding, largest-holding weight with the concentration reading, top sector, the "if you sold everything today" tax (one figure, or a range naming the undated holdings), and a count of ⚠ items grouped as bonus/split, demerger, stale price and missing price. With `--format json` it returns `{"schema": "holdings_summary_v1", "summary": ..., "flags": {...}}`. Lead with the summary when the user asks "how is my portfolio doing"; offer the full report for the details behind each ⚠.
+`--summary` prints about ten lines instead of the full report: value and P&L (₹ and %), day change, best and worst holding, largest-holding weight with the concentration reading, top sector, the "if you sold everything today" tax (one figure, or a range naming the undated holdings; it says when a doubtful typed price drives it), a "Demerged shares" line when a demerger applies (whether the resulting company's shares, such as JIOFIN or ITCHOTELS, are in the holdings; if not, how many to expect and a prompt to check the demat account, since value and P&L exclude them), and a count of ⚠ items grouped as buy/sell price, bonus/split, demerger, stale price and missing price. With `--format json` it returns `{"schema": "holdings_summary_v1", "summary": ..., "flags": {...}}`. Lead with the summary when the user asks "how is my portfolio doing"; offer the full report for the details behind each ⚠.
 
 ## Input formats
 
@@ -77,9 +79,25 @@ These defaults apply to transfers on or after 23 July 2024 under the Finance (No
 
 A holding may carry `"bought": "YYYY-MM-DD"` or just `"YYYY-MM"` (the 1st of the month is assumed and flagged). A dated holding with no lots becomes one tax lot.
 
-Yahoo's split events from the last five years are applied inside FIFO on the ex-date, before that day's trades. By default an event is treated as a **split**: open lots are multiplied by the ratio and their cost divided, keeping the purchase date. With `--bonus SYMBOL` it is treated as a **bonus**: a new lot of (ratio − 1) × the open quantity is added at nil cost, dated on the ex-date, as Indian tax treats bonus shares. Yahoo records a 1:1 bonus as a 2-for-1 split and does not say which it was, so check the company announcement. Values and P&L are the same either way; only tax lots differ.
+Yahoo's split events from the last five years are applied inside FIFO on the ex-date, before that day's trades. Yahoo records a 1:1 bonus as a 2-for-1 split and does not say which it was, so each event is classified:
 
-If a holding's quantity equals its lots before the event, it is converted to today's units and a note says so. A holding with no date that had an event gets a ⚠ in the table and an explanation under it (broker exports are normally already adjusted). Mergers and rights issues are not applied.
+- **Listed bonus → bonus, automatically.** `assets/bonuses.json` is a curated list of well-known NSE bonus issues since 2022, each with ratio (Indian terms: new shares for every N held), record date, ex-date, allotment date when the company published it, source URLs (company or exchange filings) and the date checked. A Yahoo event for the same symbol within 4 days of the ex-date or record date, with the matching share multiplier ((new + held) ÷ held, e.g. 2 for 1:1, 4/3 for 1:3), is treated as that bonus and the note says so.
+- **Bonus treatment:** a new lot of (multiplier − 1) × the open quantity at nil cost, dated from the **allotment date** (from which Indian tax counts the holding period of bonus shares); when the list has no allotment date, from the record date with a note that the long-term date may be a few days early.
+- **Split plus bonus on one record date** (Bajaj Finance Jun 2025: 1:2 split then 4:1 bonus; Bajaj Finserv Sep 2022: 1:5 split then 1:1 bonus): the entry's `split_before_bonus` makes it a split (quantity up, cost per share down, date kept) followed by the bonus lot. Yahoo has recorded only the split part for both while adjusting its prices by the full factor; either form matches.
+- **Anything else → split** (open lots multiplied by the ratio, cost divided, purchase date kept), with a note naming `--bonus SYMBOL`.
+- `--split SYMBOL` forces split treatment even for a listed bonus; `--bonus SYMBOL` forces bonus treatment (dated from the listed allotment date if any, else the ex-date). Giving one symbol to both blocks.
+
+Values and P&L are the same either way; only tax lots differ. If the list cannot be read, events fall back to splits and `errors.bonuses` says so. JSON `bonus_reference` gives the entry count, check date and forced symbols. To add an entry, cite the company's record-date or allotment letter (and the NSE F&O circular for the ex-date); never estimate dates; `tests/test_bonuses.py` refuses entries without https sources.
+
+If a holding's quantity equals its lots before the event, it is converted to today's units and a note says so. When `--apply-demergers` also changes the same holding, one note lists the events in date order with the shares and total cost after each (for RELIANCE 30 at ₹2,400 bought Jan 2023: the Jul 2023 JIOFIN cost split takes ₹72,000 to ₹68,630, then the Oct 2024 1:1 bonus takes 30 shares to 60, giving ₹1,143.84 a share). A holding with no date that had an event gets a ⚠ in the table and an explanation under it (broker exports are normally already adjusted). Mergers and rights issues are not applied.
+
+## Buy-price check
+
+Every dated buy or sell (lots, tradebook rows, or a holding's `bought` date) is compared with what the stock traded at then: the Yahoo daily low–high on that day (the days within 3 of it when the date had no trading), or over the whole month for a month-only date. Yahoo's bars are in today's share units, so each bar is scaled back by every later split or bonus to the prices of the time. A price more than 3% outside that range gets a ⚠ ("SBIN: ₹600 (bought) is outside the ₹937–984 range traded in Oct 2026 — check the price or date") in the holdings table, under "Check before trusting these numbers", in the summary's ⚠ count and tax line, and in JSON `price_warning` / `price_checks` (with `price_checks_ok` and `price_checks_not_checked` counts). The user's numbers are never changed.
+
+- If the price fits the range in today's units instead, the warning adds that the quantity and price may already be adjusted, in which case the review has adjusted them twice.
+- Yahoo also scales down prices from before some demergers (RELIANCE before Jul 2023, ITC before Jan 2025, SIEMENS before Apr 2025; not TMPV), with no event to undo it. For a period before a listed demerger, only a price **below** the range is flagged, and the warning says the real low was at or above the figure shown.
+- Dates before the five-year price history, or with no bars nearby, are not checked (counted in `price_checks_not_checked`).
 
 When some priced holdings have no purchase date, the "if you sold everything today" tax is a range: the low end treats their gains as long-term and losses as short-term, the high end the reverse.
 
@@ -99,7 +117,7 @@ Yahoo reports no demerger events, so `assets/demergers.json` ships a short curat
 
 For a holding whose symbol is a parent:
 
-- **Dated before the record date** (lots, a tradebook or `bought`): only shares held at the end of the day before the record date count, since a purchase on the record date is not entitled. The holding gets a ⚠ saying how many new shares the user should also hold (fractions are paid in cash) and whether the new symbol is already in the file. With a known split it spells out the cost: for 1,000 ITC at ₹400, ₹3,45,960 (₹345.96 a share) stays with ITC and ₹54,040 (₹540.40 each) goes to the 100 ITC Hotels shares. Without one it says the company publishes the split and the cost shown may be overstated. A month-only `bought` in the record month is caveated.
+- **Dated before the record date** (lots, a tradebook or `bought`): only shares held at the end of the day before the record date count, since a purchase on the record date is not entitled. The holding gets a ⚠ saying how many new shares the user should also hold (fractions are paid in cash) and whether the new symbol is already in the file; if not, it asks the user to check their demat account, since value and P&L exclude those shares (the summary's "Demerged shares" line says the same; JSON `demergers[].resulting_in_holdings`). With a known split it spells out the cost: for 1,000 ITC at ₹400, ₹3,45,960 (₹345.96 a share) stays with ITC and ₹54,040 (₹540.40 each) goes to the 100 ITC Hotels shares. Without one it says the company publishes the split and the cost shown may be overstated. A month-only `bought` in the record month is caveated.
 - **Undated**: the same ⚠, worded "if you bought before DATE".
 - **Dated on or after the record date**: nothing.
 - **Realised sales** of shares bought before a record date and sold after it get a note that the gain uses the full original cost.

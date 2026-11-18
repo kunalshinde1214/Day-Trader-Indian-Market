@@ -1,0 +1,154 @@
+{
+  "schema": "bonuses_v1",
+  "description": "Curated bonus issues of NSE-listed Indian companies (2022 onwards) used by scripts/holdings_review.py. Yahoo records a bonus as a split (a 1:1 bonus appears as a 2-for-1 split); when a Yahoo split event matches an entry here (same symbol, date within a few days of the ex-date or record date, same share ratio) it is treated as a bonus: the new shares are a separate nil-cost lot dated from the allotment date (or the record date when the allotment date is null). ratio is Indian terms: new_shares for every per_held_shares held. split_before_bonus, when present, is a stock split on the same record date applied before the bonus (the bonus ratio counts post-split shares). Add entries only from the company's or the exchange's own announcement; never estimate dates.",
+  "checked": "2026-11-18",
+  "bonuses": [
+    {
+      "symbol": "IOC", "company": "Indian Oil Corporation Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 2},
+      "record_date": "2022-07-01", "ex_date": "2022-06-30", "allotment_date": null,
+      "allotment_note": "Credit on 6 Jul 2022 is quoted from IOC's FY23 annual report but that document was not retrieved; record date used.",
+      "sources": [
+        {"url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/33459ed8-825c-4892-b3b2-83856201ea31.pdf", "covers": "IOC board outcome, 17 May 2022: 1:2 bonus, record date 1 Jul 2022 (primary)"},
+        {"url": "https://nsearchives.nseindia.com/content/circulars/CMPT52374.pdf", "covers": "NSE Clearing circular: ex-date 30 Jun 2022, adjustment factor 1.5"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "BAJAJFINSV", "company": "Bajaj Finserv Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 1},
+      "split_before_bonus": {"new_shares": 5, "per_old_shares": 1, "face_value": "₹5 to ₹1"},
+      "record_date": "2022-09-14", "ex_date": "2022-09-13", "allotment_date": "2022-09-15",
+      "sources": [
+        {"url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/ba7cc693-91ec-4ed9-8abd-7a09c586947d.pdf", "covers": "Company Regulation 42 filing: one record date, 14 Sep 2022, for the 1:5 split and the 1:1 bonus (primary)"},
+        {"url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/167c763f-43d1-4d20-93af-56c99408810c.pdf", "covers": "Company allotment letter: bonus shares allotted at the 15 Sep 2022 committee meeting (primary)"},
+        {"url": "https://nsearchives.nseindia.com/content/circulars/FAOP53548.pdf", "covers": "NSE F&O circular: split 5:1 and bonus 1:1, ex-date 13 Sep 2022"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "POWERGRID", "company": "Power Grid Corporation of India Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 3},
+      "record_date": "2023-09-12", "ex_date": "2023-09-12", "allotment_date": null,
+      "allotment_note": "Allotment date not found; the board expected credit by 25 Sep 2023. Record date used.",
+      "sources": [
+        {"url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/c04ec17e-1831-424a-8ff5-5f083cb5b71f.pdf", "covers": "Company letter, 8 Aug 2023: 1:3 bonus, record date 12 Sep 2023 (primary)"},
+        {"url": "https://nsearchives.nseindia.com/content/circulars/FAOP58267.pdf", "covers": "NSE F&O circular: ex-date 12 Sep 2023"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "HINDPETRO", "company": "Hindustan Petroleum Corporation Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 2},
+      "record_date": "2024-06-21", "ex_date": "2024-06-21", "allotment_date": "2024-06-25",
+      "sources": [
+        {"url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/3317540b-608e-47ac-8305-5c7b6694ffac.pdf", "covers": "Company allotment letter: bonus shares allotted 25 Jun 2024, record date 21 Jun 2024 (primary)"},
+        {"url": "https://nsearchives.nseindia.com/content/circulars/FAOP62411.pdf", "covers": "NSE F&O circular: ex-date 21 Jun 2024 (HPCL and BPCL)"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "BPCL", "company": "Bharat Petroleum Corporation Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 1},
+      "record_date": "2024-06-22", "ex_date": "2024-06-21", "allotment_date": "2024-06-24",
+      "sources": [
+        {"url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/534b1271-6a09-4a81-a0f3-f6fda98adfb2.pdf", "covers": "Company allotment letter, 24 Jun 2024: 1:1 bonus, record date 22 Jun 2024 (primary)"},
+        {"url": "https://nsearchives.nseindia.com/content/circulars/FAOP62411.pdf", "covers": "NSE F&O circular: ex-date 21 Jun 2024 (record date was a Saturday)"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "RELIANCE", "company": "Reliance Industries Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 1},
+      "record_date": "2024-10-28", "ex_date": "2024-10-28", "allotment_date": "2024-10-29",
+      "sources": [
+        {"url": "https://www.ril.com/sites/default/files/2024-10/SE_16102024.pdf", "covers": "RIL letter to the exchanges: 1:1 bonus, record date 28 Oct 2024 (primary)"},
+        {"url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/886692d7-f9f4-49a0-b3f5-a49beebe5c07.pdf", "covers": "RIL allotment letter, 29 Oct 2024: 676,61,86,449 bonus shares allotted (primary)"},
+        {"url": "https://nsearchives.nseindia.com/content/circulars/FAOP64621.pdf", "covers": "NSE F&O circular: ex-date 28 Oct 2024"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "WIPRO", "company": "Wipro Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 1},
+      "record_date": "2024-12-03", "ex_date": "2024-12-03", "allotment_date": "2024-12-04",
+      "allotment_note": "Date of the company's allotment letter, which says the shares have been allotted without naming a date.",
+      "sources": [
+        {"url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/ea940bdf-66e1-455f-8a1c-9166a1a25a69.pdf", "covers": "Wipro allotment letter, 4 Dec 2024: 1:1 bonus, record date 3 Dec 2024 (primary)"},
+        {"url": "https://nsearchives.nseindia.com/content/circulars/FAOP65261.pdf", "covers": "NSE F&O circular: ex-date 3 Dec 2024"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "NMDC", "company": "NMDC Limited",
+      "ratio": {"new_shares": 2, "per_held_shares": 1},
+      "record_date": "2024-12-27", "ex_date": "2024-12-27", "allotment_date": "2024-12-30",
+      "sources": [
+        {"url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/7b4fecc6-aeb7-4e1b-9887-167a39adbe9d.pdf", "covers": "NMDC letter, 17 Dec 2024: 2:1 bonus, record date 27 Dec 2024, deemed allotment 30 Dec 2024 (primary)"},
+        {"url": "https://nsearchives.nseindia.com/content/circulars/CML65714.pdf", "covers": "NSE listing circular confirming both dates"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "BSE", "company": "BSE Limited",
+      "ratio": {"new_shares": 2, "per_held_shares": 1},
+      "record_date": "2025-05-23", "ex_date": "2025-05-23", "allotment_date": "2025-05-26",
+      "sources": [
+        {"url": "https://nsearchives.nseindia.com/corporate/BSE1_26052025095238_NSEintimation.pdf", "covers": "BSE Ltd allotment letter: 27,07,52,718 bonus shares allotted 26 May 2025, record date 23 May 2025 (primary)"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "BAJFINANCE", "company": "Bajaj Finance Limited",
+      "ratio": {"new_shares": 4, "per_held_shares": 1},
+      "split_before_bonus": {"new_shares": 2, "per_old_shares": 1, "face_value": "₹2 to ₹1"},
+      "record_date": "2025-06-16", "ex_date": "2025-06-16", "allotment_date": "2025-06-17",
+      "sources": [
+        {"url": "https://nsearchives.nseindia.com/corporate/BAJFINANCE_17062025163606_SEIntimation_Bonus_Allotment_June2025.pdf", "covers": "Company allotment letter: 4:1 bonus allotted 17 Jun 2025 (deemed), record date 16 Jun 2025 (primary)"},
+        {"url": "https://www.msei.in/SX-Content/Circulars/2025/June/Circular-17322.pdf", "covers": "Exchange (MSEI) F&O circular: 1:2 split and 4:1 bonus both effective 16 Jun 2025, adjustment factor 10"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "ASHOKLEY", "company": "Ashok Leyland Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 1},
+      "record_date": "2025-07-16", "ex_date": "2025-07-16", "allotment_date": "2025-07-17",
+      "sources": [
+        {"url": "https://nsearchives.nseindia.com/corporate/ASHOKLEY_09072025110253_27_Bonus_Recorddate_intimation.pdf", "covers": "Company letter: 1:1 bonus, record date 16 Jul 2025, deemed allotment 17 Jul 2025 (primary)"},
+        {"url": "https://nsearchives.nseindia.com/content/circulars/CML69082.pdf", "covers": "NSE listing circular confirming both dates"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "NESTLEIND", "company": "Nestlé India Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 1},
+      "record_date": "2025-08-08", "ex_date": "2025-08-08", "allotment_date": "2025-08-11",
+      "sources": [
+        {"url": "https://bsmedia.business-standard.com/_media/bs/data/announcements/bse/29072025/0a3cd2b7-d5a3-4b49-97fa-a48313181d5f.pdf", "covers": "Company letter (copy of the BSE filing): 1:1 bonus, record date 8 Aug 2025, deemed allotment 11 Aug 2025 (primary)"},
+        {"url": "https://nsearchives.nseindia.com/corporate/NESTLEIND1_11082025094551_Allotmentofsecuritiessigned.pdf", "covers": "Company allotment letter, 11 Aug 2025 (primary)"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "HDFCBANK", "company": "HDFC Bank Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 1},
+      "record_date": "2025-08-27", "ex_date": "2025-08-26", "allotment_date": "2025-08-28",
+      "sources": [
+        {"url": "https://bsmedia.business-standard.com/_media/bs/data/announcements/bse/28082025/688adb17-d4a6-42cd-af46-d70c50a62d3f.pdf", "covers": "Bank's allotment letter (copy of the BSE filing): bonus shares allotted 28 Aug 2025, record date 27 Aug 2025 (primary)"},
+        {"url": "https://nsearchives.nseindia.com/content/circulars/FAOP69420.pdf", "covers": "NSE F&O circular: ex-date 26 Aug 2025 (27 Aug was a market holiday)"}
+      ],
+      "checked": "2026-11-18"
+    },
+    {
+      "symbol": "HDFCAMC", "company": "HDFC Asset Management Company Limited",
+      "ratio": {"new_shares": 1, "per_held_shares": 1},
+      "record_date": "2025-11-26", "allotment_date": null,
+      "allotment_note": "Allotment on 27 Nov 2025 is reported only by secondary sources; record date used.",
+      "sources": [
+        {"url": "https://files.hdfcfund.com/s3fs-public/2025-10/NSEBSE_53_0.pdf", "covers": "Company postal ballot notice: 1:1 bonus, record date 26 Nov 2025 (primary)"},
+        {"url": "https://filingreader.com/news-wire/mumbai/2025-11-27/hdfc-amc-completes-11-bonus-share-allotment", "covers": "Secondary report of the 27 Nov 2025 allotment"}
+      ],
+      "checked": "2026-11-18"
+    }
+  ]
+}

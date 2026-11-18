@@ -188,11 +188,13 @@ def public_replay(bundle, *, paths=10000, seed=19, sampling="independent", block
 
 
 def collect_daily(selected, *, fetcher=request, clock=instant):
-    indices={};errors={};session=None
+    indices={};errors={};session=None;last_seen=None
     for key in selected:
         try:
             h=collect_chart(INDEX_SYMBOLS[key],fetcher=fetcher,clock=clock)
             now=clock();period=h["regular_session"]
+            done=[instant(r["at"]).date() for r in h["bars"] if instant(r["at"]).date()<=now.date()]
+            if done:last_seen=max(last_seen or done[-1],done[-1])
             start=datetime.fromtimestamp(integer(period["start"]),IST);end=datetime.fromtimestamp(integer(period["end"]),IST)
             if start.date()!=now.date() or end.date()!=now.date() or start>=end:raise Block("CALENDAR: no provider session today")
             if now.weekday()>=5:raise Block("CALENDAR: special sessions need explicit calendar evidence")
@@ -206,12 +208,20 @@ def collect_daily(selected, *, fetcher=request, clock=instant):
             item={"index_id":key,"price_basis":"spot_index_points","source":"yahoo_public_chart","as_of":now.isoformat(),
                   "previous":{**{f:prev[f] for f in ("open","high","low","close")},"source":"yahoo_public_day","as_of":now.isoformat(),"session":day},
                   "history":{"source":"yahoo_public_day","as_of":now.isoformat(),"rows":[{"session":instant(b["at"]).date().isoformat(),"close":b["close"],"available_at":now.isoformat()} for b in previous]}}
+            today=[r for r in h["bars"] if instant(r["at"]).date()==now.date()]
+            if now>=end and today:
+                # Yahoo's daily bar for today carries the official closing value once the session has ended.
+                item["official_close"]={"value":today[-1]["close"],"session":now.date().isoformat(),"source":"yahoo_public_day","as_of":now.isoformat()}
             if now>=start:
                 intraday=collect_chart(INDEX_SYMBOLS[key],"5m",fetcher=fetcher,clock=clock)
                 item["candles"]={"source":"yahoo_public_5m","as_of":intraday["as_of"],"interval":"5minute","rows":[b for b in intraday["bars"] if start<=instant(b["at"])<end]}
             item["as_of"]=clock().isoformat();indices[key]=item
         except (Block,KeyError,TypeError,ValueError,OSError,OverflowError):errors[key]="Public index/session data unavailable or inconsistent; no synthetic substitute"
-    if session is None:raise Block("PUBLIC: no current provider session; use sourced input for closed/special sessions")
+    if session is None:
+        if last_seen:
+            raise Block(f"PUBLIC: no trading session today (weekend, holiday or before the provider's calendar updates). The last session was {last_seen.isoformat()}; "
+                        f"for its closing report run daily.py with --collect-close --session {last_seen.isoformat()}")
+        raise Block("PUBLIC: no current provider session; use sourced input for closed/special sessions")
     return {"session":session,"indices":indices,"context_errors":{"public_feed":WARNING,"calendar":"Session times and previous date are provider observations, not independently verified exchange-calendar clearance",**errors},"submitted":False}
 
 

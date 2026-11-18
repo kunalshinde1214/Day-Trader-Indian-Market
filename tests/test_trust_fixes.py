@@ -189,7 +189,7 @@ class CorporateActionTests(unittest.TestCase):
 
     def test_bonus_switch_changes_tax_lots_not_value(self):
         doc = holdings_doc([{"symbol": "HDFCBANK", "quantity": 25, "average_price": 1650, "bought": "2024-03-15"}])
-        split, bonus = run(doc), run(doc, bonus=["HDFCBANK"])
+        split, bonus = run(doc, splits=["HDFCBANK"]), run(doc, bonus=["HDFCBANK"])
         self.assertEqual(split["holdings"][0]["current_value"], bonus["holdings"][0]["current_value"])
         self.assertEqual(len(split["tax"]["open_lots"]), 1)
         self.assertEqual([l["buy_price"] for l in bonus["tax"]["open_lots"]], [1650.0, 0.0])

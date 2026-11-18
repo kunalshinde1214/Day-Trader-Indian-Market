@@ -7,7 +7,13 @@ description: Plan a paper trade in Indian markets — entry check (opening-range
 
 Read the [core skill](../../SKILL.md) first. Resolve scripts relative to `${CLAUDE_PLUGIN_ROOT}`. Run them with `python`; if that is not found use `python3` (macOS/Linux) or `py` (Windows). Keep user files outside the plugin folder, and pass the user's words as arguments, never as raw shell text.
 
-Steps run in this order and each writes a file the next one reads; any change to setup, interval, level or exit policy needs a new plan, replay and risk check ([commands](../../references/commands.md), [setups](../../references/setups.md)).
+## Quick answer: "how many shares?"
+
+For a sizing question, start here; it needs no broker setup: `python "${CLAUDE_PLUGIN_ROOT}/scripts/position_size.py" --entry PRICE --stop PRICE --risk RUPEES [--product MIS|CNC] [--capital RUPEES] [--lot N] [--target PRICE]`. It returns the quantity whose loss at the stop, including Indian charges, fits the risk budget, plus exposure, capital or intraday margin needed, the result at the target and the price that covers charges. Ask for the entry, stop and risk if missing, and for capital when the exposure could exceed it. Say that intraday margin is an assumption the broker decides.
+
+## Full paper pipeline
+
+Use the pipeline below only when the user wants the full workflow with replay and account-bound risk checks. Steps run in this order and each writes a file the next one reads; any change to setup, interval, level or exit policy needs a new plan, replay and risk check ([commands](../../references/commands.md), [setups](../../references/setups.md)).
 
 ## Entry
 

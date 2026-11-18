@@ -1,6 +1,6 @@
 ---
 name: market
-description: Indian market today — Nifty 50, Sensex and Bank Nifty levels, previous-day ranges, scenarios and closing context. Use for "how is the market today", "Nifty levels", "Bank Nifty today", "aaj market kaisa hai", or /india-daily, /nifty, /sensex, /banknifty.
+description: Indian market today — Nifty 50, Sensex and Bank Nifty levels, previous-day ranges, scenarios and closing context. Use for "how is the market today", "Nifty levels", "Bank Nifty today", "aaj market kaisa hai". The shortcut commands nifty, sensex, banknifty and india-daily open this skill.
 ---
 
 # market

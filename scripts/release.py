@@ -11,7 +11,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION="1.3.0"
+VERSION="1.4.0"
 ROOT_FILES={"SKILL.md","README.md","LICENSE","THIRD_PARTY_NOTICES.md","RISK_DISCLOSURE.md","SECURITY.md","CONTRIBUTING.md","CHANGELOG.md",".gitignore",".gitattributes","requirements-dev.txt","requirements-streaming.txt","requirements-streaming-sdk.txt"}
 DIR_TYPES={"scripts":{'.py'},"tests":{'.py','.json','.csv','.xml'},"references":{'.md'},"assets":{'.json','.svg'},"agents":{'.yaml'},"third-party":{'.LICENSE'},".github":{'.yml'},".claude-plugin":{'.json'},"skills":{'.md'}}
 DENY={"__pycache__","research","test-output","trader",".git",".env",".venv","node_modules"}
@@ -39,7 +39,7 @@ def static_checks(root=ROOT):
         raise ValueError("Plugin identity/version/skills mismatch")
     if marketplace.get("name")!="kunal-india-trading" or marketplace["plugins"][0].get("source")!="./" or marketplace["plugins"][0].get("name")!=plugin["name"]:
         raise ValueError("Marketplace identity/source mismatch")
-    expected={"stock","fno","screener","portfolio","market","news","trade-plan","broker"}
+    expected={"stock","fno","screener","portfolio","market","news","trade-plan","broker","nifty","sensex","banknifty","india-daily"}
     actual={p.parent.name for p in (root/"skills").glob("*/SKILL.md")}
     if actual!=expected:raise ValueError("Plugin command inventory mismatch")
     for name in expected:

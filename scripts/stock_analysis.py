@@ -6,18 +6,25 @@ price target. Every figure carries its source date so stale data stays visible.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+import http.client
 import json
 import math
 from pathlib import Path
 import re
 import statistics
 import sys
+import time
 import urllib.parse
 import urllib.request
 
 from core import Block, IST, instant
 from public_market import chart, request, symbol as check_symbol, NoRedirect, LIMIT, WARNING
+
+ASSETS = Path(__file__).resolve().parents[1] / "assets"
+ALIASES_PATH = ASSETS / "symbol_aliases.json"
+DEMERGERS_PATH = ASSETS / "demergers.json"
+STOPPED_DAYS = 14  # an aliased symbol whose last bar is older than this has stopped trading
 
 FUNDAMENTALS = ("annualTotalRevenue annualNetIncome annualDilutedEPS annualStockholdersEquity annualTotalDebt "
                 "annualOrdinarySharesNumber annualOperatingIncome annualEBITDA annualFreeCashFlow annualOperatingCashFlow "
@@ -37,6 +44,135 @@ def normalize(raw):
     if not text.endswith((".NS", ".BO")):
         text += ".NS"
     return check_symbol(text)
+
+
+# ---------- renamed symbols and demergers ----------
+
+class SymbolChanged(Block):
+    """The symbol no longer trades and was replaced by more than one company; the caller must choose."""
+
+    def __init__(self, entry):
+        self.old = entry["old"]
+        self.successors = [dict(s) for s in entry["successors"]]
+        self.entry = entry
+        choices = "; ".join(f"{s['symbol']}: {s['what']}" for s in self.successors)
+        super().__init__(f"STOCK: {self.old} no longer trades. {entry['reason']} It became {len(self.successors)} companies: {choices}. "
+                         f"Analyse one of them (for example {self.successors[0]['symbol']}) or each in turn. Source: {entry['source']}")
+
+
+def load_aliases(path=None):
+    try:
+        data = json.loads(Path(path or ALIASES_PATH).read_text(encoding="utf-8"))
+        return {e["old"].upper(): e for e in data.get("aliases", []) if e.get("old") and e.get("successors")}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}
+
+
+def alias_for(selected, aliases=None):
+    """The alias entry for an NSE symbol (RELIANCE.NS form), or None. BSE codes are not mapped."""
+    if not selected.endswith(".NS"):
+        return None
+    return (load_aliases() if aliases is None else aliases).get(selected[:-3])
+
+
+def renamed_note(entry, successor):
+    return (f"{entry['old']} no longer trades: {entry['reason']} Showing {successor['symbol']} ({successor['what']}). "
+            f"Source: {entry['source']}")
+
+
+def resolve_history(selected, *, fetcher, now, years, aliases=None):
+    """Daily history for `selected`; if that fails (or has stopped) and the symbol is a known old symbol, follow it.
+
+    Returns (symbol actually used, history, rename note or None). A symbol that became several companies raises
+    SymbolChanged so the caller can ask which one, or analyse each.
+    """
+    try:
+        history, failure = daily_history(selected, fetcher=fetcher, now=now, years=years), None
+    except (Block, ValueError, KeyError, TypeError) as error:
+        history, failure = None, error
+    entry = alias_for(selected, aliases)
+    stopped = history is not None and history["bars"][-1]["at"][:10] < (now.date() - timedelta(days=STOPPED_DAYS)).isoformat()
+    if not entry or (history is not None and not stopped):
+        if failure:
+            raise failure
+        return selected, history, None
+    if len(entry["successors"]) > 1:
+        raise SymbolChanged(entry)
+    successor = entry["successors"][0]
+    new = check_symbol(successor["symbol"] + ".NS")
+    try:
+        history = daily_history(new, fetcher=fetcher, now=now, years=years)
+    except (Block, ValueError, KeyError, TypeError):
+        raise Block(f"STOCK: {entry['old']} no longer trades ({entry['reason']}) and the history for its successor {successor['symbol']} "
+                    "did not load; try again later") from None
+    return new, history, renamed_note(entry, successor)
+
+
+def load_demergers(path=None):
+    try:
+        return json.loads(Path(path or DEMERGERS_PATH).read_text(encoding="utf-8")).get("demergers", [])
+    except (OSError, ValueError, AttributeError):
+        return []
+
+
+def trim_for_demerger(history, selected, demergers=None):
+    """Drop bars before the latest demerger record date of this company (as parent, under its current or former symbol).
+
+    Yahoo does not adjust a demerged parent's past prices, so its series jumps on the record date (seen: TMPV
+    ₹660.75 on 13 Oct 2025, ₹395.45 on 14 Oct). Returns a description of the cut, or None. Mutates `history`.
+    """
+    base = selected.rsplit(".", 1)[0]
+    bars = history["bars"]
+    first, last = bars[0]["at"][:10], bars[-1]["at"][:10]
+    events = [d for d in (load_demergers() if demergers is None else demergers)
+              if (d.get("parent") == base or base in (d.get("parent_aliases") or [])) and first < str(d.get("record_date")) <= last]
+    if not events:
+        return None
+    event = max(events, key=lambda d: d["record_date"])
+    keep = [b for b in bars if b["at"][:10] >= event["record_date"]]
+    before = [b for b in bars if b["at"][:10] < event["record_date"]]
+    move = keep[0]["close"] / before[-1]["close"] - 1 if keep and before else None
+    cut = {"record_date": event["record_date"], "first_session": keep[0]["at"][:10] if keep else None, "sessions": len(keep),
+           "dropped_sessions": len(before), "resulting_symbol": event.get("resulting_symbol"), "resulting_company": event.get("resulting_company"),
+           "day_move": move,
+           "note": (f"History starts {keep[0]['at'][:10] if keep else event['record_date']}, the first session on or after the "
+                    f"{event['record_date']} record date of the demerger of {event.get('resulting_company') or event.get('resulting_symbol')}"
+                    + (f"; the price moved {move * 100:+.1f}% that day because Yahoo does not adjust earlier prices" if move is not None else "")
+                    + ". Returns, averages, the 52-week range, the outlook and the P/E band use only sessions from then on.")}
+    history["bars"] = keep
+    history["demerger_cut"] = cut
+    return cut
+
+
+def unexplained_gaps(bars, split_dates=(), threshold=0.35):
+    """Single-session closes that fall by more than `threshold` with no split recorded that day: possible unadjusted actions."""
+    out = []
+    for a, b in zip(bars, bars[1:]):
+        day = b["at"][:10]
+        if b["close"] < a["close"] * (1 - threshold) and day not in split_dates:
+            out.append(f"Close fell {(b['close'] / a['close'] - 1) * 100:.0f}% on {day} with no split recorded; if that was a demerger, "
+                       "bonus or other corporate action, figures that span the date are not comparable.")
+    return out
+
+
+def retrying(fetcher, *, attempts=3, delays=(0.5, 1.5), sleep=time.sleep):
+    """Wrap a fetcher so transient failures (network errors, rate limits) are retried a bounded number of times."""
+    def fetch(url):
+        for attempt in range(attempts):
+            try:
+                return fetcher(url)
+            except (Block, OSError, http.client.HTTPException) as error:
+                # http.client errors (e.g. IncompleteRead on a cut-off reply) escape the public fetcher's own handling.
+                transient = not isinstance(error, Block) or "unavailable" in str(error)
+                if not transient:
+                    raise
+                if attempt == attempts - 1:
+                    if isinstance(error, Block):
+                        raise
+                    raise Block("PUBLIC: source unavailable (connection dropped)") from None
+                sleep(delays[min(attempt, len(delays) - 1)])
+    fetch.retrying = True
+    return fetch
 
 
 def daily_history(selected, *, fetcher, now, years=2):
@@ -172,6 +308,73 @@ def ret(closes, sessions):
     return closes[-1] / closes[-1 - sessions] - 1 if len(closes) > sessions else None
 
 
+YEAR_SESSIONS = 250
+
+
+def one_year_return(closes):
+    """The single 1-year return definition shared with the screener: last close vs the close 250 sessions earlier."""
+    return ret(closes, YEAR_SESSIONS)
+
+
+SPECIAL_MULTIPLE = 3  # a payment this many times the median of the other recent ones is flagged as a possible special
+
+
+def trailing_dividends(history, price, *, since=None):
+    """Trailing-12-month dividends per share from Yahoo's chart dividend events, divided by today's price.
+
+    Flags a payment as a possible special when, among the last two years' payments (at least four), it is more than
+    three times the median of the others, unless a payment of similar size (at least two-thirds) came about a year
+    earlier or later and the company pays fewer than about four times a year. Checked live on the Nifty 100 in Nov 2026:
+    twice the median flagged ordinary finals (TCS ₹30 against ₹11 interims); without the seasonal test, Asian Paints'
+    and GAIL's regular large final/interim were flagged; TCS's January interim-plus-special and ABB's ₹90 are flagged.
+    Nothing is flagged when the flagged payments would be over 80% of two years' dividends (MRF's annual final). Yahoo's amounts are already adjusted for later splits and bonuses (checked on
+    KOTAKBANK's 2026 split and TRENT's 2026 bonus), so they are on today's share count.
+    Returns None when the chart cannot establish it (no payments and less than a year of history).
+    """
+    bars = history["bars"]
+    last, first = date.fromisoformat(bars[-1]["at"][:10]), date.fromisoformat(bars[0]["at"][:10])
+    actions = history.get("corporate_actions") or {}
+    rows = []
+    for key, d in (actions.get("dividends") or {}).items():
+        amount, stamp = (d or {}).get("amount"), (d or {}).get("date", key)
+        try:
+            day = datetime.fromtimestamp(int(stamp), IST).date()
+        except (TypeError, ValueError, OverflowError, OSError):
+            continue
+        if isinstance(amount, (int, float)) and math.isfinite(amount) and amount > 0 and day <= last and (not since or day.isoformat() >= since):
+            rows.append((day, float(amount)))
+    rows.sort()
+    ttm = [r for r in rows if r[0] > last - timedelta(days=365)]
+    if not ttm and (last - first).days < 360:
+        return None
+    recent = [r for r in rows if r[0] > last - timedelta(days=730)]
+    specials = []
+    quarterly = len(recent) >= 7
+    for i, (day, amount) in enumerate(recent):
+        others = [a for j, (_, a) in enumerate(recent) if j != i]
+        if len(others) < 3 or amount <= SPECIAL_MULTIPLE * statistics.median(others):
+            continue
+        # A large payment that recurs in the same season (a big final or interim each year) is regular, except for
+        # quarterly payers, whose regular payments are similar in size (TCS's January interim-plus-special recurs too).
+        seasonal = any(300 <= abs((d - day).days) <= 430 and a * 1.5 >= amount for d, a in recent)
+        if quarterly or not seasonal:
+            specials.append((day, amount))
+    if specials and sum(a for _, a in specials) > 0.8 * sum(a for _, a in recent):
+        specials = []  # the "regular" stream would be implausibly small (MRF: ₹3 interims, ₹229 final every July)
+    dps = sum(a for _, a in ttm)
+    special_ttm = [s for s in specials if s in ttm]
+    flags = []
+    if special_ttm:
+        flags.append("Possible special dividend in the last 12 months: " + ", ".join(f"₹{a:,.2f} on {d.isoformat()}" for d, a in special_ttm)
+                     + f"; without it the trailing yield would be about {(dps - sum(a for _, a in special_ttm)) / price * 100:.1f}%.")
+    return {"dividend_yield": dps / price if price else None, "dps_ttm": dps,
+            "recurring_yield": (dps - sum(a for _, a in special_ttm)) / price if price else None,
+            "payments": [{"date": d.isoformat(), "amount": a} for d, a in ttm],
+            "specials": [{"date": d.isoformat(), "amount": a} for d, a in special_ttm], "flags": flags,
+            "basis": "dividends per share with an ex-date in the last 12 months ÷ today's price (Yahoo chart dividend events)"
+                     + (f"; only dividends from {since} on" if since else "")}
+
+
 def pct(value, digits=1, sign=True):
     return "n/a" if value is None else f"{value * 100:{'+' if sign else ''}.{digits}f}%"
 
@@ -221,7 +424,7 @@ def technicals(history, benchmark):
     return {
         "last_close": last, "last_close_date": bars[-1]["at"][:10], "previous_close": closes[-2],
         "day_change": last / closes[-2] - 1,
-        "returns": {k: ret(closes, n) for k, n in (("1W", 5), ("1M", 21), ("3M", 63), ("6M", 126), ("1Y", 250))},
+        "returns": {**{k: ret(closes, n) for k, n in (("1W", 5), ("1M", 21), ("3M", 63), ("6M", 126))}, "1Y": one_year_return(closes)},
         "high_52w": hi52, "low_52w": lo52, "from_high": last / hi52 - 1, "from_low": last / lo52 - 1,
         "sma20": s20, "sma50": s50, "sma200": s200, "rsi14": r,
         "rsi_reading": None if r is None else "overbought (>70)" if r > 70 else "oversold (<30)" if r < 30 else "neutral",
@@ -230,6 +433,7 @@ def technicals(history, benchmark):
         "support": min(b["low"] for b in bars[-20:]), "resistance": max(b["high"] for b in bars[-20:]),
         "support_60d": min(b["low"] for b in bars[-60:]), "resistance_60d": max(b["high"] for b in bars[-60:]),
         "relative": relative, "signals": signals, "trend": trend, "trend_score": score, "closes": closes,
+        "close_dates": [b["at"][:10] for b in bars], "history_start": bars[0]["at"][:10], "history_sessions": len(bars),
     }
 
 
@@ -275,6 +479,20 @@ def check_eps(eps, quarterly, price):
         odd = max(four, key=lambda r: abs(r["value"] - typical / 4))
         flags.append(f"One unusual quarter ({odd['date']}, EPS {odd['value']:,.2f}) distorts trailing earnings; "
                      f"on four typical quarters (EPS about {typical:,.2f}) the P/E would be about {price / typical:,.1f}.")
+    elif eps["date"] == four[-1]["date"]:
+        # Smaller distortion: one clearly depressed quarter while the other three agree with each other.
+        # Seasonal businesses (hydro power, air conditioners) have a weak quarter every year, which a trailing figure
+        # rightly includes, so the same quarter a year earlier must be in the data and must not have been weak.
+        weak = min(four, key=lambda r: r["value"])
+        rest = [r["value"] for r in four if r is not weak]
+        weak_day = datetime.fromisoformat(weak["date"]).date()
+        year_ago = [r["value"] for r in quarterly if 345 <= (weak_day - datetime.fromisoformat(r["date"]).date()).days <= 385]
+        if (min(rest) > 0 and max(rest) <= 1.6 * min(rest) and weak["value"] < 0.4 * statistics.median(rest)
+                and year_ago and year_ago[-1] >= 0.6 * statistics.median(rest)):
+            annual = sum(rest) * 4 / 3
+            flags.append(f"Trailing EPS includes a weak quarter ({weak['date']}, EPS {weak['value']:,.2f} against about "
+                         f"{statistics.median(rest):,.2f} in each of the other three); on those three annualised (EPS about {annual:,.2f}) "
+                         f"the P/E would be about {price / annual:,.1f}.")
     return eps, flags
 
 
@@ -311,7 +529,10 @@ def ratios(series, price, now, splits=None):
     fcf = value(series, "annualFreeCashFlow")
     out["fcf_yield"] = fcf / market_cap if fcf is not None and market_cap else None
     dividends = value(series, "annualCashDividendsPaid")
-    out["dividend_yield"] = abs(dividends) / market_cap if dividends is not None and market_cap else None
+    # Last financial year's cash dividends paid ÷ today's market cap. Includes special dividends and can lag a year,
+    # so the headline dividend_yield (trailing dividends per share ÷ price) is filled from the chart by the caller.
+    out["cash_dividend_yield"] = abs(dividends) / market_cap if dividends is not None and market_cap else None
+    out["dividend_yield"] = None
     rev_rows = series.get("annualTotalRevenue", [])
     out["revenue_growth"] = rev_rows[-1]["value"] / rev_rows[-2]["value"] - 1 if len(rev_rows) >= 2 and rev_rows[-2]["value"] > 0 else None
     eps_rows = series.get("annualDilutedEPS", [])
@@ -335,7 +556,20 @@ def ratios(series, price, now, splits=None):
     return out
 
 
-def outlook(tech):
+def levels(start, candidates, *, above):
+    """Reference levels beyond `start`, nearest first (ascending above the price, descending below), near-duplicates merged."""
+    keep = sorted(((v, k) for k, v in candidates if v and (v > start * 1.005 if above else v < start * 0.995)),
+                  key=lambda vk: vk[0] if above else -vk[0])
+    merged = []
+    for v, k in keep:
+        if merged and abs(v / merged[-1][0] - 1) <= 0.005:
+            merged[-1] = (merged[-1][0], merged[-1][1] + " and " + k)
+        else:
+            merged.append((v, k))
+    return merged
+
+
+def outlook(tech, cut=None):
     """Empirical forward-return ranges from this stock's own history, plus conditional levels."""
     closes = tech["closes"][-505:]
     price = closes[-1]
@@ -348,17 +582,25 @@ def outlook(tech):
             return moves[min(len(moves) - 1, int(p * len(moves)))]
         ranges[label] = {"low_10": price * (1 + q(0.10)), "median": price * (1 + q(0.5)), "high_90": price * (1 + q(0.90)),
                          "share_positive": sum(m > 0 for m in moves) / len(moves), "samples": len(moves)}
+    up = levels(tech["resistance"], (("60-day high", tech["resistance_60d"]), ("52-week high", tech["high_52w"])), above=True)
+    down = levels(tech["support"], (("60-day low", tech["support_60d"]), ("200-day average", tech["sma200"])), above=False)
+    years = len(closes) / YEAR_SESSIONS
     return {
         "bias": tech["trend"],
         "ranges": ranges,
+        "history_years": round(years, 1), "history_sessions": len(closes),
         "bull_case": f"A daily close above ₹{num(tech['resistance'])} (20-day high) would extend the move"
-                     + "".join(f"; next reference ₹{num(v)} ({k})" for k, v in (("60-day high", tech["resistance_60d"]), ("52-week high", tech["high_52w"])) if v > tech["resistance"] * 1.005) + ".",
+                     + "".join(f"; next reference ₹{num(v)} ({k})" for v, k in up) + ".",
         "bear_case": f"A daily close below ₹{num(tech['support'])} (20-day low) would weaken the picture"
-                     + "".join(f"; next reference ₹{num(v)} ({k})" for k, v in (("60-day low", tech["support_60d"]), ("200-day average", tech["sma200"])) if v and v < tech["support"] * 0.995) + ".",
+                     + "".join(f"; next reference ₹{num(v)} ({k})" for v, k in down) + ".",
+        "bull_levels": [v for v, _ in up], "bear_levels": [v for v, _ in down],
         "momentum_note": None if tech["rsi14"] is None else
             "RSI is above 70: the recent rise is stretched and short pullbacks are common from here." if tech["rsi14"] > 70 else
             "RSI is below 30: the recent fall is stretched and short rebounds are common from here." if tech["rsi14"] < 30 else None,
-        "method": "Ranges are the 10th, 50th and 90th percentiles of this stock's own overlapping past returns over ~2 years, applied to today's price. Past behaviour can change; earnings, news and market shocks can break any range.",
+        "method": f"Ranges are the 10th, 50th and 90th percentiles of this stock's own overlapping past returns over the last {years:.1f} years "
+                  f"({len(closes)} sessions from {tech['close_dates'][-len(closes)]}), applied to today's price"
+                  + (f"; history starts {cut['first_session']}, after the demerger (record date {cut['record_date']})" if cut else "")
+                  + ". Past behaviour can change; earnings, news and market shocks can break any range.",
     }
 
 
@@ -427,8 +669,9 @@ def peer_comparison(selected, own, *, fetcher, now, show=6, chosen=None):
             return snapshot(member["symbol"], fetcher=fetcher, now=now)
         except (Block, ValueError, KeyError, TypeError, OSError):
             return None
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        rows = [r for r in pool.map(one, group["peers"]) if r]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        loaded = list(pool.map(one, group["peers"]))
+    rows = [r for r in loaded if r and r["symbol"] != selected]
     everyone = rows + [own]
     medians = {}
     for field in PEER_FIELDS:
@@ -440,17 +683,53 @@ def peer_comparison(selected, own, *, fetcher, now, show=6, chosen=None):
     mismatch = bool(caps and own.get("market_cap_cr") and own["market_cap_cr"] > 3 * max(caps))
     return {"basis": group["basis"], "kind": group["kind"], "group_size": group.get("group_size"), "evaluated": len(everyone),
             "capped": group.get("capped", False), "truncated": len(ranked) > show, "rows": ranked[:show], "own": own, "medians": medians,
-            "size_mismatch": mismatch, "failed": [m["symbol"] for m in group["peers"] if m["symbol"] + ".NS" not in {r["symbol"] for r in rows}]}
+            "size_mismatch": mismatch, "failed": [m["symbol"] for m, r in zip(group["peers"], loaded) if not r],
+            "renamed": [r["renamed_note"] for r in rows if r.get("renamed_note")]}
+
+
+def prepare_history(selected, *, fetcher, now, years):
+    """History for analysis: follows a known old symbol, then drops sessions before a demerger of this company.
+
+    Returns (symbol used, history, notes) with notes {"renamed", "demerger", "gaps"}.
+    """
+    used, history, renamed = resolve_history(selected, fetcher=fetcher, now=now, years=years)
+    cut = trim_for_demerger(history, used)
+    if cut and cut["sessions"] < 60:
+        raise Block(f"STOCK: only {cut['sessions']} sessions since the {cut['record_date']} demerger of "
+                    f"{cut.get('resulting_company') or cut.get('resulting_symbol')}; earlier prices include the demerged business, "
+                    "so there is too little comparable history for this analysis yet")
+    split_days = {datetime.fromtimestamp(int(s.get("date", k)), IST).date().isoformat()
+                  for k, s in ((history.get("corporate_actions") or {}).get("splits") or {}).items() if isinstance(s, dict)}
+    gaps = unexplained_gaps(history["bars"], split_days)
+    return used, history, {"renamed": renamed, "demerger": cut, "gaps": gaps}
+
+
+def apply_dividends(fund, history, price, since=None):
+    """Fill the headline dividend yield from the chart's dividend events (None when they cannot establish it)."""
+    info = trailing_dividends(history, price, since=since)
+    fund["dividend"] = info
+    fund["dividend_yield"] = info["dividend_yield"] if info else None
+    return fund
+
+
+NO_HISTORY = ("STOCK: no price history for {}. Check the NSE symbol (for example RELIANCE, INFY, HDFCBANK), "
+              "or the BSE ticker with .BO (for example RELIANCE.BO); the public feed may also be temporarily unavailable")
 
 
 def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=instant, news_hours=168, peers=True, peer_symbols=None):
-    selected = normalize(raw_symbol)
+    requested = normalize(raw_symbol)
     now = clock()
+    if fetcher is request:
+        fetcher = retrying(request)
     try:
-        history = daily_history(selected, fetcher=fetcher, now=now, years=5)
-    except (Block, ValueError, KeyError, TypeError):
-        raise Block(f"STOCK: no price history for {selected}. Check the NSE symbol (for example RELIANCE, TATAMOTORS, HDFCBANK), "
-                    "or the BSE ticker with .BO (for example RELIANCE.BO); the public feed may also be temporarily unavailable") from None
+        selected, history, notes = prepare_history(requested, fetcher=fetcher, now=now, years=5)
+    except Block as error:
+        if isinstance(error, SymbolChanged) or str(error).startswith("STOCK:"):
+            raise
+        raise Block(NO_HISTORY.format(requested)) from None
+    except (ValueError, KeyError, TypeError):
+        raise Block(NO_HISTORY.format(requested)) from None
+    cut = notes["demerger"]
     errors = {}
     if history.get("price_note"):
         errors["price"] = history["price_note"]
@@ -471,10 +750,18 @@ def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=ins
             raise Block("STOCK: no financial statements returned")
         splits = sorted(datetime.fromtimestamp(int(s["date"]), IST).date().isoformat() for s in (history.get("corporate_actions") or {}).get("splits", {}).values())
         fund = ratios(series, tech["last_close"], now, splits)
+        apply_dividends(fund, history, tech["last_close"], since=cut["record_date"] if cut else None)
         from screener import pe_band
         fund["currency_note"] = series.get("_currency", {}).get("note")
+        if cut:
+            if fund.get("eps") and fund["eps"]["date"] < cut["record_date"]:
+                fund["eps_flags"].append(f"The EPS used for P/E (dated {fund['eps']['date']}) predates the {cut['record_date']} demerger and "
+                                         "includes the demerged business, so the P/E is not like-for-like.")
+            fund["demerger_note"] = (f"Financial statements before {cut['record_date']} include the demerged business "
+                                     f"({cut.get('resulting_company') or cut.get('resulting_symbol')}); year-on-year growth across that date is not like-for-like.")
         # Today's FX rate would distort past P/E, so the history band is shown only for rupee-reported financials.
-        fund["pe_band"] = None if "_currency" in series else pe_band(history["bars"], series.get("annualDilutedEPS", []))
+        fund["pe_band"] = None if "_currency" in series else pe_band(history["bars"], series.get("annualDilutedEPS", []),
+                                                                     since=cut["record_date"] if cut else None)
     except (Block, ValueError, KeyError, TypeError):
         fund = None
         errors["fundamentals"] = "Financial statements unavailable from the public feed; ratios omitted"
@@ -490,12 +777,13 @@ def analyse(raw_symbol, *, fetcher=request, news_fetcher=news_request, clock=ins
         except (Block, ValueError, KeyError, TypeError, OSError):
             errors["peers"] = "Peer comparison unavailable"
     headlines = gather_news(selected, history["name"], now, fetcher=fetcher, news_fetcher=news_fetcher, hours=news_hours)
-    return {"schema": "stock_analysis_v1", "symbol": selected, "name": history["name"], "as_of": now.isoformat(),
+    return {"schema": "stock_analysis_v1", "symbol": selected, "requested_symbol": requested, "name": history["name"], "as_of": now.isoformat(),
+            "renamed_note": notes["renamed"], "history_note": cut["note"] if cut else None, "demerger": cut, "history_warnings": notes["gaps"],
             "price_note": history.get("price_note"), "session_open": session_open(now), "price_source": "Yahoo Finance daily chart (may be delayed ~15 min)",
             "fundamentals_source": "Yahoo Finance fundamentals timeseries (company filings as reported)",
-            "technical": {k: v for k, v in tech.items() if k != "closes"}, "fundamentals": fund, "peers": comparison, "news": headlines,
+            "technical": {k: v for k, v in tech.items() if k not in ("closes", "close_dates")}, "fundamentals": fund, "peers": comparison, "news": headlines,
             "_bars": history["bars"],
-            "outlook": outlook(tech), "errors": errors, "warning": WARNING, "disclaimer": DISCLAIMER,
+            "outlook": outlook(tech, cut), "errors": errors, "warning": WARNING, "disclaimer": DISCLAIMER,
             "execution_eligible": False, "submitted": False}
 
 
@@ -505,12 +793,16 @@ def markdown(r):
     lines = [f"# {r['name']} ({name}) — stock analysis", "", f"As of {r['as_of'][:16].replace('T', ' ')} IST · prices as of {t['last_close_date']}"
              + (" (today's session is still trading; the latest price will change)" if r.get("session_open") and t["last_close_date"] == r["as_of"][:10] else ""), "",
              *([f"> ⚠ {r['price_note']}", ""] if r.get("price_note") else []),
+             *([f"> ⚠ {r['renamed_note']}", ""] if r.get("renamed_note") else []),
+             *([f"> ⚠ {r['history_note']}", ""] if r.get("history_note") else []),
+             *[x for w in r.get("history_warnings") or [] for x in (f"> ⚠ {w}", "")],
              f"> {r['disclaimer']}", "", "## Snapshot", "",
              f"**₹{num(t['last_close'])}** ({pct(t['day_change'], 2)} vs previous close ₹{num(t['previous_close'])})", "",
              "| Period | Stock | Nifty 50 | Difference |", "| --- | ---: | ---: | ---: |"]
     for label, row in t["relative"].items():
         lines.append(f"| {label} | {pct(row['stock'])} | {pct(row['nifty'])} | {pct(row['difference'])} |")
-    lines += ["", f"52-week range ₹{num(t['low_52w'])} – ₹{num(t['high_52w'])}; price is {pct(t['from_high'])} from the high and {pct(t['from_low'])} from the low.", "",
+    span = "52-week range" if t.get("history_sessions", 250) >= 250 else f"Range since {t['history_start']}"
+    lines += ["", f"{span} ₹{num(t['low_52w'])} – ₹{num(t['high_52w'])}; price is {pct(t['from_high'])} from the high and {pct(t['from_low'])} from the low.", "",
               "## Technical condition", "", f"**Trend: {t['trend']}** (score {t['trend_score']:+d})", ""]
     lines += [f"- {'▲' if k == 'bull' else '▼'} {text}" for k, text in t["signals"]]
     lines += ["", "| Indicator | Value |", "| --- | ---: |",
@@ -527,16 +819,21 @@ def markdown(r):
         lines += [f"Latest annual statements: {f['financials_as_of'] or 'n/a'}" + (f"; EPS ({eps['basis']}) dated {eps['date']}" if eps else "") + ("  ⚠ EPS may be out of date" if f["eps_stale"] else ""), "",
                   "| Ratio | Value |", "| --- | ---: |",
                   f"| Market cap | {crore(f['market_cap'])} |",
-                  f"| P/E | {num(f['pe'], 1)} |", f"| P/B | {num(f['pb'], 2)} |",
+                  f"| P/E ({eps['basis'] if eps else 'n/a'}) | {num(f['pe'], 1)} |", f"| P/B | {num(f['pb'], 2)} |",
                   f"| ROE | {pct(f['roe'], sign=False)} |", f"| Net margin | {pct(f['net_margin'], sign=False)} |", f"| Operating margin | {pct(f['operating_margin'], sign=False)} |",
                   f"| Debt / equity | {num(f['debt_to_equity'], 2)} |", f"| Current ratio | {num(f['current_ratio'], 2)} |",
                   f"| Interest cover | {num(f['interest_cover'], 1)}× |" if f["interest_cover"] else "| Interest cover | n/a |",
-                  f"| Free-cash-flow yield | {pct(f['fcf_yield'], sign=False)} |", f"| Dividend yield | {pct(f['dividend_yield'], sign=False)} |",
+                  f"| Free-cash-flow yield | {pct(f['fcf_yield'], sign=False)} |", f"| Dividend yield (trailing 12 months per share ÷ price) | {pct(f['dividend_yield'], sign=False)} |",
+                  f"| Cash dividends paid (last FY) / market cap | {pct(f.get('cash_dividend_yield'), sign=False)} |",
                   f"| Revenue growth (last year) | {pct(f['revenue_growth'])} |", f"| Revenue CAGR (3 years) | {pct(f['revenue_cagr_3y'])} |",
                   f"| EPS growth (last year) | {pct(f['eps_growth'])} |",
                   f"| Latest quarter profit vs previous quarter | {pct(f['quarter_profit_change'])}" + (f" ({f['latest_quarter']['date']}{' ⚠ stale' if f['quarter_stale'] else ''})" if f["latest_quarter"] else "") + " |", ""]
         for flag in f.get("eps_flags") or []:
             lines += [f"⚠ {flag}", ""]
+        for flag in (f.get("dividend") or {}).get("flags") or []:
+            lines += [f"⚠ {flag}", ""]
+        if f.get("demerger_note"):
+            lines += [f"⚠ {f['demerger_note']}", ""]
         if f.get("currency_note"):
             lines += [f"⚠ {f['currency_note']}", ""]
         if f["split_after_statements"]:
@@ -547,11 +844,14 @@ def markdown(r):
                       "(seen: HDFC Bank, Yahoo about ₹8.2 lakh crore against about ₹5.5 lakh crore reported). Check the bank's reported return on net worth before relying on either.", ""]
         band = f.get("pe_band")
         if band:
-            where = "below its usual range" if band["percentile"] < 0.25 else "above its usual range" if band["percentile"] > 0.75 else "within its usual range"
+            where = "below its usual range" if band["current"] < band["p25"] else "above its usual range" if band["current"] > band["p75"] else "within its usual range"
             lines += ["### Valuation history", "",
-                      f"P/E over the last {band['years']} years: low {num(band['min'], 1)}, typical {num(band['p25'], 1)}–{num(band['p75'], 1)} "
-                      f"(median {num(band['median'], 1)}), high {num(band['max'], 1)}. Today {num(band['current'], 1)}, "
-                      f"higher than {band['percentile'] * 100:.0f}% of past sessions — {where}.", "",
+                      f"P/E on latest annual EPS over the last {band['years']} years ({band['sessions']} sessions from {band['start']}): "
+                      f"low {num(band['min'], 1)}, typical {num(band['p25'], 1)}–{num(band['p75'], 1)} "
+                      f"(median {num(band['median'], 1)}), high {num(band['max'], 1)}. Today {num(band['current'], 1)} on the same basis, "
+                      f"higher than {band['percentile'] * 100:.0f}% of past sessions — {where}."
+                      + (f" (The P/E of {num(f['pe'], 1)} in the table uses {eps['basis']} EPS, so it is not compared with this range.)"
+                         if f.get("pe") and eps and eps["basis"] != "last financial year" else ""), "",
                       f"Basis: {band['basis']}. A low P/E versus history can reflect lower expected growth, not only cheapness.", ""]
     else:
         lines += [r["errors"].get("fundamentals", "Unavailable"), ""]
@@ -570,6 +870,7 @@ def markdown(r):
                   f"| **{r['name']}** | " + " | ".join(f"**{show(k, c['own'].get(k))}**" for k, _ in cols) + " |"]
         for row in c["rows"]:
             lines.append(f"| {row['name']} | " + " | ".join(show(k, row.get(k)) for k, _ in cols) + " |")
+        lines += [f"⚠ {n}" for n in c.get("renamed") or []]
         lines += ["| Group median | " + " | ".join(show(k, c["medians"].get(k)) for k, _ in cols) + " |", ""]
         if c.get("kind") != "chosen":
             lines += ["These peers come from NSE index membership, not business similarity. For a fairer comparison, rerun with `--peers` and companies in the same businesses.", ""]
@@ -606,15 +907,26 @@ def summary(r):
     lines = [f"{r['name']} ({r['symbol']}) — prices as of {t['last_close_date']}"]
     if r.get("price_note"):
         lines.append(f"⚠ {r['price_note']}")
+    if r.get("renamed_note"):
+        lines.append(f"⚠ {r['renamed_note']}")
+    if r.get("history_note"):
+        lines.append(f"⚠ {r['history_note']}")
     lines.append(f"Price ₹{num(t['last_close'])} ({pct(t['day_change'], 2)} on the day); 1 year {pct(t['returns']['1Y'])} vs Nifty "
                  f"{pct(t['relative']['1Y']['nifty'])}; {pct(t['from_high'])} from the 52-week high.")
     lines.append(f"Trend: {t['trend']}; RSI {num(t['rsi14'], 0)} ({t['rsi_reading'] or 'n/a'}).")
     if f:
         band = f.get("pe_band")
-        valuation = f"P/E {num(f['pe'], 1)}" + (f" (usual range {num(band['p25'], 1)}–{num(band['p75'], 1)}, today higher than {band['percentile'] * 100:.0f}% of the last {band['years']} years)" if band else "")
-        lines.append(f"Valuation: {valuation}; P/B {num(f['pb'], 2)}; ROE {pct(f['roe'], sign=False)}; debt/equity {num(f['debt_to_equity'], 2)}.")
+        eps = f.get("eps")
+        valuation = f"P/E {num(f['pe'], 1)}" + (f" ({eps['basis']})" if eps else "")
+        if band:
+            valuation += (f"; on latest annual EPS {num(band['current'], 1)} vs its usual {num(band['p25'], 1)}–{num(band['p75'], 1)} "
+                          f"(higher than {band['percentile'] * 100:.0f}% of sessions over the last {band['years']} years)")
+        lines.append(f"Valuation: {valuation}; P/B {num(f['pb'], 2)}; ROE {pct(f['roe'], sign=False)}; debt/equity {num(f['debt_to_equity'], 2)}; "
+                     f"dividend yield {pct(f.get('dividend_yield'), sign=False)} (trailing 12 months).")
         lines.append(f"Growth: revenue {pct(f['revenue_growth'])} last year, EPS {pct(f['eps_growth'])}; latest quarter profit {pct(f['quarter_profit_change'])} vs previous quarter.")
-        lines += [f"⚠ {x}" for x in (f.get("eps_flags") or [])]
+        lines += [f"⚠ {x}" for x in (f.get("eps_flags") or []) + ((f.get("dividend") or {}).get("flags") or [])]
+        if f.get("demerger_note"):
+            lines.append(f"⚠ {f['demerger_note']}")
         if f.get("currency_note"):
             lines.append(f"⚠ {f['currency_note']}")
     if c and c.get("rows"):
@@ -695,6 +1007,15 @@ def main(argv=None):
             Path(a.chart).parent.mkdir(parents=True, exist_ok=True)
             Path(a.chart).write_text(svg_price_chart(report), encoding="utf-8")
             report["chart"] = a.chart
+    except SymbolChanged as error:
+        print(f"BLOCKED - {error}", file=sys.stderr)
+        if a.format == "json":
+            if hasattr(sys.stdout, "reconfigure"):
+                sys.stdout.reconfigure(encoding="utf-8")
+            print(json.dumps({"schema": "stock_analysis_v1", "status": "SYMBOL_CHANGED", "symbol": error.old, "kind": error.entry.get("kind"),
+                              "date": error.entry.get("date"), "reason": error.entry["reason"], "successors": error.successors,
+                              "source": error.entry["source"], "execution_eligible": False, "submitted": False}, indent=2, ensure_ascii=False))
+        return 2
     except Block as error:
         print(f"BLOCKED - {error}", file=sys.stderr)
         return 2

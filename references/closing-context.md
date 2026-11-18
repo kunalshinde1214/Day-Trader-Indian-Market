@@ -20,7 +20,9 @@ Choose the actual report date. The date is never guessed from weekdays or silent
 | FII/FPI and DII | NSE's public institutional-flow endpoint. Both categories must have one date and consistent buy/sell/net arithmetic. Source units are crore rupees, with a separate INR conversion. |
 | GIFT Nifty | The separately timestamped NIFTY futures observation in NSE's market-status response. It retains expiry, timestamp, age and a stale marker. It is never substituted for the domestic spot index or a broker contract. |
 
-The new source does not supply Sensex. Combined reports explicitly mark it unavailable; requesting only Sensex through this route returns a nonzero status. Use the existing public/Kite/sourced-input Sensex routes where their own evidence is available. No Nifty value is relabelled as Sensex.
+The new source does not supply Sensex, which is a BSE index; there is no official BSE closing source in this skill. Combined reports mark Sensex unavailable and say why. `daily.py sensex --collect-close` (or `closing_context.py --indices sensex`) makes no NSE request and prints a plain explanation pointing to `python scripts/daily.py sensex --collect-public`, which reports Sensex from Yahoo public data (labelled as such); it still exits with status 2 because no Sensex close was observed. No Nifty value is relabelled as Sensex.
+
+The markdown report leads with a dated table (close, change in points and percent, day range), followed by NSE EQ breadth, FII/DII net values and the GIFT Nifty observation, each with its own date, and one **Data notes** section with sources and remaining gaps. `--brief` prints a short version of about six to eight lines. Output is UTF-8 (the rupee sign prints on a Windows console).
 
 For constituent breadth, supply the [historical membership workflow's](historical-evidence.md) generated exact-date JSON with `--membership`. Missing symbols remain visible. Content hashes detect changed inputs, but source authentication and membership verification remain false. Broader EQ breadth does not become constituent breadth without this input.
 

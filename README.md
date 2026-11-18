@@ -77,7 +77,7 @@ Requires **Claude Code**, **Git** and **Python 3.10+** installed. For a first-ti
 claude plugin marketplace add kunalshinde1214/Day-Trader-Indian-Market && claude plugin install india-day-trader@kunal-india-trading
 ```
 
-This registers the marketplace and installs all 8 plugin skills for your user account. The install step runs only if marketplace registration succeeds. Open a new Claude Code session after installation. It does not configure brokerage credentials or enable live trading.
+This registers the marketplace and installs all 12 plugin skills for your user account. The install step runs only if marketplace registration succeeds. Open a new Claude Code session after installation. It does not configure brokerage credentials or enable live trading.
 
 <details>
 <summary>Windows PowerShell 5.1, or marketplace already added?</summary>
@@ -102,12 +102,13 @@ Alternatively, inside an existing Claude Code session, run these two commands se
 Then ask naturally, or use a namespaced command:
 
 ```text
+/india-day-trader:nifty
+/india-day-trader:india-daily
 /india-day-trader:stock RELIANCE
 /india-day-trader:fno NIFTY
-/india-day-trader:market
 ```
 
-There are **8 plugin skills**: `stock`, `fno`, `screener`, `portfolio`, `market`, `news`, `trade-plan` and `broker`. Most people never type them; just ask in plain English, Hindi or Hinglish. See the [command reference](references/commands.md). For other skill-compatible hosts, download the release ZIP, unpack `india-day-trader`, and follow that host’s skill installation process. Claude plugin installation is not a universal installer for other hosts.
+There are **12 plugin skills**: the daily commands `nifty`, `sensex`, `banknifty` and `india-daily`, plus `stock`, `fno`, `screener`, `portfolio`, `market`, `news`, `trade-plan` and `broker`. In Claude Code they are typed with the plugin prefix, for example `/india-day-trader:nifty`; you can also just ask in plain English, Hindi or Hinglish ("Nifty aaj kaisa hai"). See the [command reference](references/commands.md). For other skill-compatible hosts, download the release ZIP, unpack `india-day-trader`, and follow that host’s skill installation process. Claude plugin installation is not a universal installer for other hosts.
 
 ### Python CLI
 
