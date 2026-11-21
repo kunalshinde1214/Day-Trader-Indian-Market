@@ -11,6 +11,23 @@ Run the relevant script first. Search the web when:
 - the user asks about something no script collects: BSE announcements and results, management commentary, concall notes, order wins, block deals reported in the press, sector peers, brokerage views, RBI/SEBI/budget/macro events, global cues, IPOs, or anything that happened in the last few hours;
 - the user asks "why" a stock or index moved.
 
+## Same-day market news: put the full date in the query
+
+Generic searches such as "stock market today" or "why is Nifty falling" often return the same calendar date from
+earlier years (an 18 November 2025 or 2024 story for an 18 November 2026 question). Put the full date with the year in
+the query, for example `stock market today 18 November 2026` or `Sensex Nifty 18 November 2026 why falling`, check each
+article's own publication date before using it, and drop anything not from today. If the search returns nothing dated
+today, fall back to the daily script's "Possible reasons (headlines, unverified)" and "Cues" lines, which are dated and
+filtered to today's movers, and say that the web search found nothing newer.
+
+When a dated web search returns nothing useful for a same-day question (no result from today, or only results from
+earlier years), read Google News's RSS search before giving up:
+`https://news.google.com/rss/search?q=<topic>+when:1d&hl=en-IN&gl=IN&ceid=IN:en` (for example `q=metal+stocks+when:1d`
+or `q=Nifty+IT+when:1d`). It returns today's headlines with publisher and time; use the titles as unverified possible
+causes, check each item's own date, prefer Indian business media and the major wires, and drop items about another
+country's market (a Pakistani or Sri Lankan rupee, Thai gold prices, Oman crude). Only then fall back to the script's
+headline lines.
+
 ## Where to look first
 
 | Need | Prefer |

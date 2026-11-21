@@ -27,11 +27,31 @@ def prefix(rows, now, interval=5):
     return [found[at] for at in expected]
 
 
+def data_end(rows, now, interval=5):
+    """`now` capped at the end of today's data once the session is over. After 15:30 Yahoo often omits the last 5-minute
+    bars (15:20, 15:25 on 18 Nov 2026), so the data ends at the completion of the last bar of the unbroken run from 09:15
+    rather than at 15:30. During the session (or for another day's rows) `now` is returned unchanged."""
+    start = now.replace(hour=9, minute=15, second=0, microsecond=0)
+    end = start.replace(hour=15, minute=30)
+    if now < end: return now
+    have = {instant(r["at"]) for r in rows if instant(r["at"]).date() == now.date()}
+    at = start
+    while at < end and at in have: at += timedelta(minutes=interval)
+    if at == start: raise Block(f"BARS: no bars for the {now:%d %b %Y} session in the data (a holiday, or the provider has not published them)")
+    return at
+
+
+def until(rows, cap):
+    """Rows of `cap`'s day stamped before `cap` (other days' rows unchanged): the input to prefix() at a capped time."""
+    return [r for r in rows if instant(r["at"]).date() != cap.date() or instant(r["at"]) < cap]
+
+
 def entry(rows, now, *, setup="orb", level=None, side="BUY", interval=5, not_before="09:30", not_after="14:30"):
     if side not in {"BUY", "SELL"} or setup not in {"orb", "level"}: raise Block("ENTRY: invalid side/setup")
     before, after = time.fromisoformat(not_before), time.fromisoformat(not_after)
     if not time(9,15) <= before <= after < time(15,30): raise Block("ENTRY: invalid window")
-    bars = prefix(rows, now, interval)
+    cap = data_end(rows, now, interval)
+    bars = prefix(until(rows, cap), cap, interval)
     n = 15//interval
     waiting = {"state": "waiting", "setup": setup, "interval_minutes": interval, "side": side}
     if setup == "orb":
@@ -49,6 +69,9 @@ def entry(rows, now, *, setup="orb", level=None, side="BUY", interval=5, not_bef
                     "range_low": float(min(positive(x["low"]) for x in observed[:n])),
                     "stop_reference": float(min(positive(x["low"]) for x in observed) if side == "BUY" else max(positive(x["high"]) for x in observed)),
                     "trigger_at": at.isoformat(), "turnover_estimate_inr": float(sum(positive(x["close"])*number(x["volume"]) for x in observed))}
+    if cap < now and cap.time() < after:
+        raise Block(f"BARS: the provider's {interval}-minute bars for today stop at {cap:%H:%M} (the {cap:%H:%M} bar is missing), "
+                    f"before the {not_after} end of the entry window, so the setup cannot be checked; use your broker's chart")
     return {**waiting, "reference_price": float(level), "reason": "No eligible completed close across the level"}
 
 

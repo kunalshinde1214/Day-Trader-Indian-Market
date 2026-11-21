@@ -125,7 +125,7 @@ class PlainHeadlineTests(unittest.TestCase):
         self.assertNotIn("Coverage:", text)
         self.assertEqual(text.count("Yahoo Finance public charts"), 1)
         self.assertEqual(text.count("Advance/decline breadth not available"), 1)
-        self.assertEqual(text.count("Spot-index points only"), 1)
+        self.assertEqual(text.count("Research only; no orders."), 1)
 
 
 class VixTests(unittest.TestCase):
@@ -156,12 +156,14 @@ class VixTests(unittest.TestCase):
         bundle = public_bundle(PREOPEN, vix=False)
         vix = collect_vix(fetcher=fetcher(PREOPEN), clock=lambda: PREOPEN)
         with patch("public_market.collect_daily", return_value=bundle) as collector, patch("daily.collect_vix", return_value=vix), \
+             patch("daily.enrich_public", side_effect=lambda b, *a, **k: b), \
              patch("daily.instant", side_effect=lambda value=None: instant(value) if value is not None else PREOPEN), \
              contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(main(["india-daily", "--collect-public", "--format", "json"]), 0)
         self.assertEqual(json.loads(out.getvalue())["vix"]["close"], 15.52)
         self.assertEqual(collector.call_args.args[0], ["nifty", "sensex", "banknifty"])
         with patch("public_market.collect_daily", return_value=public_bundle(PREOPEN, vix=False)), patch("daily.collect_vix", side_effect=Block("PUBLIC: down")), \
+             patch("daily.enrich_public", side_effect=lambda b, *a, **k: b), \
              patch("daily.instant", side_effect=lambda value=None: instant(value) if value is not None else PREOPEN), \
              contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(main(["nifty", "--collect-public"]), 0)
@@ -198,18 +200,20 @@ class SensexTests(unittest.TestCase):
         self.assertIn("| Sensex (Yahoo) | 17 Nov |", combined)
 
     def test_sensex_only_closing_request_explains_public_route_without_nse_calls(self):
-        with patch.object(cc, "collect") as collector, contextlib.redirect_stdout(io.StringIO()) as out:
+        unavailable = {"status": "UNAVAILABLE", "reason": cc.SENSEX_REASON}
+        with patch.object(cc, "collect") as collector, patch.object(cc, "sensex_row", return_value=unavailable), contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(main(["sensex", "--collect-close", "--session", "2026-11-17"]), 2)
             collector.assert_not_called()
         text = out.getvalue()
         self.assertIn("not in the NSE closing report", text); self.assertIn("daily.py sensex --collect-public", text)
         self.assertNotIn("BLOCKED", text)
-        with patch.object(cc, "collect") as collector, contextlib.redirect_stdout(io.StringIO()) as out:
+        with patch.object(cc, "collect") as collector, patch.object(cc, "sensex_row", return_value=unavailable), contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(main(["sensex", "--collect-close", "--session", "2026-11-17", "--format", "json"]), 2)
         self.assertEqual(json.loads(out.getvalue())["alternative_command"], cc.SENSEX_ROUTE)
 
     def test_closing_context_cli_sensex_only_writes_explanation(self):
-        with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, patch.object(cc, "fetch") as fetch:
+        with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, patch.object(cc, "fetch") as fetch, \
+             patch.object(cc, "sensex_row", return_value={"status": "UNAVAILABLE", "reason": cc.SENSEX_REASON}):
             path = Path(d) / "sensex.md"
             self.assertEqual(cc.main(["--session", "2026-11-17", "--indices", "sensex", "--out", str(path)]), 2)
             fetch.assert_not_called()
@@ -253,6 +257,36 @@ class ClosingReadabilityTests(unittest.TestCase):
         lines = [line for line in text.splitlines() if line.strip()]
         self.assertLessEqual(len(lines), 10)
         self.assertIn("Nifty 50 (17 Nov): 25,387.40, +96.30 (+0.38%)", text)
+
+
+class ClosingGiftAndSensexTests(unittest.TestCase):
+    def test_gift_is_dropped_while_the_domestic_session_trades(self):
+        fixture = ClosingFixture(); calls = []
+        def fetch(url): calls.append(url); return fixture.fetch(url)
+        result = cc.collect("2026-11-17", selected=["nifty"], fetcher=fetch, clock=lambda: INTRADAY)
+        self.assertNotIn(cc.STATUS, calls); self.assertNotIn("gift", result)
+        self.assertNotIn("GIFT", cc.markdown(result))
+        calls.clear(); result = cc.collect("2026-11-17", selected=["nifty"], fetcher=fetch, clock=lambda: PREOPEN)
+        self.assertIn(cc.STATUS, calls); self.assertIn("gift", result)
+        calls.clear(); cc.collect("2026-11-17", selected=["nifty"], fetcher=fetch, clock=lambda: PREOPEN, include_gift=False)
+        self.assertNotIn(cc.STATUS, calls)
+
+    def test_sensex_close_from_yahoo_daily_bar_is_labelled_unofficial(self):
+        result = cc.collect("2026-11-17", selected=["nifty", "sensex"], fetcher=ClosingFixture().fetch, clock=lambda: PREOPEN,
+                            sensex_fetcher=fetcher(PREOPEN))
+        sx = result["indices"]["sensex"]
+        self.assertEqual((sx["status"], sx["close"], sx["points_change"]), ("OBSERVED", 82532.19, 427.4))
+        text = cc.markdown(result)
+        self.assertIn("| Sensex (Yahoo, unofficial) | 82,532.19 | +427.40 | +0.52% | 82,091.90-82,897.49 |", text)
+        self.assertIn("Official BSE Sensex close (Yahoo daily close shown, unofficial)", text)
+        self.assertIn("(Yahoo daily close; unofficial): 82,532.19", cc.markdown(result, brief=True))
+        only = cc.sensex_notice("2026-11-17", clock=lambda: PREOPEN, sensex_fetcher=fetcher(PREOPEN))
+        self.assertEqual(only["indices"]["sensex"]["close"], 82532.19); self.assertNotIn("alternative_command", only)
+
+    def test_report_links_cite_nseindia_com(self):
+        text = cc.markdown(ClosingFixture().collect(["nifty"]))
+        self.assertNotIn("nseindia.in/", text); self.assertIn("https://www.nseindia.com/api/fiidiiTradeReact", text)
+        self.assertEqual(cc.API_TWIN[cc.FLOWS], "https://www.nseindia.in/api/fiidiiTradeReact")
 
 
 class EncodingTests(unittest.TestCase):

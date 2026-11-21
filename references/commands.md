@@ -2,10 +2,16 @@
 
 Daily briefings run through `scripts/daily.py india-daily|nifty|sensex|banknifty` (no leading slash on the command line). In Claude Code the plugin commands are `/india-day-trader:india-daily`, `/india-day-trader:nifty`, `/india-day-trader:sensex` and `/india-day-trader:banknifty`; plain requests such as "Nifty today" work too. Bare `/nifty` is not a registered command. See [daily reports](daily.md) for one-command Kite collection and offline examples. For broker trade imports, provisional-fee reserves, supervised polling and opt-in webhook delivery, see [account/service operations](account-service.md).
 
-## Screener, portfolio review and position size
+## Screener, portfolio review, position size and more
 
 ```text
-python scripts/position_size.py --entry 1344.40 --stop 1340.64 --risk 2000 [--product MIS|CNC] [--capital 200000]
+python scripts/stock_analysis.py --compare TCS INFY HCLTECH --summary
+python scripts/shareholding.py ADANIPORTS --summary
+python scripts/market_movers.py --summary [--premise up|down]
+python scripts/fno.py grid BANKNIFTY --structure condor --width 500 --monthly [--row 4 --summary] [--no-margin]
+python scripts/public_market.py entry --symbol RELIANCE.NS --setup orb --risk 2000
+python scripts/position_size.py --entry 1344.40 --stop 1340.64 --risk 2000 [--product MIS|CNC|BOTH] [--capital 200000]
+python scripts/position_size.py --symbol INFY --capital 300000 --risk-pct 0.5 --stop-pct 1.5
 python scripts/screener.py --universe nifty50 --where "roe>15" --where "pe<25" --sort roe
 python scripts/holdings_review.py --input holdings.json
 python scripts/holdings_review.py --input holdings.csv --tradebook tradebook.csv --fy 2026-27

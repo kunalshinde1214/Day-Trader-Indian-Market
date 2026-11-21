@@ -31,6 +31,30 @@ METRICS={"revenue":{"RevenueFromOperations","RevenueFromOperationsNet","Revenue"
          "assets":{"Assets","TotalAssets"},"cash":{"CashAndCashEquivalents","CashAndCashEquivalentsAtCarryingValue"}}
 
 
+NSE_FEEDS={SOURCES["announcements"],SOURCES["corporate_actions"],SOURCES["sast29"]}
+CLEARANCE_NOTE=("Not a clearance: these public RSS feeds hold only the latest exchange items (about a day of announcements), so an empty or short "
+                "list does not mean there were no filings. For promoter shareholding and pledges use scripts/shareholding.py; for a dated "
+                "backfill use scripts/announcement_history.py.")
+
+
+def nse_headline(title,description):
+    """NSE announcement items are titled with the company name; the subject sits in the description ('... |SUBJECT: Press Release')."""
+    subject=description.rsplit("|SUBJECT:",1)[1].strip() if "|SUBJECT:" in description else ""
+    purpose=re.search(r"PURPOSE:([^|]+)",description)
+    detail=subject or (purpose.group(1).strip().title() if purpose else "")
+    return f"{title}: {detail}" if detail and detail.lower() not in title.lower() else title
+
+
+def item_symbols(url,text,symbols):
+    """Requested symbols named in the text, or in an NSE attachment file name (nsearchives.../corporate/SYMBOL_ddmmyyyy...)."""
+    name=urllib.parse.urlsplit(url).path.rsplit("/",1)[-1].upper()
+    found=[]
+    for s in symbols:
+        base=s.rsplit(".",1)[0]
+        if re.search(r"(?<![A-Z0-9])"+re.escape(base)+r"(?![A-Z0-9])",text.upper()) or name.startswith(base+"_"):found.append(s)
+    return found
+
+
 def news(symbols, now, *, fetcher=request, hours=24, disclosure_only=False):
     if not isinstance(symbols,list) or not 1<=len(symbols)<=50 or len(set(symbols))!=len(symbols):raise Block("NEWS: 1..50 unique equity symbols")
     hours=integer(hours)
@@ -43,17 +67,23 @@ def news(symbols, now, *, fetcher=request, hours=24, disclosure_only=False):
             url="https://feeds.finance.yahoo.com/rss/2.0/headline?"+urllib.parse.urlencode({"s":s,"region":"IN","lang":"en-IN"})
             feeds.append((url,s))
     feeds += [(SOURCES["announcements"],None),(SOURCES["corporate_actions"],None)]
+    if disclosure_only:feeds.append((SOURCES["sast29"],None))
     for url,selected in feeds:
         try:
-            feed=rss(fetcher(url),url,now);unparsed+=len(feed["unparsed"])
+            # NSE stamps items in IST without an offset ('18-Nov-2026 09:37:12'); without nse_local_time every one was unparsed.
+            feed=rss(fetcher(url),url,now,nse_local_time=url in NSE_FEEDS);unparsed+=len(feed["unparsed"])
             for r in feed["records"]:
                 if instant(r["published_at"])<now-timedelta(hours=hours):continue
-                title=r["headline"];categories=[c for c,words in CATEGORIES.items() if any(w in title.lower() for w in words)]
-                matches=[selected] if selected else [s for s in symbols if re.search(r"(?<![A-Z0-9])"+re.escape(s.rsplit(".",1)[0])+r"(?![A-Z0-9])",title.upper())]
+                description=r.get("description") or ""
+                title=nse_headline(r["headline"],description) if url in NSE_FEEDS else r["headline"]
+                text=f"{title} {description}".lower()
+                categories=[c for c,words in CATEGORIES.items() if any(w in text for w in words)]
+                if url==SOURCES["sast29"] and "SAST" not in categories:categories.append("SAST")
+                matches=[selected] if selected else item_symbols(r["url"],title,symbols)
                 if disclosure_only and not set(categories)&{"PIT","SAST","pledge","bulk","block"}:continue
                 row={"headline":title,"url":r["url"],"published_at":r["published_at"],"source":url,"symbols":matches,
-                     "symbol_match_basis":"requested ticker feed" if selected else "literal headline symbol match; unmatched items retained",
-                     "categories":categories or ["other"],"classification_basis":"headline keywords, not verified filing facts",
+                     "symbol_match_basis":"requested ticker feed" if selected else "symbol in the headline or NSE attachment name; unmatched items retained",
+                     "categories":categories or ["other"],"classification_basis":"headline and subject keywords, not verified filing facts",
                      "transaction_date":None,"quantity":None,"review_required":True}
                 row["id"]=fingerprint({k:row[k] for k in ("headline","url","published_at")})
                 records.append(row)
@@ -65,9 +95,15 @@ def news(symbols, now, *, fetcher=request, hours=24, disclosure_only=False):
             old["symbols"]=sorted(set(old["symbols"]+row["symbols"]))
             old["sources"]=sorted(set(old["sources"]+[row["source"]]))
         else:unique[row["id"]]={**row,"sources":[row["source"]]}
-    return {"schema":"public_research_v1","as_of":now.isoformat(),"records":sorted(unique.values(),key=lambda r:r["published_at"],reverse=True),
-            "failed_sources":failures,"unparsed_items":unparsed,"coverage":"partial public feeds; not complete exchange or company coverage",
-            "no_event_clearance":True,"submitted":False,"disclosure_facts_parsed":False}
+    ordered=sorted(unique.values(),key=lambda r:r["published_at"],reverse=True)
+    matched=[r for r in ordered if r["symbols"]]
+    return {"schema":"public_research_v1","as_of":now.isoformat(),"records":ordered,"matched_records":len(matched),
+            "failed_sources":failures,"unparsed_items":unparsed,
+            "unparsed_note":"Feed items without a source link or with a release time later than this run are skipped (most NSE announcement items carry no link).",
+            "coverage":"partial public feeds; not complete exchange or company coverage",
+            # Kept for older readers: True means "this report never clears events" (not "no events found").
+            "no_event_clearance":True,"clearance":"none","clearance_note":CLEARANCE_NOTE,
+            "submitted":False,"disclosure_facts_parsed":False}
 
 
 def unseen(report, state, *, all_items=False):

@@ -1,0 +1,315 @@
+{
+  "_about": "Default peers for companies whose NSE index puts them next to different businesses (a conglomerate such as Reliance sits with refiners), chosen business by business, and the listed companies they hold a stake in for a sum-of-parts check. stock_analysis.py uses them unless --peers is given. Stakes and market values are never stored here: they are read live from NSE's shareholding filings and Yahoo. A group company is never a business peer. Holdings lists were audited on 21 Nov 2026 against the latest NSE shareholding pattern of every Nifty 500 company: a company is listed under a parent when a promoter entity in its filing is the parent itself (stakes worth about 2% of the parent's market cap or more).",
+  "checked": "2026-11-21",
+  "companies": {
+    "RELIANCE": {
+      "peers": {
+        "IOC": "refining and fuel retail",
+        "BPCL": "refining and fuel retail",
+        "BHARTIARTL": "telecom (Jio)",
+        "DMART": "retail",
+        "TRENT": "retail"
+      },
+      "holdings": [
+        "JPL"
+      ],
+      "rest": "oil-to-chemicals, retail, oil and gas, media and new energy"
+    },
+    "ITC": {
+      "peers": {
+        "HINDUNILVR": "FMCG",
+        "NESTLEIND": "FMCG",
+        "BRITANNIA": "FMCG",
+        "TATACONSUM": "FMCG",
+        "GODFRYPHLP": "cigarettes"
+      },
+      "holdings": [
+        "ITCHOTELS"
+      ],
+      "rest": "cigarettes, FMCG, agri-business and paperboards"
+    },
+    "GRASIM": {
+      "peers": {
+        "ASIANPAINT": "paints (Birla Opus)",
+        "AMBUJACEM": "cement (through UltraTech)",
+        "SHREECEM": "cement (through UltraTech)"
+      },
+      "holdings": [
+        "ULTRACEMCO",
+        "ABCAPITAL"
+      ],
+      "rest": "viscose fibre, chemicals, paints and B2B e-commerce"
+    },
+    "BAJAJFINSV": {
+      "peers": {
+        "HDFCLIFE": "life insurance",
+        "SBILIFE": "life insurance",
+        "ICICIGI": "general insurance",
+        "ICICILIFE": "life insurance"
+      },
+      "holdings": [
+        "BAJFINANCE"
+      ],
+      "rest": "general and life insurance (unlisted subsidiaries) and other businesses"
+    },
+    "M&M": {
+      "holdings": [
+        "M&MFIN",
+        "TECHM"
+      ],
+      "rest": "automobiles, farm equipment and other businesses"
+    },
+    "LT": {
+      "holdings": [
+        "LTM",
+        "LTTS",
+        "LTF"
+      ],
+      "rest": "engineering and construction, and other businesses"
+    },
+    "HDFCBANK": {
+      "holdings": [
+        "HDFCLIFE",
+        "HDFCAMC",
+        "HDBFS"
+      ],
+      "rest": "the bank and its unlisted subsidiaries"
+    },
+    "SBIN": {
+      "holdings": [
+        "SBILIFE",
+        "SBICARD"
+      ],
+      "rest": "the bank and its unlisted subsidiaries"
+    },
+    "ICICIBANK": {
+      "holdings": [
+        "ICICILIFE",
+        "ICICIGI",
+        "ICICIAMC"
+      ],
+      "rest": "the bank and its unlisted subsidiaries"
+    },
+    "BAJFINANCE": {
+      "peers": {
+        "SHRIRAMFIN": "consumer and vehicle lending (NBFC)",
+        "CHOLAFIN": "vehicle, home and SME lending (NBFC)",
+        "MUTHOOTFIN": "gold loans (NBFC)",
+        "SBICARD": "consumer credit (cards)",
+        "LTF": "retail lending (NBFC)",
+        "MANAPPURAM": "gold loans (NBFC)",
+        "POONAWALLA": "consumer and SME lending (NBFC)"
+      },
+      "holdings": [
+        "BAJAJHFL"
+      ],
+      "rest": "Bajaj Finance's own lending and other subsidiaries"
+    },
+    "ETERNAL": {
+      "peers": {
+        "SWIGGY": "food delivery and quick commerce",
+        "NYKAA": "consumer internet (e-commerce)",
+        "NAUKRI": "consumer internet (classifieds)"
+      }
+    },
+    "SWIGGY": {
+      "peers": {
+        "ETERNAL": "food delivery and quick commerce",
+        "NYKAA": "consumer internet (e-commerce)",
+        "NAUKRI": "consumer internet (classifieds)"
+      }
+    },
+    "BHARTIARTL": {
+      "holdings": [
+        "BHARTIHEXA",
+        "INDUSTOWER"
+      ],
+      "rest": "the rest of the business, including Airtel Africa (listed in London, not valued here)"
+    },
+    "BAJAJHLDNG": {
+      "holdings": [
+        "BAJAJ-AUTO",
+        "BAJAJFINSV"
+      ],
+      "rest": "its other investments"
+    },
+    "CHOLAHLDNG": {
+      "holdings": [
+        "CHOLAFIN"
+      ],
+      "rest": "its unlisted businesses"
+    },
+    "COALINDIA": {
+      "holdings": [
+        "BHARATCOAL",
+        "CMPDI"
+      ],
+      "rest": "coal mining in its other subsidiaries"
+    },
+    "GODREJIND": {
+      "holdings": [
+        "GODREJCP",
+        "GODREJPROP",
+        "GODREJAGRO"
+      ],
+      "rest": "chemicals and its other businesses"
+    },
+    "IOC": {
+      "holdings": [
+        "CHENNPETRO",
+        "PETRONET"
+      ],
+      "rest": "refining, pipelines, fuel retail and petrochemicals"
+    },
+    "ONGC": {
+      "holdings": [
+        "HINDPETRO",
+        "MRPL",
+        "PETRONET"
+      ],
+      "rest": "oil and gas production and its other subsidiaries"
+    },
+    "HINDPETRO": {
+      "holdings": [
+        "MRPL"
+      ],
+      "rest": "refining and fuel retail"
+    },
+    "BPCL": {
+      "holdings": [
+        "IGL",
+        "PETRONET"
+      ],
+      "rest": "refining and fuel retail"
+    },
+    "GAIL": {
+      "holdings": [
+        "MGL",
+        "IGL",
+        "PETRONET"
+      ],
+      "rest": "gas transmission, marketing and petrochemicals"
+    },
+    "NTPC": {
+      "holdings": [
+        "NTPCGREEN"
+      ],
+      "rest": "power generation and its other subsidiaries"
+    },
+    "PFC": {
+      "holdings": [
+        "RECLTD"
+      ],
+      "rest": "PFC's own lending"
+    },
+    "VEDL": {
+      "holdings": [
+        "HINDZINC"
+      ],
+      "rest": "the rest of the business"
+    },
+    "TMPV": {
+      "holdings": [
+        "TATATECH"
+      ],
+      "rest": "passenger vehicles, including Jaguar Land Rover"
+    },
+    "TIINDIA": {
+      "holdings": [
+        "CGPOWER"
+      ],
+      "rest": "engineering, metal-formed products, mobility and other businesses"
+    },
+    "AMBUJACEM": {
+      "holdings": [
+        "ACC"
+      ],
+      "rest": "cement"
+    },
+    "BIOCON": {
+      "holdings": [
+        "SYNGENE"
+      ],
+      "rest": "biosimilars, generics and other businesses"
+    },
+    "EIDPARRY": {
+      "holdings": [
+        "COROMANDEL"
+      ],
+      "rest": "sugar, nutraceuticals and other businesses"
+    },
+    "ZYDUSLIFE": {
+      "holdings": [
+        "ZYDUSWELL"
+      ],
+      "rest": "pharmaceuticals"
+    },
+    "MOTHERSON": {
+      "holdings": [
+        "MSUMI"
+      ],
+      "rest": "auto components"
+    },
+    "ABCAPITAL": {
+      "holdings": [
+        "ABSLAMC"
+      ],
+      "rest": "lending, insurance and other financial businesses"
+    },
+    "HEROMOTOCO": {
+      "holdings": [
+        "ATHERENERG"
+      ],
+      "rest": "two-wheelers"
+    },
+    "CANBK": {
+      "holdings": [
+        "CANFINHOME",
+        "CANHLIFE"
+      ],
+      "rest": "the bank and its unlisted subsidiaries"
+    },
+    "PNB": {
+      "holdings": [
+        "PNBHOUSING"
+      ],
+      "rest": "the bank and its unlisted subsidiaries"
+    },
+    "LICI": {
+      "holdings": [
+        "IDBI",
+        "LICHSGFIN"
+      ],
+      "rest": "life insurance"
+    },
+    "AEGISLOG": {
+      "holdings": [
+        "AEGISVOPAK"
+      ],
+      "rest": "LPG and chemicals logistics and distribution"
+    }
+  },
+  "promoter_vehicles": {
+    "_about": "Well-known promoter holding vehicles, by the entity name as filed; shareholding.py adds the note beside the entity. Add only what a cited source says; never infer from a name.",
+    "Bharti Telecom Limited": {
+      "note": "holding company owned by Singtel and the Mittal family (Bharti Enterprises)",
+      "checked": "2026-11-21",
+      "source": "https://www.business-standard.com/article/companies/singtel-entities-jointly-offload-1-76-stake-in-airtel-for-rs-7-128-cr-122090800411_1.html"
+    },
+    "Pastel Limited": {
+      "note": "wholly owned subsidiary of Singtel",
+      "checked": "2026-11-21",
+      "source": "https://www.business-standard.com/companies/news/singtel-sells-1-2-percent-stake-in-bharti-airtel-for-1-54-billion-125051600435_1.html"
+    },
+    "Viridian Limited": {
+      "note": "Singtel subsidiary",
+      "checked": "2026-11-21",
+      "source": "https://www.business-standard.com/article/companies/singtel-entities-jointly-offload-1-76-stake-in-airtel-for-rs-7-128-cr-122090800411_1.html"
+    },
+    "Tata Sons Private Limited": {
+      "note": "the Tata group's principal investment holding company and promoter of Tata companies",
+      "checked": "2026-11-21",
+      "source": "https://www.tata.com/about-us/tata-sons"
+    }
+  }
+}

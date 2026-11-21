@@ -92,6 +92,23 @@ class ReferenceFileTests(unittest.TestCase):
         self.assertEqual((itc["resulting_symbol"], itc["record_date"], itc["new"], itc["per"]), ("ITCHOTELS", date(2025, 1, 6), 1, 10))
         self.assertEqual((itc["parent_pct"], itc["resulting_pct"]), (Decimal("86.49"), Decimal("13.51")))
 
+    def test_hul_and_vedanta_entries_match_the_company_letters(self):
+        loaded = {e["parent"]: e for e in hr.load_demergers()}
+        hul, vedl = loaded["HINDUNILVR"], loaded["VEDL"]
+        self.assertEqual((hul["resulting_symbol"], hul["record_date"], hul["new"], hul["per"]), ("KWIL", date(2025, 12, 5), 1, 1))
+        self.assertEqual((hul["parent_pct"], hul["resulting_pct"]), (Decimal("98.09"), Decimal("1.91")))
+        self.assertEqual((vedl["record_date"], vedl["parent_pct"], vedl["resulting_pct"]), (date(2026, 5, 1), Decimal("52.34"), Decimal("47.66")))
+        raw = {e["parent"]: e for e in json.loads((ROOT / "assets" / "demergers.json").read_text(encoding="utf-8"))["demergers"]}
+        parts = raw["VEDL"]["resulting_companies"]
+        self.assertEqual([c["symbol"] for c in parts], ["VAML", "VEDPOWER", "VOGL", "VISL"])
+        self.assertAlmostEqual(sum(c["cost_split_pct"] for c in parts), 47.66)
+        self.assertEqual(raw["VEDL"]["ex_date"], "2026-04-30")  # 1 May 2026 was a market holiday
+        self.assertEqual(raw["TMPV"]["appointed_date"], "2025-07-01")
+        for e in raw.values():  # the optional dates, when present, are ISO dates
+            for key in ("ex_date", "appointed_date", "effective_date", "resulting_first_full_fy_end"):
+                if e.get(key):
+                    date.fromisoformat(e[key])
+
     def test_malformed_entries_are_refused(self):
         good = {"parent": "AAA", "resulting_company": "B", "resulting_symbol": "BBB", "record_date": "2025-01-01",
                 "ratio": {"new_shares": 1, "per_parent_shares": 1}, "cost_split_pct": {"parent": 60, "resulting": 40},
@@ -277,12 +294,12 @@ class OrderAndDemergedSharesTests(unittest.TestCase):
 
     def test_summary_says_whether_demerged_shares_are_held(self):
         missing = hr.summary(run(holdings_doc(ITC_DATED)))
-        self.assertIn("- **Demerged shares**: ITCHOTELS (100 expected from ITC) is not in your holdings — check your demat account; "
-                      "the value and P&L above exclude them", missing)
+        self.assertIn("- **Demerged shares**: ITCHOTELS (100 expected from ITC, worth ₹21,000) is not in your holdings — check your demat account; "
+                      "the value and P&L above exclude them. If you still hold them: +₹21,000 → total ₹4,31,000, P&L ₹31,000 (+7.8%)", missing)
         held = hr.summary(run(holdings_doc(ITC_DATED + [{"symbol": "ITCHOTELS", "quantity": 100, "average_price": 0}])))
         self.assertIn("- **Demerged shares**: ITCHOTELS (100 held, from ITC) is in your holdings", held)
         undated = hr.summary(run(holdings_doc([{"symbol": "ITC", "quantity": 250, "average_price": 400}])))
-        self.assertIn("ITCHOTELS (25 expected if your ITC was bought before 2025-01-06) is not in your holdings", undated)
+        self.assertIn("ITCHOTELS (25 expected if your ITC was bought before 2025-01-06, worth ₹5,250) is not in your holdings", undated)
         self.assertNotIn("Demerged shares", hr.summary(run(holdings_doc([{"symbol": "TCS", "quantity": 5, "average_price": 3400}]))))
         w = row(run(holdings_doc(ITC_DATED)), "ITC")["demerger_warning"]
         self.assertIn("ITCHOTELS is not in this file; check your demat account for these shares", w)
@@ -313,10 +330,16 @@ class SummaryTests(unittest.TestCase):
         self.assertIn(f"**worst** {ranked[0]['symbol']}", text)
         self.assertIn(f"- **Largest holding** {r['concentration']['top_holding']}", text)
         self.assertIn(r["concentration"]["reading"], text)
-        self.assertIn(f"- **Top sector** {r['sectors'][0]['sector']}", text)
-        self.assertIn("- **If you sold everything today**: estimated FY 2026-27 tax", text)
-        self.assertIn("HDFCBANK, TCS, OLDCO", text)
-        self.assertIn("demerger cost splits (⚠) are not applied", text)
+        self.assertIn(f" · **top sector** {r['sectors'][0]['sector']}", text)   # round 6: on the largest-holding line
+        self.assertIn("- **If you sold everything today**: estimated tax year 2026-27 tax", text)
+        self.assertIn("HDFCBANK, TCS and OLDCO undated", text)
+        # The cost splits leave the figure unchanged here (long-term gains stay inside the exemption), so no caveat is printed.
+        self.assertFalse(r["tax"]["hypothetical_sell_all"]["with_demerger_cost_split"]["changes_figure"])
+        self.assertNotIn("demerger cost splits", text)
+        self.assertIn("top 5", text)  # six holdings
+        self.assertNotIn("top 5", hr.summary(run(holdings_doc(self.HOLDINGS[:5]))))
+        self.assertNotIn("Herfindahl", text)
+        self.assertIn("like 1.4 equal-sized holdings", text)
         self.assertIn("⚠ 5 items to check**: bonus/split HDFCBANK; demerger ITC, RELIANCE; stale price OLDCO; missing price GONE", text)
         self.assertNotIn("Holdings |", text)  # not the full report
 

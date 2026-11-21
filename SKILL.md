@@ -33,7 +33,7 @@ Anything else (broker data plumbing, accounting, streaming, live orders, protect
 
 ## Answer templates for common questions
 
-- **"Which looks best?" / "which should I pick?"** Do not pick. Compare the candidates on quality (ROE, debt), value (P/E against its own history and real peers), growth (revenue and EPS) and momentum (1-year return, trend), in one table, and end with the trade-off each one represents.
+- **"Which looks best?" / "which should I pick?"** Do not pick. Run `stock_analysis.py --compare SYM ...` and compare the candidates on quality (ROE, debt), value (P/E against its own history and real peers), growth (revenue and EPS) and momentum (1-year return, trend), in one table, and end with the trade-off each one represents.
 - **"Kal kya lagta hai?" / "where will it go tomorrow?"** Say no one can predict it. Give the levels that would change the picture, the expected range (options-implied move for indices and F&O stocks, past ranges for others), and scheduled events in that window from the web.
 - **"Is it cheap?"** Compare P/E with the stock's own history band and with peers in the same businesses (pass `--peers`), alongside growth and ROE. A low P/E can mean low expected growth.
 - **"Should I buy / sell / sell this option?"** Show both sides, the risk (for short options, the unlimited or large loss) and what would change the view; the decision is the user's.

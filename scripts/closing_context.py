@@ -3,6 +3,7 @@ import argparse
 import csv
 from datetime import date, datetime
 import hashlib
+import http.client
 import io
 import json
 from pathlib import Path
@@ -12,11 +13,18 @@ import urllib.request
 from core import Block, IST, instant, number, positive, fingerprint
 from data import MAX_BYTES, NoRedirect
 
-FLOWS = 'https://www.nseindia.in/api/fiidiiTradeReact'
-STATUS = 'https://www.nseindia.in/api/marketStatus'
-INDEX_BASE = 'https://nsearchives.nseindia.in/content/indices/ind_close_all_'
-CASH_BASE = 'https://nsearchives.nseindia.in/products/content/sec_bhavdata_full_'
+FLOWS = 'https://www.nseindia.com/api/fiidiiTradeReact'
+STATUS = 'https://www.nseindia.com/api/marketStatus'
+# NSE answers scripts' API calls on www.nseindia.in (www.nseindia.com sends a 301 there, and redirects are refused here).
+# Reports cite the www.nseindia.com address people use; the request goes to the exact .in twin of an allowlisted URL.
+API_TWIN = {FLOWS: 'https://www.nseindia.in/api/fiidiiTradeReact', STATUS: 'https://www.nseindia.in/api/marketStatus'}
+INDEX_BASE = 'https://nsearchives.nseindia.com/content/indices/ind_close_all_'
+CASH_BASE = 'https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_'
 NAMES = {'nifty': 'NIFTY 50', 'banknifty': 'NIFTY BANK'}
+
+
+def public_url(url):
+    return str(url).replace('://www.nseindia.in/', '://www.nseindia.com/').replace('://nsearchives.nseindia.in/', '://nsearchives.nseindia.com/')
 
 
 def report_url(base, session):
@@ -26,8 +34,11 @@ def report_url(base, session):
 def fetch(url):
     allowed = url in (FLOWS, STATUS) or any(re.fullmatch(re.escape(base) + r'\d{8}\.csv', url) for base in (INDEX_BASE, CASH_BASE))
     if not allowed: raise Block('CLOSING: unsupported official endpoint')
-    req = urllib.request.Request(url, headers={'User-Agent': 'IndiaDayTrader personal research', 'Accept': 'text/csv,application/json'})
-    with urllib.request.build_opener(NoRedirect()).open(req, timeout=20) as response: body = response.read(MAX_BYTES + 1)
+    req = urllib.request.Request(API_TWIN.get(url, url), headers={'User-Agent': 'IndiaDayTrader personal research', 'Accept': 'text/csv,application/json'})
+    try:
+        with urllib.request.build_opener(NoRedirect()).open(req, timeout=20) as response: body = response.read(MAX_BYTES + 1)
+    except http.client.HTTPException:  # e.g. IncompleteRead: the body was cut short
+        raise Block('CLOSING: source connection dropped') from None
     if len(body) > MAX_BYTES: raise Block('CLOSING: oversized report')
     return body
 
@@ -144,16 +155,24 @@ def gift(body, now):
             'price_basis': 'GIFT Nifty futures; not domestic spot-index points or an executable broker contract'}
 
 
-def collect(session, *, selected=None, membership=None, fetcher=fetch, clock=instant):
+def domestic_session_open(now):
+    """True during the regular NSE cash session on a weekday (GIFT Nifty adds nothing once the spot index trades)."""
+    return now.weekday() < 5 and (9, 15) <= (now.hour, now.minute) < (15, 30)
+
+
+def collect(session, *, selected=None, membership=None, fetcher=fetch, clock=instant, include_gift=None, sensex_fetcher=None):
     now = clock(); day = date.fromisoformat(session); selected = ['nifty', 'sensex', 'banknifty'] if selected is None else selected
     if day.isoformat() != session or day > now.date() or not selected or len(selected) != len(set(selected)) or any(k not in ('nifty', 'sensex', 'banknifty') for k in selected):
         raise Block('CLOSING: exact nonfuture session and supported indices required')
     result = {'schema': 'india_closing_context_v1', 'session': session, 'as_of': now.isoformat(), 'indices': {}, 'coverage': []}
+    if include_gift is None: include_gift = not domestic_session_open(now)
     for name, url, parser in (
         ('index_report', report_url(INDEX_BASE, day), lambda raw: indices(raw, day, now)),
         ('cash_report', report_url(CASH_BASE, day), lambda raw: cash_prices(raw, day, now)),
         ('institutional_flows', FLOWS, lambda raw: flows(raw, now)), ('gift', STATUS, lambda raw: gift(raw, now)),
     ):
+        if name == 'gift' and not include_gift:
+            continue  # GIFT Nifty is pre-open context only; once the domestic session opens the spot index replaces it
         try:
             result[name] = parser(fetcher(url)); result['coverage'].append({'component': name, 'status': 'COLLECTED'})
         except (Block, ValueError, KeyError, TypeError, OSError, csv.Error):
@@ -165,8 +184,10 @@ def collect(session, *, selected=None, membership=None, fetcher=fetch, clock=ins
                                    'scope': 'Valid EQ rows in the cited daily report; not complete Indian-market or index membership'}
     for key in selected:
         row = result.get('index_report', {}).get('indices', {}).get(key)
+        if key == 'sensex':
+            result['indices'][key] = sensex_row(day, now, sensex_fetcher=sensex_fetcher, live=fetcher is fetch); continue
         if row is None:
-            result['indices'][key] = {'status': 'UNAVAILABLE', 'reason': SENSEX_REASON if key == 'sensex' else 'No matching index in this NSE closing source'}; continue
+            result['indices'][key] = {'status': 'UNAVAILABLE', 'reason': 'No matching index in this NSE closing source'}; continue
         result['indices'][key] = {**row, 'status': 'OBSERVED', 'constituent_breadth': None}
         if membership is not None and key in membership and cash is not None:
             try:
@@ -182,7 +203,8 @@ def collect(session, *, selected=None, membership=None, fetcher=fetch, clock=ins
     if 'institutional_flows' in result:
         result['institutional_flows']['matches_requested_session'] = result['institutional_flows']['trading_date'] == session
     result.update(status='PARTIAL', full_market_coverage=False, execution_eligible=False, submitted=False,
-                  missing_coverage=['BSE/Sensex closing provider', 'Independent membership and publication/finality verification',
+                  missing_coverage=[('Official BSE Sensex close (Yahoo daily close shown, unofficial)' if result['indices'].get('sensex', {}).get('status') == 'OBSERVED'
+                                     else 'BSE/Sensex closing provider'), 'Independent membership and publication/finality verification',
                                     'Complete macro-event calendar', 'Current tradable quotes and instrument-session clearance'])
     result['context_hash'] = fingerprint(result)
     return result
@@ -194,10 +216,40 @@ SENSEX_REASON = ('Sensex is a BSE index and is not in the NSE closing report use
                  'For Sensex use `' + SENSEX_ROUTE + '` (Yahoo public data; not an official BSE feed).')
 
 
-def sensex_notice(session, clock=instant):
-    """Plain explanation for a Sensex-only closing request; no NSE request is made because it cannot cover Sensex."""
+def sensex_row(day, now, *, sensex_fetcher=None, live=True):
+    """Sensex close for ``day`` from Yahoo's public daily chart: unofficial (BSE does not serve scripts), labelled as such.
+    Without an explicit fetcher it only goes to the network when the NSE fetcher is the real one (tests stay offline)."""
+    if sensex_fetcher is None and not live:
+        return {'status': 'UNAVAILABLE', 'reason': SENSEX_REASON}
+    try:
+        from public_market import collect_chart, request
+        if day == now.date() and (now.hour, now.minute) < (15, 35): raise Block('SENSEX: session not finished')
+        chart = collect_chart('^BSESN', '1d', fetcher=sensex_fetcher or request, clock=lambda: now)
+        bars = [(instant(b['at']).date(), b) for b in chart['bars']]
+        i = next(k for k, (d, _) in enumerate(bars) if d == day)
+        if i == 0: raise Block('SENSEX: previous close missing')
+        b, (pday, p) = bars[i][1], bars[i - 1]
+        change = b['close'] - p['close']
+        return {'index_id': 'sensex', 'name': 'Sensex', 'session': day.isoformat(), 'open': b['open'], 'high': b['high'], 'low': b['low'],
+                'close': b['close'], 'points_change': round(change, 2), 'change_pct': round(change / p['close'] * 100, 2),
+                'previous_session': pday.isoformat(), 'status': 'OBSERVED', 'unofficial': True, 'source': chart['source_url'],
+                'price_basis': 'yahoo_daily_close_unofficial', 'constituent_breadth': None}
+    except (Block, StopIteration, KeyError, TypeError, ValueError, OSError):
+        return {'status': 'UNAVAILABLE', 'reason': SENSEX_REASON}
+
+
+def sensex_notice(session, clock=instant, sensex_fetcher=None, live=True):
+    """Sensex-only closing request: Yahoo's daily close (unofficial) when available, else a plain explanation.
+    No NSE request is made because NSE files cannot cover a BSE index."""
     day = date.fromisoformat(session)
     if day.isoformat() != session: raise Block('CLOSING: exact YYYY-MM-DD session required')
+    now = clock()
+    row = sensex_row(day, now, sensex_fetcher=sensex_fetcher, live=live)
+    if row['status'] == 'OBSERVED':
+        return {'schema': 'india_closing_context_v1', 'session': session, 'as_of': now.isoformat(), 'status': 'PARTIAL',
+                'indices': {'sensex': row}, 'coverage': [{'component': 'sensex_yahoo_daily', 'status': 'COLLECTED'}],
+                'missing_coverage': ['Official BSE Sensex close (Yahoo daily close shown, unofficial)'],
+                'full_market_coverage': False, 'execution_eligible': False, 'submitted': False}
     return {'schema': 'india_closing_context_v1', 'session': session, 'as_of': clock().isoformat(), 'status': 'UNAVAILABLE',
             'indices': {'sensex': {'status': 'UNAVAILABLE', 'reason': SENSEX_REASON}}, 'coverage': [],
             'alternative_command': SENSEX_ROUTE, 'missing_coverage': ['BSE/Sensex closing provider'],
@@ -220,7 +272,8 @@ def _index_line(key, row):
     name = LABELS.get(key, key)
     if row['status'] != 'OBSERVED':
         return name + ': ' + (SENSEX_REASON if key == 'sensex' else row.get('reason', 'unavailable'))
-    return (f"{name} ({_day(row['session'])}): {row['close']:,.2f}, {_signed(row['points_change'])} ({_signed(row['change_pct'], '%')}); "
+    tag = ' (Yahoo daily close; unofficial)' if row.get('unofficial') else ''
+    return (f"{name} ({_day(row['session'])}){tag}: {row['close']:,.2f}, {_signed(row['points_change'])} ({_signed(row['change_pct'], '%')}); "
             f"range {row['low']:,.2f}-{row['high']:,.2f}.")
 
 
@@ -258,7 +311,7 @@ def markdown(result, brief=False):
              '| Index | Close | Change | Change % | Day range |', '| --- | ---: | ---: | ---: | --- |']
     for key, row in result['indices'].items():
         if row['status'] == 'OBSERVED':
-            lines.append(f"| {LABELS.get(key, key)} | {row['close']:,.2f} | {_signed(row['points_change'])} | {_signed(row['change_pct'], '%')} | "
+            lines.append(f"| {LABELS.get(key, key)}{' (Yahoo, unofficial)' if row.get('unofficial') else ''} | {row['close']:,.2f} | {_signed(row['points_change'])} | {_signed(row['change_pct'], '%')} | "
                          f"{row['low']:,.2f}-{row['high']:,.2f} |")
         else:
             lines.append(f"| {LABELS.get(key, key)} | {'not in NSE report' if key == 'sensex' else 'not collected'} | | | |")
@@ -274,7 +327,7 @@ def markdown(result, brief=False):
     if flows: lines += ['', _flow_text(flows)]
     if gift: lines += ['', _gift_text(gift)]
     lines += ['', '## Data notes', '']
-    sources = [f"[{name}]({result[key]['source']})" for key, name in (('index_report', 'NSE index closes'), ('cash_report', 'NSE bhavcopy'),
+    sources = [f"[{name}]({public_url(result[key]['source'])})" for key, name in (('index_report', 'NSE index closes'), ('cash_report', 'NSE bhavcopy'),
                ('institutional_flows', 'NSE FII/DII'), ('gift', 'NSE market status')) if key in result]
     if sources: lines.append('- Sources: ' + ', '.join(sources) + '.')
     failed = [r['component'].replace('_', ' ') for r in result['coverage'] if r['status'] != 'COLLECTED']
@@ -297,7 +350,7 @@ def main(argv=None):
         out = Path(args.out)
         if out.exists(): raise Block('OUTPUT: choose a new file')
         if args.indices == ['sensex']:
-            result = sensex_notice(args.session)
+            result = sensex_notice(args.session)  # Yahoo daily close (unofficial) or an explanation
         else:
             result = collect(args.session, selected=args.indices, membership=read(args.membership) if args.membership else None)
     except Block as exc:

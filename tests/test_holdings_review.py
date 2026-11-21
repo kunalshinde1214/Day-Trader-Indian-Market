@@ -271,8 +271,8 @@ class TaxTests(unittest.TestCase):
         self.assertEqual(x["open_lots"][0]["long_term_from"], "2027-05-02")
         self.assertIsNotNone(x["hypothetical_sell_all"])
         md = markdown(run(source, parse_text(text), fy="2026-27"))
-        for needle in ("default rates — verify current rates", "Cess", "Not modelled", "Grandfathering", "check with a tax professional",
-                       "LTCG exemption remaining this FY"):
+        for needle in ("Income-tax Act 2025", "s.196", "s.198", "verify current rates", "Cess", "Not modelled", "Grandfathering",
+                       "check with a tax professional", "LTCG exemption remaining this tax year", "tax estimate — tax year 2026-27"):
             self.assertIn(needle.lower(), md.lower())
         for banned in ("you should sell", "we recommend", "harvest now"):
             self.assertNotIn(banned, md.lower())

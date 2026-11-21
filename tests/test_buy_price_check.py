@@ -85,7 +85,7 @@ class BuyPriceTests(unittest.TestCase):
         self.assertIn("- **SBIN**: ₹600 (bought) is outside the ₹937–984 range traded in Oct 2026", text)
         brief = hr.summary(r)
         self.assertIn("⚠ 1 item to check**: buy/sell price SBIN", brief)
-        self.assertIn("SBIN has a typed price outside what traded then (⚠)", brief)
+        self.assertIn("⚠ SBIN typed price is outside what traded then", brief)
 
     def test_price_inside_the_range_or_within_tolerance_is_not_flagged(self):
         for price, flagged in ((950, False), (937.5, False), (910, False), (905, True), (1013, False), (1015, True)):

@@ -261,6 +261,8 @@ class FakeFeeds:
 
     def __call__(self, url):
         self.urls.append(url)
+        if "nsccl/span" in url:  # NSE Clearing SPAN files: unavailable unless a test serves one (test_fno_margin.py)
+            raise Block("PUBLIC: source unavailable")
         if "INDIAVIX" in url:
             return vix_chart(VIX_DAYS, VIX_CLOSES)
         if TRADE.replace("-", "") in url:
@@ -311,7 +313,10 @@ class FnoImprovementTests(unittest.TestCase):
         dod = fno.compare_previous(r, "NIFTY", fetcher=feeds)
         self.assertEqual(dod["status"], "ok")
         self.assertEqual(dod["previous_date"], PREV)
-        self.assertEqual([u.split("_")[-3] for u in feeds.urls], ["20261116", "20261113"])  # Monday holiday, weekend skipped
+        # No holiday list: Monday 16 Nov is the expected previous day; its file is tried twice, then the walk back skips the weekend.
+        self.assertEqual([u.split("_")[-3] for u in feeds.urls], ["20261116", "20261116", "20261113"])
+        self.assertEqual((dod["expected_previous_date"], dod["sessions"], dod["sessions_certain"]), ("2026-11-16", 2, False))
+        self.assertIn("no Mon 16 Nov bhavcopy (a holiday, or the file failed twice", dod["gap_note"])
         m = dod["metrics"]
         prev_pcr = sum(PREV_PUT_OI.values()) / sum(PREV_CALL_OI.values())
         self.assertAlmostEqual(m["pcr_oi"]["previous"], prev_pcr)
@@ -341,7 +346,8 @@ class FnoImprovementTests(unittest.TestCase):
         feeds = FakeFeeds()
         code, text = run_cli(["chain", "NIFTY", "--no-vix", "--no-compare"], feeds)
         self.assertEqual(code, 0)
-        self.assertEqual(len(feeds.urls), 2)  # the 18th (missing) and the 17th only; no previous-day download
+        bhav = [u for u in feeds.urls if "BhavCopy" in u]
+        self.assertEqual(len(bhav), 2)  # the 18th (missing) and the 17th only; no previous-day bhavcopy download
         self.assertIn("--no-compare", text)
 
     def test_input_mode_compares_only_with_previous_date(self):
@@ -356,7 +362,7 @@ class FnoImprovementTests(unittest.TestCase):
             code, text = run_cli(["chain", "NIFTY", "--input", str(path), "--no-vix", "--format", "json"], feeds)
             self.assertEqual(code, 0)
             self.assertEqual(json.loads(text)["day_over_day"]["status"], "skipped")
-            self.assertEqual(feeds.urls, [])
+            self.assertEqual([u for u in feeds.urls if "BhavCopy" in u], [])  # no bhavcopy; holiday list and participant OI only
             code, text = run_cli(["chain", "NIFTY", "--input", str(path), "--no-vix", "--format", "json", "--previous-date", "2026-11-16"], feeds)
             dod = json.loads(text)["day_over_day"]
             self.assertEqual((dod["status"], dod["previous_date"]), ("ok", PREV))
@@ -393,7 +399,7 @@ class FnoImprovementTests(unittest.TestCase):
                     if "breakeven" in t["marks"]:
                         self.assertAlmostEqual(t["expiry_pnl"], 0, delta=LOT * 0.01)
                 text = fno.payoff_markdown(r, p)
-                self.assertIn("| Underlying | At expiry ₹ | Today (T+0) ₹ | Note |", text)
+                self.assertIn("| Underlying | At expiry ₹ | At expiry after costs ₹ | Today (T+0) ₹ | Note |", text)
                 body = text.split("| ---: | ---: | ---: | --- |")[1].strip().split("\n\n")[0].splitlines()
                 self.assertEqual(len(body), len(p["table"]))
 
@@ -456,11 +462,14 @@ class FnoImprovementTests(unittest.TestCase):
         code, text = run_cli(["chain", "NIFTY", "--summary"], FakeFeeds())
         self.assertEqual(code, 0)
         lines = [l for l in text.strip().splitlines() if l.strip()]
-        self.assertTrue(8 <= len(lines) <= 14, len(lines))
-        self.assertIn(f"data {TRADE}", lines[0])
-        self.assertIn(f"Max pain 25,000 (+250 vs {PREV})", text)
-        self.assertRegex(text, r"PCR \(OI\) [0-9.]+ \([+-][0-9.]+ vs 2026-11-13\)")
-        self.assertRegex(text, r"ATM IV 15\.0% \(-2\.0 pts vs 2026-11-13\)")
+        self.assertTrue(8 <= len(lines) <= 18, len(lines))   # round 5: + the 'Next session' heading
+        self.assertIn("END-OF-DAY data from Tue 17 Nov close", lines[0])  # NOW is 10:00 on a trading day: market open
+        self.assertIn(f"data {TRADE} close", lines[1])
+        # No holiday list in FakeFeeds, so the skipped Monday may have been a holiday or a missing file: "up to 2 sessions".
+        self.assertIn(f"Max pain 25,000 (+250 vs {PREV}, up to 2 sessions)", text)
+        self.assertRegex(text, r"PCR \(OI\) [0-9.]+ \([+-][0-9.]+ vs 2026-11-13, up to 2 sessions\)")
+        self.assertRegex(text, r"ATM IV 15\.0% \(-2\.0 pts vs 2026-11-13, up to 2 sessions\)")
+        self.assertIn("- ⚠ No Mon 16 Nov bhavcopy", text)
         self.assertIn("India VIX 14.00 (close 2026-11-17)", text)
         self.assertIn("Call OI walls above spot: 25,500", text)
         self.assertIn("put OI walls below spot: 24,500", text)
@@ -474,7 +483,7 @@ class FnoImprovementTests(unittest.TestCase):
         code, text = run_cli(["payoff", "NIFTY", *SPREAD, "--summary"], FakeFeeds())
         self.assertEqual(code, 0)
         lines = [l for l in text.strip().splitlines() if l.strip()]
-        self.assertTrue(8 <= len(lines) <= 12, len(lines))
+        self.assertTrue(8 <= len(lines) <= 18, len(lines))   # round 5: + the 'Next session' heading
         for part in ("Net premium received", "Max profit ₹", "max loss ₹", "Breakeven(s):", "P above",
                      "Probability of profit at expiry", "implied by option prices, not a forecast", "68% implied range"):
             self.assertIn(part, text)
@@ -555,8 +564,10 @@ class ExpiryTypeTests(unittest.TestCase):
                       "check the exchange circular)", text)
         self.assertIn("NIFTY has no weekly expiries in this data (one expiry per month)", text)
         self.assertIn("2026-11-23 (monthly, moved from 2026-11-24), 2026-12-29 (monthly)", text)
-        with self.assertRaisesRegex(Block, "no weekly expiries in this data .* Nearest monthly: 2026-11-23"):
-            fno.analyse_chain(contracts, "NIFTY", kind="weekly", rate=RATE)
+        fallback = fno.analyse_chain(contracts, "NIFTY", kind="weekly", rate=RATE)  # no weeklies: nearest monthly, with a note
+        self.assertEqual((fallback["expiry"], fallback["expiry_type"]), ("2026-11-23", "monthly"))
+        self.assertIn("no weekly expiries", fallback["selection_note"])
+        self.assertIn("nearest monthly, 2026-11-23, instead", fallback["selection_note"])
         self.assertEqual(fno.analyse_chain(contracts, "NIFTY", kind="monthly", rate=RATE)["expiry"], EXPIRY)
         weekly = fno.parse_bhavcopy(bhavcopy(extra=option_rows(WEEKLY[1:]) + fut_rows(WEEKLY_FUTS[1:])), "NIFTY")
         w = fno.analyse_chain(weekly, "NIFTY", kind="weekly", rate=RATE)
@@ -576,10 +587,10 @@ class ExpiryTypeTests(unittest.TestCase):
         data = json.loads(raw)
         self.assertEqual(data["expiries"][:2], ["2026-11-23", "2026-12-29"])
         self.assertFalse(data["has_weeklies"])
-        err = io.StringIO()
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
-            self.assertEqual(fno.main(["chain", "NIFTY", "--weekly", "--no-vix", "--no-compare"], fetcher=feed, clock=lambda: NOW), 2)
-        self.assertIn("no weekly expiries", err.getvalue())
+        code, text = run_cli(["chain", "NIFTY", "--weekly", "--no-vix", "--no-compare", "--summary"], feed)
+        self.assertEqual(code, 0)  # falls back to the nearest monthly instead of exiting 2
+        self.assertIn("**Note:** NIFTY has no weekly expiries", text)
+        self.assertIn("uses the nearest monthly, 2026-11-23, instead", text)
         code, text = run_cli(["chain", "NIFTY", "--monthly", "--no-vix", "--no-compare", "--summary"], feed)
         self.assertIn(f"expiry {EXPIRY} (monthly, ", text)
         self.assertIn("- Expiry 2026-11-23 is a monthly, Monday — moved from Tuesday 2026-11-24", text)
@@ -617,7 +628,10 @@ class OneDayMoveTests(unittest.TestCase):
     def test_summary_carries_the_one_day_move(self):
         code, text = run_cli(["chain", "NIFTY", "--summary", "--no-vix"], FakeFeeds())
         self.assertEqual(code, 0)
-        self.assertRegex(text, r"- Next session 1-sigma move ±2[0-9]{2}\.[0-9]{2} \(0\.9[0-9]%\): 24,7[0-9]{2} – 25,2[0-9]{2} \(ATM IV × √\(1/252\)")
+        # NOW is 10:00 IST on Wed 18 Nov (open); data is the Tue 17 Nov close. Today's session is under way, so the summary
+        # leaves out its range from yesterday's close and leads with the next session's, dated.
+        self.assertNotIn("1-sigma for the Wed 18 Nov session (in progress)", text)
+        self.assertRegex(text, r"- 1-sigma to the Thu 19 Nov close \(tomorrow\), from the Tue 17 Nov close")
         code, raw = run_cli(["chain", "NIFTY", "--summary", "--format", "json", "--no-vix"], FakeFeeds())
         data = json.loads(raw)
         self.assertAlmostEqual(data["one_day_move"]["points"], data["spot"] * data["atm_iv"] / math.sqrt(252), places=6)

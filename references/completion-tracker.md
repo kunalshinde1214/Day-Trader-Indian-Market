@@ -1,6 +1,6 @@
 # Completion status
 
-Updated 18 November 2026 for version 1.4.0.
+Updated 18 November 2026 for version 1.5.0.
 
 The skill is complete for its purpose: Indian-market research, daily reports, single-stock analysis with peers and valuation history, a [stock screener](screener.md), a [portfolio review with capital-gains estimates](holdings-review.md), F&O analytics ([guide](fno.md)), news and filings, pattern scans, and paper trade planning with Indian costs and risk checks. Data that the scripts do not bundle is fetched at request time by [web research](web-research.md), and each user connects their own broker through a [broker connector](broker-connectors.md) or the built-in adapters. No publisher trading account is needed, and none is used.
 

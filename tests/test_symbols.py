@@ -181,6 +181,8 @@ DEMERGERS = [{"parent": "TMPV", "parent_aliases": ["TATAMOTORS"], "resulting_sym
 
 
 class DemergerHistoryTests(unittest.TestCase):
+    """Demerged parents keep their whole history: unadjusted prices are scaled, never dropped (5-year P/E band, 52-week range)."""
+
     def setUp(self):
         self.patch = sa.load_demergers
         sa.load_demergers = lambda path=None: DEMERGERS
@@ -188,42 +190,73 @@ class DemergerHistoryTests(unittest.TestCase):
     def tearDown(self):
         sa.load_demergers = self.patch
 
-    def test_history_is_cut_at_the_record_date(self):
-        closes = demerged_closes()
-        history = {"bars": [{"at": d.isoformat(), "close": c, "high": c, "low": c} for d, c in zip(DAYS, closes)]}
-        cut = sa.trim_for_demerger(history, "TMPV.NS")
-        self.assertEqual(cut["record_date"], "2025-10-14")
-        self.assertEqual(history["bars"][0]["at"][:10], "2025-10-14")
-        self.assertLess(cut["day_move"], -0.35)
-        self.assertIn("History starts 2025-10-14", cut["note"])
-        # former symbol counts too; unrelated symbols and events outside the history are left alone
-        history = {"bars": [{"at": d.isoformat(), "close": c} for d, c in zip(DAYS, closes)]}
-        self.assertIsNotNone(sa.trim_for_demerger(history, "TATAMOTORS.NS"))
-        history = {"bars": [{"at": d.isoformat(), "close": c} for d, c in zip(DAYS, closes)]}
-        self.assertIsNone(sa.trim_for_demerger(history, "TMCV.NS"))
-        self.assertEqual(len(history["bars"]), len(DAYS))
+    def bars(self, closes):
+        return {"bars": [{"at": d.isoformat(), "close": c, "high": c, "low": c, "open": c} for d, c in zip(DAYS, closes)]}
 
-    def test_report_uses_only_post_demerger_sessions(self):
+    def test_unadjusted_large_demerger_is_scaled_by_the_days_price_ratio(self):
+        history = self.bars(demerged_closes())
+        cut = sa.trim_for_demerger(history, "TMPV.NS")
+        self.assertEqual((cut["record_date"], cut["mode"], cut["minor"]), ("2025-10-14", "scaled", False))
+        self.assertEqual(history["bars"][0]["at"][:10], DAYS[0].date().isoformat())  # nothing dropped
+        k = next(i for i, d in enumerate(DAYS) if d.date() >= date(2025, 10, 14))
+        self.assertAlmostEqual(history["bars"][k - 1]["close"], history["bars"][k]["close"], places=6)  # no jump left
+        self.assertLess(cut["day_move"], -0.35)
+        self.assertIn("scaled by 0.57", cut["note"])  # 395 / 1.0003^k against 660 / 1.0005^k in the fixture
+        self.assertIn("that day's own price change", cut["note"])
+        # former symbol counts too; unrelated symbols are left alone
+        self.assertIsNotNone(sa.trim_for_demerger(self.bars(demerged_closes()), "TATAMOTORS.NS"))
+        history = self.bars(demerged_closes())
+        self.assertIsNone(sa.trim_for_demerger(history, "TMCV.NS"))
+        self.assertEqual(history["bars"][0]["close"], 660.0)
+
+    def test_history_yahoo_already_adjusted_is_left_alone(self):
+        # Reliance 2023: Yahoo's series has no jump on the record date, so scaling again would double-count it.
+        sa.load_demergers = lambda path=None: [{**DEMERGERS[0], "cost_split_pct": {"parent": 95.32, "resulting": 4.68}}]
+        history = self.bars(rising(len(DAYS)))
+        before = [b["close"] for b in history["bars"]]
+        cut = sa.trim_for_demerger(history, "TMPV.NS")
+        self.assertEqual((cut["mode"], cut["factor"]), ("provider", 1.0))
+        self.assertEqual([b["close"] for b in history["bars"]], before)
+        self.assertIn("already reflect it", cut["note"])
+
+    def test_small_demerger_with_a_jump_uses_the_published_cost_split(self):
+        sa.load_demergers = lambda path=None: [{**DEMERGERS[0], "cost_split_pct": {"parent": 98.09, "resulting": 1.91}}]
+        history = self.bars(demerged_closes(before=1000.0, after=950.0))
+        cut = sa.trim_for_demerger(history, "TMPV.NS")
+        self.assertEqual((cut["mode"], cut["minor"]), ("scaled", True))
+        self.assertAlmostEqual(cut["factor"], 0.9809)
+        self.assertAlmostEqual(history["bars"][0]["close"], 980.9)
+
+    def test_report_keeps_full_history_without_the_demerger_jump(self):
         feed = Feed({"TMPV": lambda s: chart(s, demerged_closes(), name="Tata Motors Passenger Vehicles Limited")})
         r = run("TMPV", feed)
         t, o = r["technical"], r["outlook"]
-        self.assertEqual(t["history_start"], "2025-10-14")
-        self.assertLess(t["high_52w"], 500)  # the ₹660 pre-demerger prices are gone
+        self.assertEqual(t["history_start"], DAYS[0].date().isoformat())
+        self.assertLess(t["high_52w"], 500)  # pre-demerger ₹660 prices are scaled to the post-demerger level
         self.assertGreater(t["returns"]["1Y"], -0.1)  # not the -40% demerger jump
-        self.assertLess(o["history_years"], 1.2)
-        self.assertIn("after the demerger", o["method"])
-        self.assertNotIn("~2 years", o["method"])
-        text = sa.markdown(r)
-        self.assertIn("> ⚠ History starts 2025-10-14", text)
-        self.assertIn("first session on or after the 2025-10-14 record date", sa.summary(r))
-        self.assertIn("include the demerged business", text)
+        self.assertIn("scaled by", o["method"])
+        self.assertIn("Yahoo does not adjust prices before the 2025-10-14 demerger", sa.markdown(r))
+        self.assertIn("Yahoo does not adjust prices before the 2025-10-14 demerger", sa.summary(r))
+        self.assertEqual(r["history_warnings"], [])  # the demerger day is explained, not an unexplained gap
+        recent = DAYS[-60].date()  # a demerger within the last year is a headline caution, at the top
+        sa.load_demergers = lambda path=None: [{**DEMERGERS[0], "record_date": recent.isoformat()}]
+        r = run("TMPV", Feed({"TMPV": lambda s: chart(s, demerged_closes(recent))}))
+        self.assertFalse(r["history_note_old"])
+        self.assertIn(f"> ⚠ Yahoo does not adjust prices before the {recent.isoformat()} demerger", sa.markdown(r))
+        self.assertTrue(sa.summary(r).splitlines()[1].startswith("⚠ Yahoo does not adjust"))
 
-    def test_short_post_demerger_history_blocks_with_reason(self):
-        record = DAYS[-30].date()
+    def test_old_demerger_note_moves_below_the_answer(self):
+        record = DAYS[100].date()
         feed = Feed({"TMPV": lambda s: chart(s, demerged_closes(record))})
         sa.load_demergers = lambda path=None: [{**DEMERGERS[0], "record_date": record.isoformat()}]
-        with self.assertRaisesRegex(Block, "only 30 sessions since the .* demerger"):
-            run("TMPV", feed)
+        r = run("TMPV", feed)
+        self.assertTrue(r["history_note_old"])
+        lines = sa.summary(r).splitlines()
+        note = next(i for i, x in enumerate(lines) if "Yahoo does not adjust" in x)
+        self.assertGreater(note, next(i for i, x in enumerate(lines) if x.startswith("Valuation")))
+        self.assertTrue(lines[note].startswith("Note: "))
+        self.assertEqual(lines[-1], "Research only; not investment advice.")
+        self.assertIn("## Notes", sa.markdown(r))
 
     def test_unexplained_single_day_fall_is_warned(self):
         sa.load_demergers = lambda path=None: []
@@ -233,6 +266,46 @@ class DemergerHistoryTests(unittest.TestCase):
         self.assertIn("on 2025-10-14 with no split recorded", r["history_warnings"][0])
         bars = [{"at": d.isoformat(), "close": c} for d, c in zip(DAYS, demerged_closes())]
         self.assertEqual(sa.unexplained_gaps(bars, {"2025-10-14"}), [])
+
+
+class CorporateActionGapTests(unittest.TestCase):
+    def bars(self, day, move):
+        closes = [100.0 if d.date() < day else 100.0 * (1 + move) for d in DAYS]
+        return [{"at": d.isoformat(), "close": c} for d, c in zip(DAYS, closes)]
+
+    def test_fall_on_an_nse_ex_date_is_flagged_even_below_35_percent(self):
+        day = date(2026, 6, 15)
+        bars = self.bars(day, -0.08)
+        self.assertEqual(sa.unexplained_gaps(bars), [])  # the old 35% rule misses it
+        out = sa.action_gaps(bars, [("2026-06-15", "Rights 1:5 @ Premium Rs 80/-")])
+        self.assertEqual(len(out), 1)
+        self.assertIn("Close fell -8.0% on 2026-06-15, the ex-date of 'Rights 1:5", out[0])
+        self.assertIn("not like-for-like", out[0])
+        self.assertEqual(sa.action_gaps(bars, [("2026-06-15", "Bonus 1:1")], split_dates={"2026-06-15"}), [])  # Yahoo adjusted it
+
+    def test_dividend_that_explains_the_fall_is_named_and_ordinary_dividends_are_quiet(self):
+        day = date(2026, 6, 15)
+        out = sa.action_gaps(self.bars(day, -0.06), [("2026-06-15", "Special Dividend - Rs 5 Per Share")])
+        self.assertIn("most of the fall is the dividend", out[0])
+        self.assertEqual(sa.action_gaps(self.bars(day, -0.06), [("2026-06-15", "Interim Dividend - Rs 1 Per Share")]), [])
+
+    def test_report_checks_nse_actions_only_when_a_big_fall_exists(self):
+        day = DAYS[-30].date()
+        actions = json.dumps([{"exDate": day.strftime("%d-%b-%Y"), "subject": "Bonus 2:1"}]).encode()
+        closes = [100.0 if d.date() < day else 92.0 for d in DAYS]
+
+        class WithNse(Feed):
+            def __call__(self, url):
+                if "corporates-corporateActions" in url:
+                    self.urls.append(url)
+                    return actions
+                return super().__call__(url)
+        feed = WithNse({"GAPPY": lambda s: chart(s, closes)})
+        r = run("GAPPY", feed)
+        self.assertTrue(any("ex-date of 'Bonus 2:1'" in w for w in r["history_warnings"]))
+        quiet = WithNse({"FLAT": lambda s: chart(s, rising(520))})
+        run("FLAT", quiet)
+        self.assertFalse(any("corporates-corporateActions" in u for u in quiet.urls))
 
 
 class RetryTests(unittest.TestCase):
@@ -294,8 +367,12 @@ class DividendTests(unittest.TestCase):
         d = sa.trailing_dividends(history_with_dividends(tcs), 2400.0)
         self.assertEqual([s["date"] for s in d["specials"]], ["2026-01-16"])
         self.assertAlmostEqual(d["dividend_yield"], 112 / 2400)
-        self.assertAlmostEqual(d["recurring_yield"], 55 / 2400)
+        # Only the part above a regular payment is special: ₹57 - ₹12 (median of the others; the January a year
+        # earlier was itself flagged) = ₹45, as TCS's ₹57 was an ₹11 interim plus a ₹46 special.
+        self.assertAlmostEqual(d["specials"][0]["special_part"], 45.0)
+        self.assertAlmostEqual(d["recurring_yield"], 67 / 2400)
         self.assertIn("Possible special dividend", d["flags"][0])
+        self.assertIn("about ₹45.00 above a regular ₹12.00 payment", d["flags"][0])
 
     def test_regular_large_final_is_not_special(self):
         paints = [(date(2024, 11, 19), 4.25), (date(2025, 6, 10), 20.55), (date(2025, 11, 18), 4.5), (date(2026, 6, 23), 23.0), (date(2026, 11, 4), 5.75)]
@@ -320,6 +397,50 @@ class DividendTests(unittest.TestCase):
         text = sa.markdown(r)
         self.assertIn("| Dividend yield (trailing 12 months per share ÷ price) |", text)
         self.assertIn("| Cash dividends paid (last FY) / market cap |", text)
+
+
+class SpecialPartTests(unittest.TestCase):
+    def test_only_the_amount_above_a_regular_payment_is_special(self):
+        # ABB-like: the August interim a year earlier (₹9.77) is the regular amount, so ₹80.23 of the ₹90 is special.
+        abb = [(date(2025, 5, 2), 33.5), (date(2025, 8, 8), 9.77), (date(2026, 4, 30), 29.59), (date(2026, 8, 7), 90.0)]
+        d = sa.trailing_dividends(history_with_dividends(abb), 6000.0)
+        self.assertAlmostEqual(d["specials"][0]["special_part"], 90.0 - 9.77)
+        self.assertAlmostEqual(d["specials"][0]["regular_part"], 9.77)
+        self.assertAlmostEqual(d["recurring_yield"], (29.59 + 9.77) / 6000.0)
+        self.assertIn("about ₹80.23 above a regular ₹9.77 payment", d["flags"][0])
+
+    def test_latest_payment_and_its_age_are_reported(self):
+        d = sa.trailing_dividends(history_with_dividends([(date(2026, 6, 1), 2.0), (date(2026, 11, 3), 8.0)]), 1000.0)
+        self.assertEqual(d["latest"], {"date": "2026-11-03", "amount": 8.0, "days_ago": (DAYS[-1].date() - date(2026, 11, 3)).days})
+
+
+class SummaryHistoryNoteTests(unittest.TestCase):
+    def setUp(self):
+        self.patch = sa.load_demergers
+
+    def tearDown(self):
+        sa.load_demergers = self.patch
+
+    def test_old_demerger_yahoo_already_adjusted_is_dropped_from_the_summary(self):
+        # Reliance 2023 / Jio Financial: no jump in Yahoo's prices and more than a year old, so nothing in the
+        # summary depends on it; the full report keeps it under Notes.
+        record = DAYS[100].date()
+        sa.load_demergers = lambda path=None: [{**DEMERGERS[0], "record_date": record.isoformat(), "cost_split_pct": {"parent": 95.32, "resulting": 4.68}}]
+        r = run("TMPV", Feed({"TMPV": lambda s: chart(s, rising(520))}))
+        self.assertEqual(r["demerger"]["mode"], "provider")
+        self.assertTrue(r["history_note_old"])
+        self.assertNotIn("demerger", sa.summary(r))
+        self.assertIn("already reflect it", sa.markdown(r))
+
+    def test_scaling_note_is_one_plain_sentence(self):
+        sa.load_demergers = lambda path=None: DEMERGERS
+        r = run("TMPV", Feed({"TMPV": lambda s: chart(s, demerged_closes())}))
+        text = sa.summary(r)
+        line = next(x for x in text.splitlines() if "Yahoo does not adjust" in x)
+        self.assertIn("Yahoo does not adjust prices before the 2025-10-14 demerger of Tata Motors Limited (TMCV); they are scaled down", line)
+        for jargon in ("tax apportionment", "scaled by 0.", "cost split"):
+            self.assertNotIn(jargon, text)
+        self.assertIn("scaled by 0.", sa.markdown(r))  # the full report keeps the detail
 
 
 if __name__ == "__main__":

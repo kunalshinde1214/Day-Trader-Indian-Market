@@ -316,5 +316,143 @@ class PeBandFixTests(unittest.TestCase):
         self.assertIn("2025-10-14 demerger", band["basis"])
 
 
+
+class DividendPresetTests(unittest.TestCase):
+    def test_columns_show_fields_without_dummy_filters(self):
+        r = screener.screen("nifty50", [], fetcher=Feed(), now=NOW, columns=["pe", "payout_ratio", "fcf_cover"])
+        header = screener.markdown(r).split("| --- |")[0]
+        self.assertIn("| Stock | sector | P/E | payout (cash div ÷ profit) | FCF ÷ dividends |", header)
+        with self.assertRaisesRegex(Block, "unknown column"):
+            screener.screen("nifty50", [], fetcher=Feed(), now=NOW, columns=["colour"])
+
+    def test_preset_and_columns_reach_the_screen_from_the_command_line(self):
+        captured = {}
+        original = screener.screen
+
+        def stub(universe, where, **k):
+            captured.update(where=where, **k)
+            raise Block("SCREENER: stopped by the test")
+        screener.screen = stub
+        try:
+            with redirect_stderr(io.StringIO()):
+                screener.main(["--universe", "nifty100", "--preset", "dividend", "--where", "roe>15"])
+                self.assertEqual(captured["where"], ["recurring_yield>=1.5%", "dividend_years>=5", "debt_to_equity<=0.5", "roe>15"])
+                self.assertEqual(captured["sort"], "recurring_yield")
+                self.assertIn("payout_ratio", captured["columns"])
+                screener.main(["--columns", "pe,roe", "dividend_years"])
+                self.assertEqual(captured["columns"], ["pe", "roe", "dividend_years"])
+        finally:
+            screener.screen = original
+        self.assertEqual(screener.parse_filter("recurring_yield>=1.5%"), ("recurring_yield", ">=", 0.015))
+
+    def test_debt_filter_leaves_out_financials_and_says_so(self):
+        # The bank fixtures have no current assets or EBITDA, so they look like banks; DELTA/EPSILON are textiles.
+        base = Feed()
+
+        def feed(url):
+            if "fundamentals-timeseries" in url and ("/DELTA" in url or "/EPSILON" in url):
+                return fundamentals(10.0, extra={"annualCurrentAssets": [("2026-03-31", 4e10)], "annualCurrentLiabilities": [("2026-03-31", 2e10)],
+                                                 "annualTotalDebt": [("2026-03-31", 1e10)]})
+            return base(url)
+        r = screener.screen("nifty50", ["debt_to_equity<=0.5"], fetcher=feed, now=NOW)
+        self.assertEqual(sorted(r["excluded_financials"]), ["ALPHA.NS", "BETA.NS", "GAMMA.NS"])
+        self.assertEqual({x["symbol"] for x in r["results"]}, {"DELTA.NS", "EPSILON.NS"})
+        self.assertIn("Banks/financials excluded: debt/equity not meaningful (ALPHA, BETA, GAMMA)", screener.markdown(r))
+        r = screener.screen("nifty50", ["pe<1000"], fetcher=feed, now=NOW)
+        self.assertEqual(r["excluded_financials"], [])  # only a debt filter excludes them
+
+    def test_dividend_history_is_fetched_only_when_its_fields_are_used(self):
+        urls = []
+        base = Feed()
+
+        def feed(url):
+            urls.append(url)
+            return base(url)
+        screener.screen("nifty50", ["pe<1000"], fetcher=feed, now=NOW, symbols=["ALPHA"])
+        self.assertFalse(any("interval=1mo" in u for u in urls))
+        r = screener.screen("nifty50", ["dividend_years>=0"], fetcher=feed, now=NOW, symbols=["ALPHA"])
+        self.assertTrue(any("interval=1mo" in u for u in urls))
+        self.assertEqual(r["results"][0]["dividend_years"], 0)
+        self.assertIn("years paid in a row", screener.markdown(r))
+
+
+class PeerSpreadTests(unittest.TestCase):
+    def test_no_median_pe_when_peers_span_more_than_five_times(self):
+        own = {"symbol": "ALPHA.NS", "name": "Alpha", "market_cap_cr": 10.0, "pe": 4.0}
+        c = sa.peer_comparison("ALPHA.NS", own, fetcher=Feed(eps={"BETA": 0.5, "GAMMA": 10.0}), now=NOW)
+        self.assertTrue(c["pe_spread_wide"])
+        self.assertNotIn("pe", c["medians"])
+        self.assertIn("roe", c["medians"])
+        line = sa.peer_line(c)
+        self.assertIn("too wide for a meaningful median", line)
+        self.assertIn("BETA", line)
+        c = sa.peer_comparison("ALPHA.NS", {**own, "pe": 30.0}, fetcher=Feed(eps={"BETA": 9.0, "GAMMA": 10.0}), now=NOW)
+        self.assertFalse(c["pe_spread_wide"])
+        self.assertIn("pe", c["medians"])
+
+
+def dividend_report(columns, latest_days=6):
+    row = {"symbol": "ONGC.NS", "name": "Oil and Natural Gas Corporation Limited", "price": 223.0, "recurring_yield": 0.068,
+           "dividend_yield": 0.068, "payout_ratio": 0.41, "dividend_latest": {"date": "2026-11-12", "amount": 8.0, "days_ago": latest_days}}
+    return {"universe": "nifty100", "as_of": "2026-11-18T10:00:00+05:30", "filters": [], "sort": None, "results": [row], "evaluated": 1,
+            "requested": 1, "matched": 1, "missing_data": [], "failed": [], "truncated": False, "note": "Research only.", "columns": columns}
+
+
+class Round2ScreenerTests(unittest.TestCase):
+    def test_definitions_only_for_the_columns_shown(self):
+        text = screener.markdown(dividend_report(["price", "recurring_yield", "dividend_yield"]))
+        self.assertIn("Dividend yield (12m) = dividends per share", text)
+        self.assertIn("Ex-specials leaves out the special part", text)
+        for absent in ("Payout =", "FCF ÷ dividends =", "Years paid in a row", "5-year DPS growth", "Cash dividends / mkt cap"):
+            self.assertNotIn(absent, text)
+        text = screener.markdown(dividend_report(["price", "payout_ratio"]))
+        self.assertIn("Payout =", text)
+        self.assertNotIn("Dividend yield (12m) =", text)
+
+    def test_recent_ex_date_is_marked_for_yield_screens(self):
+        text = screener.markdown(dividend_report(["price", "recurring_yield"]))
+        self.assertIn("(ONGC) † |", text)
+        self.assertIn("† Went ex-dividend in the last 30 days, so a buyer today does not receive that payment", text)
+        self.assertIn("ONGC ₹8.00 on 12 Nov 2026", text)
+        self.assertNotIn("†", screener.markdown(dividend_report(["price", "recurring_yield"], latest_days=45)))
+        self.assertNotIn("†", screener.markdown(dividend_report(["price", "payout_ratio"])))  # no yield shown: no mark
+
+    def test_curated_industry_peers_replace_a_mixed_sector_index(self):
+        g = screener.peers_for("TMCV.NS", fetcher=Feed())
+        self.assertEqual(g["kind"], "industry")
+        self.assertEqual([m["symbol"] for m in g["peers"]], ["ASHOKLEY", "SMLMAH", "EICHERMOT"])
+        self.assertIn("NSE industry 'commercial vehicles'", g["basis"])
+        self.assertIn("https://www.screener.in/market/", g["basis"])
+        g = screener.peers_for("EICHERMOT.NS", fetcher=Feed())  # an add-on to the CV group, classed as a two-wheeler maker
+        self.assertIn("2/3 wheelers", g["basis"])
+        for name, entry in screener.SUB_INDUSTRIES.items():
+            with self.subTest(group=name):
+                self.assertTrue(entry["source"].startswith("https://"))
+                for s in entry["symbols"] + entry.get("also", []):
+                    self.assertEqual(sa.normalize(s), s + ".NS")
+
+    def test_industry_peers_are_labelled_and_named_in_the_summary(self):
+        own = {"symbol": "TMCV.NS", "name": "Tata Motors Limited", "market_cap_cr": 10.0, "pe": 25.0}
+        c = sa.peer_comparison("TMCV.NS", own, fetcher=Feed(eps={"ASHOKLEY": 4.0, "SMLMAH": 2.0, "EICHERMOT": 3.0}), now=NOW)
+        self.assertEqual(c["kind"], "industry")
+        self.assertTrue(sa.peer_line(c).startswith("Industry peers ("))
+        for sym in ("ASHOKLEY", "SMLMAH", "EICHERMOT"):
+            self.assertIn(sym, sa.peer_line(c))
+
+    def test_screen_withholds_revenue_that_more_than_doubled(self):
+        class Doubling(Feed):
+            def __call__(self, url):
+                if "fundamentals-timeseries" in url and "ALPHA" in url:
+                    return fundamentals(extra={"annualTotalRevenue": [("2025-03-31", 4e10), ("2026-03-31", 1e11)]})
+                return super().__call__(url)
+        r = screener.screen("nifty50", [], symbols=["ALPHA", "GAMMA"], fetcher=Doubling(), now=NOW, columns=["revenue_growth", "net_margin"])
+        rows = {x["symbol"]: x for x in r["results"]}
+        self.assertIsNone(rows["ALPHA.NS"]["revenue_growth"])
+        self.assertIsNone(rows["ALPHA.NS"]["net_margin"])
+        self.assertIn("Yahoo's revenue looks inconsistent", rows["ALPHA.NS"]["revenue_note"])
+        self.assertIsNotNone(rows["GAMMA.NS"]["revenue_growth"])
+        self.assertIn("ALPHA: Yahoo's revenue looks inconsistent", screener.markdown(r))
+
+
 if __name__ == "__main__":
     unittest.main()

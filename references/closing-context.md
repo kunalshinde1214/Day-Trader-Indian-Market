@@ -20,7 +20,11 @@ Choose the actual report date. The date is never guessed from weekdays or silent
 | FII/FPI and DII | NSE's public institutional-flow endpoint. Both categories must have one date and consistent buy/sell/net arithmetic. Source units are crore rupees, with a separate INR conversion. |
 | GIFT Nifty | The separately timestamped NIFTY futures observation in NSE's market-status response. It retains expiry, timestamp, age and a stale marker. It is never substituted for the domestic spot index or a broker contract. |
 
-The new source does not supply Sensex, which is a BSE index; there is no official BSE closing source in this skill. Combined reports mark Sensex unavailable and say why. `daily.py sensex --collect-close` (or `closing_context.py --indices sensex`) makes no NSE request and prints a plain explanation pointing to `python scripts/daily.py sensex --collect-public`, which reports Sensex from Yahoo public data (labelled as such); it still exits with status 2 because no Sensex close was observed. No Nifty value is relabelled as Sensex.
+NSE files do not supply Sensex, which is a BSE index, and BSE refuses scripts, so there is no official BSE closing source in this skill. Sensex rows therefore use **Yahoo's public daily bar** for the session (close, change against the previous Yahoo bar, day range), labelled “Yahoo, unofficial” in the table and “Yahoo daily close; unofficial” in brief mode; the data notes list the official BSE close as not covered. A same-day Sensex close is read only after 15:35 IST. `daily.py sensex --collect-close` (or `closing_context.py --indices sensex`) makes no NSE request. If Yahoo has no bar for that date, the report prints a plain explanation pointing to `python scripts/daily.py sensex --collect-public` and exits with status 2. No Nifty value is relabelled as Sensex.
+
+GIFT Nifty is included only outside the domestic session (before 09:15 or after 15:30 IST, and on weekends): once the spot index trades, a futures quote from GIFT City adds nothing. `collect(..., include_gift=False)` drops it explicitly; `daily.py --collect-public` asks for it only before the open.
+
+NSE's JSON endpoints (`fiidiiTradeReact`, `marketStatus`) answer scripts on `www.nseindia.in`; `www.nseindia.com` sends them a 301 and redirects are refused. The script requests the exact `.in` twin of the allowlisted `www.nseindia.com` URL and every report cites the `www.nseindia.com` address. Index and bhavcopy files come from `nsearchives.nseindia.com`.
 
 The markdown report leads with a dated table (close, change in points and percent, day range), followed by NSE EQ breadth, FII/DII net values and the GIFT Nifty observation, each with its own date, and one **Data notes** section with sources and remaining gaps. `--brief` prints a short version of about six to eight lines. Output is UTF-8 (the rupee sign prints on a Windows console).
 
@@ -38,6 +42,6 @@ All output remains partial, with `execution_eligible: false`, `full_market_cover
 
 A public read-only smoke test on 15 November 2026 obtained the 13 November Nifty/Bank Nifty report and 2,744 valid NSE EQ observations, institutional-flow observations and an explicitly stale GIFT observation. No brokerage account or order endpoint was used. Source samples and generated reports remain in excluded local test output.
 
-Primary references: [NSE daily reports](https://www.nseindia.in/all-reports), [FII/DII reports and crore units](https://www.nseindia.in/reports/fii-dii), [market-status observation](https://www.nseindia.in/api/marketStatus). These establish the source context, not guaranteed future endpoint availability.
+Primary references: [NSE daily reports](https://www.nseindia.com/all-reports), [FII/DII reports and crore units](https://www.nseindia.com/reports/fii-dii), [market-status observation](https://www.nseindia.com/api/marketStatus). These establish the source context, not guaranteed future endpoint availability.
 
 Remaining work includes a BSE closing provider, complete macro-event feeds, independently verified release/finality and membership evidence, and broader provider compatibility. See the [ordered checklist](completion-tracker.md).

@@ -57,7 +57,7 @@ class CoreTests(unittest.TestCase):
 
     def test_rate_card_expires(self):
         with self.assertRaisesRegex(Block,"RATES"):
-            charges(100,110,1,"BUY",self.i,self.r,"2026-12-01")
+            charges(100,110,1,"BUY",self.i,self.r,"2027-01-01")  # after the card's review_after (2026-12-31 since round 8)
 
     def test_invalid_numbers(self):
         for v in (float("nan"),float("inf"),True,-1,"bad"):

@@ -2,10 +2,12 @@
 import argparse
 from datetime import timedelta
 import html
+import http.client
 import json
 from pathlib import Path
 import re
 import sys
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
@@ -38,10 +40,28 @@ def subject_of(description):
     return match.group(1).strip() if match else None
 
 
-def importance(subject, text):
-    """material / notable / routine from the exchange SUBJECT plus the announcement text. Items without a subject stay notable."""
+DIVIDEND_RE=re.compile(r'(?<![a-z])(?:interim dividend|final dividend|special dividend|dividend|record date|ex-date|book closure)(?![a-z])')
+LARGE_CAP_LIST='https://nsearchives.nseindia.com/content/indices/ind_nifty100list.csv'
+
+
+def company_key(name):
+    """'Oil India Limited - Ex-Date: 20-Nov-2026' / 'Oil India Ltd.' -> 'oil india'."""
+    name=re.split(r'\s+-\s+ex-date',str(name or ''),flags=re.I)[0].lower()
+    name=re.sub(r'[^a-z0-9& ]+',' ',name)
+    return ' '.join(w for w in name.split() if w not in {'limited','ltd','the','co','company','corporation','corp'})
+
+
+def importance(subject, text, headline='', large_caps=None):
+    """material / notable / routine from the exchange SUBJECT plus the announcement text. Items without a subject stay notable.
+
+    Routine dividend/record-date ex-date notices are not market-moving: they are 'notable' for Nifty 100 companies
+    (when that list is supplied) and 'routine' for everyone else; without a list they are 'notable'."""
     s=(subject or '').lower();body=f"{s} {text or ''}".lower()
-    if MATERIAL_RE.search(body):return 'material'
+    if MATERIAL_RE.search(body):
+        if DIVIDEND_RE.search(body) and not MATERIAL_RE.search(DIVIDEND_RE.sub(' ',body)):
+            if large_caps is None:return 'notable'
+            return 'notable' if company_key(headline) in large_caps else 'routine'
+        return 'material'
     if subject and ROUTINE_RE.search(s):return 'routine'
     return 'notable'
 
@@ -50,17 +70,64 @@ FEEDS={"nse-announcements":SOURCES["announcements"],"nse-actions":SOURCES["corpo
        "et-markets":"https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms"}
 FEEDS.update({'nse-results':SOURCES['financial_results'],'nse-integrated':SOURCES['integrated_financials'],
               'nse-insider':SOURCES['insider_trading'],'nse-sast':SOURCES['sast29'],'nse-pledge':SOURCES['encumbrance']})
+# Google News search RSS (India edition). Google offers it for personal feed readers only: headlines and links are shown,
+# never article text, and they are labelled as unverified. One exact URL shape; the query is URL-encoded.
+GOOGLE_NEWS='https://news.google.com/rss/search?q={}&hl=en-IN&gl=IN&ceid=IN:en'
+GOOGLE_NEWS_RE=re.compile(r'https://news\.google\.com/rss/search\?q=[A-Za-z0-9%+._-]{1,160}&hl=en-IN&gl=IN&ceid=IN:en')
+FEEDS['google-news-markets']=GOOGLE_NEWS.format('Sensex+Nifty+when%3A1d')
 
 
-def fetch(url):
-    if url not in FEEDS.values():raise Block("Unsupported news source")
+def google_news_url(query):
+    """Exact Google News search-RSS URL for ``query`` (for example '"Titan Company" share when:1d')."""
+    url=GOOGLE_NEWS.format(urllib.parse.quote_plus(str(query)))
+    if not GOOGLE_NEWS_RE.fullmatch(url):raise Block("Unsupported news query")
+    return url
+
+
+def publisher(headline):
+    """Google News titles end with ' - Publisher': (title, publisher)."""
+    title,sep,name=str(headline).rpartition(' - ')
+    return (title.strip(),name.strip()) if sep and title.strip() and 0<len(name.strip())<=60 else (str(headline).strip(),None)
+
+
+SOCIAL_PUBLISHERS=re.compile(r"^(?:linkedin|facebook|instagram|x|twitter|youtube|reddit|telegram|quora|threads|tiktok|pinterest|medium)(?:\.com)?$",re.I)
+
+
+def search(query, hours=24, *, fetcher=None, clock=instant):
+    """Recent Google News headlines for one query, newest first: [{headline, publisher, url, published_at}]. Posts on
+    social networks (LinkedIn, Facebook, X, YouTube ...) are dropped: they are people's posts, not reporting."""
+    url=google_news_url(query);now=clock()
+    feed=rss((fetcher or fetch)(url),url,now)
+    rows=[r for r in feed['records'] if instant(r['published_at'])>=now-timedelta(hours=integer(hours))]
+    out=[]
+    for r in sorted(rows,key=lambda r:instant(r['published_at']),reverse=True):
+        title,name=publisher(r['headline'])
+        if name and SOCIAL_PUBLISHERS.match(name.strip()):continue
+        out.append({'headline':title,'publisher':name,'url':r['url'],'published_at':r['published_at'],'source':'Google News'})
+    return out
+
+
+def fetch(url, timeout=20):
+    if url not in FEEDS.values() and url!=LARGE_CAP_LIST and not GOOGLE_NEWS_RE.fullmatch(url):raise Block("Unsupported news source")
     req=urllib.request.Request(url,headers={"User-Agent":"IndiaDayTrader/0.9 personal RSS reader"})
-    with urllib.request.build_opener(NoRedirect()).open(req,timeout=20) as response:body=response.read(LIMIT+1)
+    try:
+        from nse_live import read_within  # a feed that drips bytes is cut off after 3 per-read timeouts
+        with urllib.request.build_opener(NoRedirect()).open(req,timeout=timeout) as response:body=read_within(response,LIMIT,timeout*3)
+    except http.client.HTTPException:raise Block("News source connection dropped") from None  # e.g. IncompleteRead
     if len(body)>LIMIT:raise Block("Oversized feed")
     return body
 
 
-def collect(sources, hours=24, *, fetcher=fetch, clock=instant):
+def large_cap_names(body):
+    """Normalized company names from NSE's Nifty 100 constituent CSV."""
+    import csv,io
+    rows=list(csv.DictReader(io.StringIO(body.decode('utf-8-sig') if isinstance(body,bytes) else body),skipinitialspace=True))
+    names={company_key(r.get('Company Name')) for r in rows if r.get('Company Name')}
+    if len(names)<80:raise Block('Unexpected Nifty 100 list')
+    return names
+
+
+def collect(sources, hours=24, *, fetcher=fetch, clock=instant, large_caps=None):
     hours=integer(hours)
     if hours>720 or not sources or len(set(sources))!=len(sources) or any(s not in FEEDS for s in sources):raise Block("Invalid sources/window")
     records={};coverage=[]
@@ -77,7 +144,7 @@ def collect(sources, hours=24, *, fetcher=fetch, clock=instant):
                 if key in records:records[key]['sources'].append(name)
                 else:records[key]={'id':key,'headline':row['headline'],'url':row['url'],'published_at':row['published_at'],
                                   'sources':[name],'categories':categories or ['market'],'subject':subject,
-                                  'importance':importance(subject,text),'summary':text[:240] or None,'classification_basis':'headline keywords; unverified',
+                                  'importance':importance(subject,text,row['headline'],large_caps),'summary':text[:240] or None,'classification_basis':'headline keywords; unverified',
                                   'timezone_basis':row.get('timezone_basis','Explicit feed offset'),'publication_time_raw':row.get('publication_time_raw'),
                                   'timezone_verified':row.get('timezone_verified',True),
                                   'attachments':discover_links(row.get('description',''),row['url'])}
@@ -132,7 +199,9 @@ def main(argv=None):
     a=p.parse_args(argv)
     try:
         if not 1<=a.limit<=200 or a.out and Path(a.out).exists():raise Block('Invalid limit or output already exists')
-        result=collect(a.sources,a.hours)
+        try:large=large_cap_names(fetch(LARGE_CAP_LIST))
+        except (Block,OSError,ValueError,KeyError):large=None  # without the list, dividend notices stay 'notable', never 'material'
+        result=collect(a.sources,a.hours,large_caps=large)
         if a.state:result=unseen(result,a.state,all_items=a.all)
         body=json.dumps(result,indent=2,allow_nan=False) if a.format=='json' else markdown(result,a.limit,a.include_routine)
         if a.out:

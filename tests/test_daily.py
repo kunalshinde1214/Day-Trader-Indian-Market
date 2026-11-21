@@ -41,28 +41,41 @@ class DailyTests(unittest.TestCase):
     def test_unknown_command_blocked(self):
         with self.assertRaises(Block): self.result("crude")
 
-    def test_stale_quote_blocks_only_affected_index(self):
+    def test_stale_quote_is_ignored_not_blocking(self):
         self.item()["quote"] = {"source": "test", "as_of": (self.now - timedelta(seconds=61)).isoformat(), "value": 25000}
-        self.assertEqual(self.first()["status"], "BLOCKED")
-        self.assertEqual(self.result()["coverage"]["available"], 2)
+        r = self.first()
+        self.assertEqual(r["status"], "PARTIAL"); self.assertEqual(r["value_basis"], "last_completed_candle_close")
+        self.assertIn("Latest quote is stale; not used", r["coverage_gaps"])
+        self.assertEqual(self.result()["coverage"]["available"], 3)
 
     def test_wrong_identity_and_price_basis(self):
         for key, value in (("index_id", "sensex"), ("price_basis", "futures_rupees")):
             b = copy.deepcopy(self.b); b["indices"]["nifty"][key] = value
             self.assertEqual(report("nifty", b, self.now)["status"], "BLOCKED")
 
-    def test_missing_intervening_or_latest_bar_blocks(self):
+    def test_missing_intervening_or_latest_bar_degrades_instead_of_blocking(self):
         for index in (0, 1, -1):
-            b = copy.deepcopy(self.b); b["indices"]["nifty"]["candles"]["rows"].pop(index)
-            self.assertEqual(report("nifty", b, self.now)["status"], "BLOCKED")
+            with self.subTest(index=index):
+                b = copy.deepcopy(self.b); b["indices"]["nifty"]["candles"]["rows"].pop(index)
+                r = report("nifty", b, self.now); item = r["indices"][0]
+                self.assertEqual(r["status"], "PARTIAL"); self.assertEqual(item["intraday_bars"], "incomplete")
+                self.assertEqual((item["completed_bars"], item["expected_bars"]), (3, 4))
+                self.assertEqual(item["last_session"]["close"], 24980)  # daily reference survives
+                if index in (0, 1): self.assertNotIn("opening_range_high", item["levels"])  # no opening range from a gapped window
+                text = markdown(r)
+                self.assertIn("intraday 5-minute bars received 3 of 4", text); self.assertNotIn("BARS:", text)
 
-    def test_duplicate_out_of_order_and_future_bars_block(self):
+    def test_corrupt_bars_are_discarded_and_daily_reference_still_reported(self):
         for mutation in ("duplicate", "reverse", "future"):
-            b = copy.deepcopy(self.b); rows = b["indices"]["nifty"]["candles"]["rows"]
-            if mutation == "duplicate": rows.append(rows[-1])
-            if mutation == "reverse": rows.reverse()
-            if mutation == "future": rows[-1]["at"] = (self.now + timedelta(minutes=5)).isoformat()
-            self.assertEqual(report("nifty", b, self.now)["status"], "BLOCKED")
+            with self.subTest(mutation=mutation):
+                b = copy.deepcopy(self.b); rows = b["indices"]["nifty"]["candles"]["rows"]
+                if mutation == "duplicate": rows.append(rows[-1])
+                if mutation == "reverse": rows.reverse()
+                if mutation == "future": rows[-1]["at"] = (self.now + timedelta(minutes=5)).isoformat()
+                r = report("nifty", b, self.now); item = r["indices"][0]
+                self.assertEqual(item["intraday_bars"], "unavailable"); self.assertEqual(item["completed_bars"], 0)
+                self.assertIsNone(item["change_from_previous_close_points"])  # no invented current level
+                self.assertIn("Last close on 5 Nov: **24,980.00**", markdown(r))
 
     def test_forming_bar_does_not_trigger_scenario(self):
         row = {"at": self.now.isoformat(), "open": 26000, "high": 27000, "low": 25900, "close": 26900}
@@ -95,8 +108,14 @@ class DailyTests(unittest.TestCase):
     def test_closing_report_requires_complete_session(self):
         b, now = demo("close"); b["indices"]["sensex"]["candles"]["rows"].pop()
         r = report("india-daily", b, now)
-        self.assertEqual(r["indices"][1]["status"], "BLOCKED")
+        sensex = r["indices"][1]
+        self.assertNotEqual(sensex["status"], "BLOCKED"); self.assertEqual(sensex["value_basis"], "last_available_bar_close")
         self.assertEqual(r["indices"][0]["completed_bars"], 75)
+        self.assertIn("bars incomplete, not the official close", markdown(report("sensex", b, now)))
+        b["indices"]["sensex"]["official_close"] = {"value": 80380, "session": "2026-11-06", "source": "Yahoo daily close (unofficial)", "basis": "Yahoo daily close (unofficial)"}
+        r = report("sensex", b, now)
+        self.assertEqual(r["indices"][0]["value"], 80380); self.assertEqual(r["indices"][0]["value_basis"], "official_daily_close")
+        self.assertIn("Yahoo daily close; unofficial", markdown(r))
 
     def add_breadth(self):
         self.item()["breadth"] = {"source": "test", "as_of": self.now.isoformat(), "membership_date": "2026-11-06", "membership_source": "test_master",
@@ -127,15 +146,16 @@ class DailyTests(unittest.TestCase):
         self.assertEqual(r["status"], "READY")
         self.assertAlmostEqual(r["indices"][0]["prior_sma20"], prev - 9.5)
         self.item()["history"]["rows"][-1]["close"] += 1
-        self.assertEqual(self.result("nifty")["status"], "BLOCKED")
+        r = self.result("nifty")["indices"][0]
+        self.assertEqual(r["status"], "PARTIAL"); self.assertIsNone(r["prior_sma20"])
 
     def test_history_cannot_include_future_release_or_today(self):
         prev = self.item()["previous"]["close"]
         self.item()["history"] = {"source": "test", "as_of": self.now.isoformat(), "rows": [
             {"session": "2026-11-05", "close": prev, "available_at": (self.now + timedelta(seconds=1)).isoformat()}]}
-        self.assertEqual(self.first()["status"], "BLOCKED")
+        self.assertIsNone(self.first()["last_session"]["change_points"]); self.assertIn("cross-check", " ".join(self.first()["coverage_gaps"]))
         self.item()["history"]["rows"][0].update(session="2026-11-06", available_at=self.now.isoformat())
-        self.assertEqual(self.first()["status"], "BLOCKED")
+        self.assertIsNone(self.first()["prior_sma20"]); self.assertEqual(self.first()["status"], "PARTIAL")
 
     def test_stale_constituent_does_not_produce_fresh_breadth(self):
         self.add_breadth(); self.item()["breadth"]["observations"][0]["as_of"] = (self.now - timedelta(minutes=2)).isoformat()

@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 from india_news import collect,markdown,fetch
@@ -90,3 +91,62 @@ class DigestTests(unittest.TestCase):
     def test_items_without_subject_stay_visible(self):
         r=collect(['et-markets'],fetcher=lambda u:BODY,clock=lambda:NOW)
         self.assertEqual(r['records'][0]['importance'],'notable');self.assertIn('Company profit rises',markdown(r))
+
+
+ACTIONS=('<rss><channel>'
+  '<item><title>Oil India Limited - Ex-Date: 20-Nov-2026 </title><link>https://www.nseindia.com/companies-listing/corporate-filings-actions</link>'
+  '<description>SERIES:EQ |PURPOSE:INTERIM DIVIDEND - RS 7 PER SHARE |FACE VALUE:10 |RECORD DATE:20-Nov-2026</description><pubDate>10-Nov-2026 06:11:45</pubDate></item>'
+  '<item><title>Tiny Cotspin Limited - Ex-Date: 23-Nov-2026 </title><link>https://www.nseindia.com/companies-listing/corporate-filings-actions</link>'
+  '<description>SERIES:EQ |PURPOSE:INTERIM DIVIDEND - RE 0.02 PER SHARE |FACE VALUE:1 |RECORD DATE:23-Nov-2026</description><pubDate>10-Nov-2026 06:11:45</pubDate></item>'
+  '<item><title>Small Buyback Limited - Ex-Date: 18-Nov-2026 </title><link>https://www.nseindia.com/companies-listing/corporate-filings-actions</link>'
+  '<description>SERIES:EQ |PURPOSE:BUY BACK |FACE VALUE:2 |RECORD DATE:18-Nov-2026</description><pubDate>10-Nov-2026 06:11:45</pubDate></item>'
+  '</channel></rss>').encode()
+NIFTY100=b'Company Name,Industry,Symbol,Series,ISIN Code\n'+b''.join(f'Large Company {k} Ltd.,X,LC{k},EQ,INE{k:03d}\n'.encode() for k in range(99))+b'Oil India Ltd.,Oil,OIL,EQ,INE274J01014\n'
+
+
+class DividendDemotionTests(unittest.TestCase):
+    def report(self,large=None):
+        from india_news import large_cap_names
+        return collect(['nse-actions'],fetcher=lambda u:ACTIONS,clock=lambda:NOW,large_caps=large_cap_names(NIFTY100) if large else None)
+
+    def test_small_company_dividend_ex_dates_are_routine_not_material(self):
+        levels={r['headline'].split(' - ')[0]:r['importance'] for r in self.report(large=True)['records']}
+        self.assertEqual(levels,{'Oil India Limited':'notable','Tiny Cotspin Limited':'routine','Small Buyback Limited':'material'})
+        text=markdown(self.report(large=True))
+        self.assertNotIn('Tiny Cotspin',text);self.assertLess(text.index('Small Buyback'),text.index('Oil India'))
+
+    def test_without_a_large_cap_list_dividends_are_never_material(self):
+        levels={r['headline'].split(' - ')[0]:r['importance'] for r in self.report()['records']}
+        self.assertEqual(levels['Tiny Cotspin Limited'],'notable');self.assertEqual(levels['Small Buyback Limited'],'material')
+
+    def test_large_cap_list_url_is_allowlisted_and_name_matching_ignores_suffixes(self):
+        from india_news import LARGE_CAP_LIST,company_key
+        self.assertEqual(company_key('Oil India Limited - Ex-Date: 20-Nov-2026 '),company_key('Oil India Ltd.'))
+        with patch('urllib.request.build_opener') as opener:
+            opener.return_value.open.side_effect=OSError('offline')
+            with self.assertRaises(OSError):fetch(LARGE_CAP_LIST)
+
+
+class GoogleNewsTests(unittest.TestCase):
+    """Google News search RSS (India edition): one exact URL shape, publisher split from the title, newest first."""
+    def test_query_urls_are_exact_and_encoded(self):
+        import india_news
+        url = india_news.google_news_url('"Titan Company" share when:1d')
+        self.assertEqual(url, "https://news.google.com/rss/search?q=%22Titan+Company%22+share+when%3A1d&hl=en-IN&gl=IN&ceid=IN:en")
+        self.assertEqual(india_news.FEEDS["google-news-markets"], "https://news.google.com/rss/search?q=Sensex+Nifty+when%3A1d&hl=en-IN&gl=IN&ceid=IN:en")
+        for bad in ("https://news.google.com/rss/search?q=x&hl=en-US&gl=US&ceid=US:en", "https://news.google.com/rss/articles/abc",
+                    "http://news.google.com/rss/search?q=x&hl=en-IN&gl=IN&ceid=IN:en", "https://news.google.com.evil/rss/search?q=x&hl=en-IN&gl=IN&ceid=IN:en"):
+            with self.assertRaises(Block): fetch(bad)
+        with self.assertRaises(Block): india_news.google_news_url("x" * 300)
+
+    def test_search_splits_publisher_and_keeps_recent_items_newest_first(self):
+        import india_news
+        body = (b'<rss><channel>'
+                b'<item><title>Old story - Mint</title><link>https://news.google.com/rss/articles/o</link><pubDate>Fri, 06 Nov 2026 03:00:00 GMT</pubDate></item>'
+                b'<item><title>Titan slides as gold falls - Upstox</title><link>https://news.google.com/rss/articles/a</link><pubDate>Tue, 10 Nov 2026 03:00:00 GMT</pubDate></item>'
+                b'<item><title>Titan Q2: margins - what next - Business Standard</title><link>https://news.google.com/rss/articles/b</link><pubDate>Tue, 10 Nov 2026 04:00:00 GMT</pubDate></item>'
+                b'</channel></rss>')
+        rows = india_news.search('"Titan Company" share when:1d', 24, fetcher=lambda url: body, clock=lambda: NOW)
+        self.assertEqual([(r["headline"], r["publisher"]) for r in rows],
+                         [("Titan Q2: margins - what next", "Business Standard"), ("Titan slides as gold falls", "Upstox")])
+        self.assertEqual(rows[0]["published_at"], "2026-11-10T09:30:00+05:30")
