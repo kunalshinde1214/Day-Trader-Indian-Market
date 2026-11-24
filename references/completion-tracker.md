@@ -1,12 +1,17 @@
 # Completion status
 
-Updated 18 November 2026 for version 1.5.0.
+Updated 24 November 2026 for version 1.5.1.
 
-The skill is complete for its purpose: Indian-market research, daily reports, single-stock analysis with peers and valuation history, a [stock screener](screener.md), a [portfolio review with capital-gains estimates](holdings-review.md), F&O analytics ([guide](fno.md)), news and filings, pattern scans, and paper trade planning with Indian costs and risk checks. Data that the scripts do not bundle is fetched at request time by [web research](web-research.md), and each user connects their own broker through a [broker connector](broker-connectors.md) or the built-in adapters. No publisher trading account is needed, and none is used.
+**Implemented:** Indian-market research, daily reports, market-move explanations, single-stock analysis with peers and valuation history, shareholding, a [stock screener](screener.md), a [portfolio review with capital-gains estimates](holdings-review.md), F&O analytics ([guide](fno.md)), news and filings, pattern scans, and paper trade planning with Indian costs and risk checks. "Implemented" means code and offline tests exist; see [release status](release-status.md) for how it was checked.
+
+**Not claimed:**
+
+- *Comprehensive exchange coverage.* Scripts read specific NSE public files and APIs. Anything else (BSE notices and filings, special sessions, emergency circulars, concalls, macro events) is looked up by [web research](web-research.md) when a user asks. That is a cited search at request time, not an automatic feed, and it can miss things.
+- *Broker or production acceptance.* Broker adapters and execution paths pass tests against recorded and simulated responses only. Each user connects and validates their own account through a [broker connector](broker-connectors.md) or the built-in adapters. No publisher trading account is needed, and none was used.
 
 ## How each original workstream is covered
 
-| # | Area | Covered by the skill | Covered at request time | Left to each user |
+| # | Area | Implemented in scripts | Looked up by web research when asked (not automatic) | Left to each user |
 | --- | --- | --- | --- | --- |
 | 1 | Other-broker carry execution | Angel One/FYERS reducing exits, stop-limits and cancellation ([guide](angel-fyers-execution.md)) | — | Validate their own account before enabling live actions |
 | 2 | Broader inventory | Settled, T1, pledged, MTF and corporate-action lot reconciliation, including trades ([inventory book](inventory-book.md)) | — | Supply their own statements; unsupported inventory stays blocked |
@@ -23,7 +28,7 @@ The skill is complete for its purpose: Indian-market research, daily reports, si
 
 ## Optional future enhancements
 
-These would extend the skill. They are not needed for it to work:
+These would extend the skill. The research and paper workflows work without them:
 
 - calibrated market-impact, queue and latency models fitted to real fills;
 - pre-open and market-regime models for replay;

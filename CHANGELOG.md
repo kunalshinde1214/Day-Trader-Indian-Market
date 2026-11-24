@@ -1,8 +1,16 @@
 # Changelog
 
+## 1.5.1 — 24 November 2026
+
+Documentation and release-manifest corrections; no change to how the skill answers questions.
+
+- **README:** release badge, download link and checksum steps now point to the current release (they still referenced 1.0.0); "See it in action" shows fresh 1.5.x output; the feature table covers market moves, shareholding and position sizing and no longer lists bonus/split handling as missing.
+- **Release status:** one current page (contents, how it was checked, what that does not establish, known limits, release history) instead of the 1.5.0 summary layered over the 0.10.0 baseline of sixteen skills and 936 tests. The requirements page is marked as a historical 0.10.0 record.
+- **Precise claims:** "complete for its purpose" is replaced by what is implemented and what is not claimed. Exchange coverage is partial (NSE public data in scripts; BSE and other sources through request-time web research, which is not automatic or comprehensive), and passing offline tests does not establish broker or production acceptance. The release manifest records `research_workflows_implemented` and `comprehensive_exchange_coverage: false` instead of `skill_scope_complete`. Testing is described as scoring by separate AI reviewer agents, with the last unseen-question average (about 8 out of 10) stated.
+
 ## 1.5.0 — 21 November 2026
 
-Built from eight rounds of independent scoring: six on 15 everyday questions (market, stocks, portfolio, F&O, sizing), then two on 30 questions the skill had never seen, with every number checked against NSE files, company filings, Screener.in and a broker margin calculator.
+Built from eight rounds of scoring by separate AI reviewer agents against a fixed rubric: six on 15 everyday questions (market, stocks, portfolio, F&O, sizing), then two on 30 questions not used during development, with figures spot-checked against NSE files, company filings, Screener.in and a broker margin calculator. On the last unseen set the average was about 8 out of 10 before the final fixes, which were not re-scored. Exchange coverage remains partial (NSE public data in scripts; other sources through request-time web research) and broker workflows remain tested offline only.
 
 - **Live NSE levels and calendar:** daily reports use NSE's own live index levels during market hours, NSE's 20-day averages, the NSE holiday list (with names) and the Tuesday-expiry rule. Reports degrade with a labelled gap instead of stopping when an optional source fails, and no longer crash on a dropped connection.
 - **"Why did the market move?"** `scripts/market_movers.py` gives direction first (and corrects a wrong premise), weakest and strongest sectors, the stocks that moved the index most, breadth, VIX, FII/DII and dated, filtered headlines. Sensex reports show Sensex drivers in Sensex points (estimated weights, checked against the index), not Nifty points. Index-point contributions are anchored to the NSE Indices factsheet weights (`assets/index_weights.json`, refreshed monthly; ignored after 100 days), and Sensex reports lead with one labelled "Sensex ≈" figure estimated from live Nifty (BSE does not serve scripts), with the last Yahoo quote beside it. Nifty Bank drivers are anchored to the Nifty Bank factsheet too. Intraday daily reports add "Possible reasons (headlines, unverified)" ranked by causal wording (routine filings and multi-day stories filtered out) and a "Cues" line (GIFT Nifty, US markets, gold, crude, rupee).

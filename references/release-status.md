@@ -1,58 +1,69 @@
-# Release status — 21 November 2026
+# Release status
 
-**1.5.0, 21 November 2026:** eight rounds of independent scoring — six on 15 everyday questions and two on 30 questions the skill had never seen — live NSE levels and calendar, "why did the market move" with same-day headline reasons and cues, split-safe P/E and one-off-adjusted growth, after-close option chains and re-pricing, F&O re-pricing and indicative SPAN margin, shareholding and pledge, side-by-side comparison, dividend screen, demerger-aware portfolio review, and bounded retries so a failed download never silently changes an answer.
+Current version: **1.5.1**, published 24 November 2026: the 1.5.0 features with corrected documentation and release manifest. This is the one place for what the current release contains, how it was checked and what that checking does not establish. Per-version detail is in the [changelog](../CHANGELOG.md).
 
-**1.4.0, 18 November 2026:** fixes from the second round of user testing: the daily commands are back, daily reports show the day's change and work on Windows, renamed symbols such as TATAMOTORS are explained, screens are repeatable, P/E is compared like with like, a simple position sizer needs no broker setup, and F&O expiries are labelled weekly/monthly with a next-session move.
+## What 1.5.1 contains
 
-**1.3.0, 18 November 2026:** easier to use: 8 skills instead of 19, a short core skill with broker and live-order material moved to [advanced tools](advanced.md), answer-first `--summary` modes, answer templates for common questions, business peers in stock analysis, demerger flags in the portfolio review, and day-over-day, probability and today-value views in F&O.
+**12 plugin skills:** the daily commands `nifty`, `sensex`, `banknifty` and `india-daily`, plus `market`, `stock`, `screener`, `fno`, `portfolio`, `trade-plan`, `news` and `broker`. See the [command reference](commands.md).
 
-**1.2.1, 18 November 2026:** trust fixes from user testing: the latest price is no longer silently a day old, bonuses and splits are applied in the portfolio review, Yahoo's EPS is cross-checked against quarterly figures, missing purchase dates give a tax range instead of ₹0, and bank ROE/P/B carry a warning.
+| Area | What is implemented | Guide |
+| --- | --- | --- |
+| Market moves | Direction, sectors, index drivers in estimated points (checked against the official change), breadth, VIX, FII/DII and NSDL flows, dated headlines and cues; one sector's stocks; indices over a period; a mood view; weekend and holiday reports | [market movers](market-movers.md) |
+| Daily briefings | Nifty, Sensex, Bank Nifty, India Daily: live NSE levels in market hours, close and closed-day modes, next-session levels | [daily reports](daily.md) |
+| Stock research | Ratios cross-checked with NSE consolidated filings, P/E history adjusted for bonuses and splits, one-offs stripped, 3-year growth, business peers, sum of parts, side-by-side compare, news | [public workflows](public-workflows.md) |
+| Shareholding | Pattern, promoter pledge and encumbrance trend, SAST filings, fund houses matched across quarters | [shareholding](shareholding.md) |
+| Screener | Index universes, fundamental and momentum filters, dividend preset, sector exclusion | [screener](screener.md) |
+| Portfolio review | P&L, XIRR, concentration, bonuses, splits and demergers, capital-gains estimates under the Income-tax Act 2025 | [holdings review](holdings-review.md) |
+| F&O analytics | Chain, OI, PCR, max pain, IV and Greeks, payoffs, strike grids, indicative SPAN + exposure margin | [F&O](fno.md) |
+| Paper planning | Scanners, opening-range plans, replay, position sizing with Indian charges, risk checks | [setups](setups.md) |
+| Broker workflows | Broker connectors and five built-in adapters; human-operated execution and protection, disabled by default | [broker connectors](broker-connectors.md), [advanced tools](advanced.md) |
 
-**1.2.0, 18 November 2026:** adds a [stock screener](screener.md), a [portfolio review with capital-gains estimates](holdings-review.md), sector peers, a five-year P/E band and a price chart in stock analysis, a ranked news digest, currency conversion for companies that report in US dollars, Hindi/Hinglish answers, and tests against recorded real responses.
+## How it was checked
 
-**1.1.0, 17 November 2026:** adds [F&O analytics](fno.md): option chain, OI build-up, PCR, max pain, IV and Greeks, expected move, futures basis, India VIX context and multi-leg strategy payoff with charts, from NSE's free end-of-day data or a live broker-connector chain.
+- **Automated tests:** 1,883 offline tests pass on Python 3.10, 3.12 and 3.13 in GitHub CI, and on 3.11, 3.12 and 3.13 locally with network access blocked. They use recorded and simulated exchange and broker responses, including failure cases. Mutation checks confirmed the new logic in 1.5.0 is covered by tests; 1.5.1 changes documentation and the release manifest only.
+- **Packaging:** `python scripts/release.py --check` reruns the suite and checks Python syntax, JSON, local links, plugin manifests and self-contained SVGs. The ZIP is built from an explicit allowlist and carries a SHA-256 manifest of every file; private outputs, credentials, local state and dependencies are excluded.
+- **Answer scoring:** separate AI reviewer agents answered everyday questions by following the skill, scored each answer out of 10 against a fixed rubric (correctness, completeness, clarity, honesty, friction, comparison with the best free alternative), and spot-checked figures against NSE files, company filings, Screener.in and a broker margin calculator.
 
-**1.0.0, 17 November 2026:** completes the skill's scope by adding [web research](web-research.md) for BSE, filings, news and macro events, and [broker connectors](broker-connectors.md) for each user's own account. It includes 0.10.1's [history, inventory, risk and protection work](development-progress.md). Release validation passed **984 offline tests**. The 0.10.0 feature description below still applies.
+  | Round | Questions | Average before that round's fixes |
+  | --- | --- | --- |
+  | 1–6 | The same 15 questions, used during development | 6.5 at the start; about 9 by round 6 |
+  | 7 | 15 questions not used during development | 6.8 market · 7.2 stocks · 7.6 portfolio and F&O |
+  | 8 | 15 more unseen questions | 8.4 market · 7.8 stocks · 7.6 portfolio and F&O |
 
-Version: **1.5.0**. Complete for its purpose; optional future enhancements and per-user broker validation are listed in the [completion status](completion-tracker.md). See also the [feature matrix](../README.md#what-is-implemented). The sections below describe the 0.10.0 baseline that 1.0.0 builds on.
+  Fixes followed each round. The round-8 fixes were checked by the agents that made them, not re-scored independently, so the last independent figure is **about 8 out of 10 on unseen questions**. The reviewers were AI agents, not traders, and the rubric is this project's own.
 
-## Included in this release
+## What this does not establish
 
-- Sixteen Claude plugin skills, a one-line terminal installer, four daily aliases and one-stock public research. The README includes original SVG artwork and a workflow illustration.
-- Six scanners plus custom levels at one/five-minute intervals, interval-bound replay, INR sizing and risk checks. Gap and Go retains its full fifteen-minute opening window.
-- Dated public NSE Nifty/Bank Nifty closes, observed EQ breadth, separately dated FII/DII and GIFT context, surveillance indicators and F&O-ban observations. Missing or stale components remain explicit; none establishes trade clearance.
-- Bounded NSE announcement backfill, official attachment discovery, symbol-plus-ISIN matching, supported Indian inline-XBRL numeric formats and a durable filing backlog.
-- Reviewed historical membership intervals and split/bonus reconstruction, with information cutoffs and source hashes. Inventory accounting covers sourced settled, T1, pledged, funded and entitlement lots without granting trading eligibility.
-- Supported reducing carry exits, stop-limits and cancellation across Kite, Upstox, Dhan, Angel One and FYERS. Separate long MIS cash entries can coexist with supported long CNC/MIS exposure. These are disabled-by-default, human-operated workflows.
-- Five-broker cash-depth observations, quantity-dependent replay fees and explicit cost sensitivity, plus Kite/Upstox/Angel/FYERS basket prefixes and supplied fill scenarios. Dhan/FYERS depth is research-only where book timestamps are unavailable; margin providers retain their different response semantics.
-- Bounded repeated public collection; user-owned setup and acceptance workflows; the existing experimental single-instrument intraday protection runner. No service is installed automatically.
+- **Exchange coverage is partial.** Scripts read specific NSE public files and APIs. BSE notices and filings, special sessions, emergency circulars, concalls and macro events come from [web research](web-research.md) at request time: a cited search, not an automatic or comprehensive feed, and a search can miss things. BSE blocks scripts, so Sensex figures are estimates or Yahoo quotes.
+- **Sources can change.** Live smoke runs against NSE, Yahoo and Google News succeeded during development; they do not establish that these sources will stay available or keep their formats.
+- **Broker acceptance is not tested.** Broker adapters and execution paths are tested against recorded and simulated responses only. No publisher trading account was connected, no real order was submitted and no production service was activated. Passing tests does not establish that any broker accepts these workflows; each user supplies their own credentials and acceptance evidence ([user setup](user-setup.md), [acceptance evidence](acceptance-evidence.md)).
+- **No performance claim.** Nothing here measures profitability. Research output is not investment advice.
 
-## Validation and its limits
+## Known limits and upkeep
 
-The final development suite passes **936 offline tests**. Packaging reruns the full suite and checks Python syntax, JSON, local links, plugin manifests and self-contained SVGs. ZIP contents have a SHA-256 manifest; private outputs, credentials, local state and dependencies are excluded by an allowlist.
+- Prices and some fundamentals come from Yahoo (unofficial, about 15 minutes delayed). Fundamentals are cross-checked with NSE filings where the skill can; it flags the disagreements it detects, not every error.
+- Index-point drivers use estimated weights anchored to the monthly NSE Indices factsheet (`assets/index_weights.json`, ignored after 100 days).
+- Indicative margin follows NSE Clearing's files and published exposure rules; broker figures differ, and the broker's basket margin is final.
+- Kept up to date by hand: index weights (monthly), the NSE holiday list (yearly), tax and STT rates (each Budget), the bonus and split list, and curated peer, subsidiary and holding-vehicle lists.
 
-Release verification checks the archive manifest, source-byte agreement, a clean unpack, synthetic daily commands, disabled-profile generation, new CLI entrypoints and portfolio/journal workflows. GitHub CI targets Python **3.10, 3.12 and 3.13**. Use the exact published commit's CI result; a generic badge does not prove account acceptance.
-
-Public NSE source smoke tests succeeded during development, but do not establish future source availability or comprehensive coverage. Simulated broker tests do not establish authenticated broker behavior, installed-host invocation, production reliability or profitability.
-
-No publisher trading account was connected, trade submitted or production service activated. Each user supplies their own credentials and acceptance evidence. The publisher does not need a brokerage account to distribute the skill.
-
-## Remaining engineering
-
-1. Provider-specific T1/pledged/MTF execution, broader settlement/corporate actions and more mixed-entry combinations.
-2. Comprehensive BSE/calendar/surveillance/filing coverage, complete licensed histories, independent effective-date/issuer/fact verification, BSE closing data and macro feeds.
-3. Derivative depth units, calibrated queue/latency/partial-fill/impact models, Dhan baskets, collateral/market stress and unenumerated margin scenarios.
-4. Pre-open/regime models and consistent special-session handling across research and replay.
-5. Multi-instrument/account and carry-aware unattended protection, runtime validation, remaining broker inventory/master ambiguities and account-specific tariffs/exemptions/rounding.
-
-The [completion tracker](completion-tracker.md) keeps all twelve requested areas visible. Partial implementations are not counted as complete.
-
-## User-owned acceptance
-
-Users supply broker login, API permissions and entitlements, delivery authorization, current tariffs, approved limits and observed broker/host/service checks. See [user setup](user-setup.md), [acceptance evidence](acceptance-evidence.md), [carry execution](mixed-inventory-exits.md) and [protection operations](protection-controller.md). Operator-supplied declarations are not independent broker certification.
+Remaining engineering and optional enhancements are listed in the [completion status](completion-tracker.md).
 
 ## Distribution
 
-Build with `python scripts/release.py --out dist/india-day-trader-1.5.0.zip`. The command refuses overwrite and does not skip tests. The manifest records `skill_scope_complete: true`, the optional enhancements, `authenticated_broker_acceptance: false` and `live_enabled_by_default: false`.
+Build with `python scripts/release.py --out dist/india-day-trader-1.5.1.zip`. The command refuses to overwrite and does not skip tests. The [1.5.1 release page](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.5.1) provides the ZIP and its `.sha256` checksum; see the [README](../README.md#python-cli) for how to verify it.
 
-The [1.5.0 release page](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.5.0) provides the ZIP, checksum and scope notes. Original contributions remain source-available for personal use; third-party MIT rights remain intact.
+Original contributions are source-available, free for personal use; third-party MIT rights remain intact.
+
+## Release history
+
+| Version | Date | Summary |
+| --- | --- | --- |
+| 1.5.1 | 24 Nov 2026 | Documentation and release manifest brought up to date with 1.5.0; completion and coverage claims made precise |
+| 1.5.0 | 21 Nov 2026 | Market moves, sectors, periods and mood; stock figures cross-checked with NSE filings; shareholding; after-close F&O and SPAN margin; weekend reports; 1,883 tests |
+| 1.4.0 | 18 Nov 2026 | Daily commands restored, repeatable screens, renamed symbols, simple position sizer, weekly/monthly expiry labels |
+| 1.3.0 | 18 Nov 2026 | 19 skills reduced to 8, answer-first `--summary` modes, broker material moved to advanced tools |
+| 1.2.1 | 18 Nov 2026 | Trust fixes: fresh prices, bonuses and splits in the portfolio review, EPS cross-check |
+| 1.2.0 | 18 Nov 2026 | Screener, portfolio review with capital gains, peers, P/E band, Hinglish answers |
+| 1.1.0 | 17 Nov 2026 | F&O analytics |
+| 1.0.0 | 17 Nov 2026 | Web research and broker connectors; 984 tests |
+| 0.10.x and earlier | to 17 Nov 2026 | Scanners, replay, broker adapters, carry accounting, protection runners; see [0.10.1 scope](development-progress.md) and the [changelog](../CHANGELOG.md) |

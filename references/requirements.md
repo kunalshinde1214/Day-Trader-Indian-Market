@@ -1,6 +1,6 @@
 # Requirements and implementation status
 
-For 1.0.0 scope, read the [completion status](completion-tracker.md), [web research](web-research.md) and [broker connectors](broker-connectors.md); for 0.10.1 additions, [0.10.1 scope](development-progress.md). The 0.10.0 counts and scope below are preserved as publication evidence.
+**Historical page.** For the current release (1.5.1, 12 plugin skills, 1,883 offline tests) read [release status](release-status.md) and the [completion status](completion-tracker.md). The requirements sources below still apply. The development checkpoint and module counts further down describe version 0.10.0 and are kept unchanged as a record; their counts (sixteen skills) are not current.
 
 Development checkpoint: **16 November 2026**, version **0.10.0-market-workflows-alpha**. Includes sixteen Claude plugin skills, credential-free charts and screening, one-minute/custom-level research, explicit exit policies, news and supplied XBRL analysis. Limited five-broker carry collection/execution, streaming, monitoring deployment files, daily reports and paper analysis are included. Each user supplies their broker/data entitlement, approved limits and sourced evidence for broker-bound workflows. Example capital and loss limits are not approvals.
 

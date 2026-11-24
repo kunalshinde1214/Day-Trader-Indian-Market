@@ -11,7 +11,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION="1.5.0"
+VERSION="1.5.1"
 ROOT_FILES={"SKILL.md","README.md","LICENSE","THIRD_PARTY_NOTICES.md","RISK_DISCLOSURE.md","SECURITY.md","CONTRIBUTING.md","CHANGELOG.md",".gitignore",".gitattributes","requirements-dev.txt","requirements-streaming.txt","requirements-streaming-sdk.txt"}
 DIR_TYPES={"scripts":{'.py'},"tests":{'.py','.json','.csv','.xml'},"references":{'.md'},"assets":{'.json','.svg'},"agents":{'.yaml'},"third-party":{'.LICENSE'},".github":{'.yml'},".claude-plugin":{'.json'},"skills":{'.md'}}
 DENY={"__pycache__","research","test-output","trader",".git",".env",".venv","node_modules"}
@@ -77,7 +77,7 @@ def static_checks(root=ROOT):
 def package(out,root=ROOT):
     checks=static_checks(root)
     files=release_files(root)
-    manifest={"version":VERSION,"mode":"research-paper-human-execution-and-opt-in-bounded-protection","skill_scope_complete":True,
+    manifest={"version":VERSION,"mode":"research-paper-human-execution-and-opt-in-bounded-protection","research_workflows_implemented":True,"exchange_coverage":"partial: NSE public files and APIs in scripts; BSE and other sources via request-time web research, not automatic or comprehensive","comprehensive_exchange_coverage":False,
               "runtime_sources":"web research for BSE, filings, news and macro events; user broker connector or local adapters for account data",
               "optional_enhancements":["calibrated impact/queue/latency models","pre-open and regime models","carry and derivative mixed entries","multiple accounts per broker in one protection process"],
               "unattended_protection":"bounded intraday and carry-aware runners; explicit human arming and per-user account acceptance required; reduce/cancel only",

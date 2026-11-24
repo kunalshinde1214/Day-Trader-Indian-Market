@@ -6,13 +6,13 @@
 
 [![Offline validation](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml/badge.svg)](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-244b3f)
-![Release 1.0.0](https://img.shields.io/badge/Release-1.0.0-2b6cbb)
+![Release 1.5.1](https://img.shields.io/badge/Release-1.5.1-2b6cbb)
 
-[Install](#install) · [See the workflow](#from-question-to-research) · [Feature matrix](#what-is-implemented) · [Download 1.0.0](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.0.0) · [Documentation](#go-deeper)
+[Install](#install) · [See the workflow](#from-question-to-research) · [Feature matrix](#what-is-implemented) · [Download 1.5.1](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.5.1) · [Documentation](#go-deeper)
 
 Created by **Kunal Shinde**. Source-available and free for personal use. Public research needs **no brokerage account or API key**. Broker workflows use **your own account**, with credentials kept locally.
 
-**Also in 1.0.0 (from 0.10.1):** resumable NSE announcement history, trade-inclusive inventory reconciliation, short MIS entries alongside existing inventory, Dhan basket margins, fill and collateral stress scenarios, and carry-aware protection. See [0.10.1 scope](references/development-progress.md).
+**New in 1.5.0:** "why did the market move" with index drivers and dated headlines, one sector's stocks (`--sector`), index performance over a period (`--period`), a market-mood view, weekend and holiday reports, stock figures cross-checked with NSE filings, shareholding and pledge trends, after-close option chains, indicative SPAN margin, and position sizing from a stock name. See the [changelog](CHANGELOG.md) and [release status](references/release-status.md).
 
 ## From question to research
 
@@ -35,35 +35,43 @@ Historical ranges are **observed outcomes, not forecasts**. A rule match is not 
 
 ## See it in action
 
-Real output from 17–18 November 2026, unedited apart from trimming. Prices and figures are as of those dates, not current.
+Real output from version 1.5.1 on Tue 24 Nov 2026, an NSE holiday, so the figures are from the Mon 23 Nov session. Trimmed, otherwise unedited; figures are as of that date, not current.
 
-**“Analyse Reliance”** (`stock_analysis.py RELIANCE --summary`):
+**“Analyse Reliance. Is it cheap?”** (`stock_analysis.py RELIANCE --summary`):
 
 ```text
-Reliance Industries Limited (RELIANCE.NS) — prices as of 2026-11-17
-⚠ Yahoo's daily bar for 2026-11-17 had no close; using its last traded price ₹1,367.00 at 15:28 IST and that day's high/low.
-Price ₹1,367.00 (+1.65% on the day); 1 year -9.6% vs Nifty -1.2%; -15.2% from the 52-week high.
-Trend: uptrend; RSI 84 (overbought (>70)).
-Valuation: P/E 22.5 (usual range 24.0–28.5, today higher than 14% of the last 3.4 years); P/B 2.05; ROE 9.2%; debt/equity 0.44.
-Growth: revenue +9.6% last year, EPS +16.0%; latest quarter profit +22.0% vs previous quarter.
-Index peers: median P/E 16.5, ROE 14.5% — ⚠ much larger than every peer, weak comparison.
-Past 1-month moves from today's price: ₹1,275.22 to ₹1,476.99 (10th–90th percentile, not a forecast).
-Levels: above ₹1,374.00 extends the move; below ₹1,152.50 weakens it.
+Reliance Industries Limited (RELIANCE.NS) — prices as of 2026-11-23
+Valuation: P/E 22.3 (trailing 12 months); on latest annual EPS 22.6, cheaper than on 89% of trading days since Nov 2021 (usual range 24.4–29.4) — but that EPS includes one-offs: without them about 25.0, cheaper than on 70% of days (estimate, see ⚠ below); P/B 1.94; market cap ₹18.28 lakh cr.
+Quality and growth: ROE 9.2%; debt/equity 0.43 at 30 Sep 2026; revenue +9.6%, EPS +16.0% (FY2026 vs FY2025; EPS about +4.9% without one-offs, estimate); 3-year CAGR FY2023–FY2026: revenue +6.4% a year, profit +6.6% a year (NSE consolidated results filings).
+Sum of parts: 64.48% of Jio Platforms (JPL) × its market cap ₹12.61 lakh cr = ₹8.13 lakh cr — 44% of Reliance's own market cap (estimate).
+Price ₹1,351.00 (-1.92% on the day); 1 year -11.1% vs Nifty -2.6%; -16.2% from the 52-week high.
+⚠ FY2026 earnings include one-offs: other income in the Jun 2025 quarter was ₹15,119 cr, about ₹10,210 cr above its usual ₹4,910 cr … check that quarter's results release.
+```
+
+**“Why did the market fall?”** (`market_movers.py --summary`):
+
+```text
+Market closed today (Tue 24 Nov 2026: Prakash Gurpurb Sri Guru Nanak Dev) — figures are from the last session, Mon 23 Nov 2026.
+Nifty 50 closed down 450.95 points (-1.75%) at 25,349.65 on Mon 23 Nov 2026 (NSE).
+- Breadth: 11 of 50 Nifty stocks up, 39 down. Nifty Midcap 150 -0.92%, Nifty Smallcap 250 -0.69%.
+- Sectors: strongest Nifty IT +1.69%; weakest Nifty Metal -3.68%, Nifty PSU Bank -3.25%, Nifty Private Bank -3.19%.
+- Biggest drags (est. index points): HDFCBANK -93.3 pts, ICICIBANK -84.3 pts, RELIANCE -38.2 pts, AXISBANK -35.7 pts.
+- Check: these estimates add up to -449.4 points vs the official -450.9.
+- FII/FPI net +₹5,672.99 cr (net buyers), DII net -₹2,760.12 cr (net sellers) (provisional NSE data).
+- Mood context (not a forecast): Nifty 50 P/E 20.65 vs its past-year range 19.05–22.81; India VIX 17.70 vs its 52-week range 8.72–28.91.
 ```
 
 **“Nifty ka option chain dikhao”** (`fno.py chain NIFTY --summary`):
 
 ```text
-NIFTY options, expiry 2026-11-23 (6.0 days) — data 2026-11-17 (NSE F&O bhavcopy, end of day)
-- Spot 25,387.40 · forward 25,409.26
-- PCR (OI) 1.08 (+0.02 vs 2026-11-16)
-- Max pain 25,000 (+200 vs 2026-11-16)
-- ATM IV 14.2% (-0.4 pts vs 2026-11-16)
-- Expected move to expiry ±369.15 (1.5%) by ATM straddle; 68% implied range 24,946–25,872
-- Call OI walls above spot: 26,000, 25,500, 26,500 · put OI walls below spot: 25,000, 24,000, 23,000
+NIFTY options, expiry 2026-12-01 (weekly, 8.0 days) — data 2026-11-23 close (NSE F&O bhavcopy, end of day)
+- PCR (OI) 0.70 (-0.17 vs 2026-11-20)
+- Max pain 25,500 — 0.6% above spot (the Mon 23 Nov close)
+- Expected move to expiry ±506.45 (2.0%) by ATM straddle; 68% implied range 24,737–26,008 around the forward 25,373
+Next session — Wed 25 Nov: 1-sigma ±270 (1.07%): 25,079–25,620; OI walls near spot: calls 26,000, 25,500 · puts 25,000, 24,800
 ```
 
-**“Payoff of selling the 25800 call and buying the 26000 call”** (`fno.py payoff NIFTY --leg SELL:CE:25800:1 --leg BUY:CE:26000:1 --chart …`): net credit ₹1,693, maximum loss ₹11,307, breakeven 25,826, probability of profit 81.6% as implied by option prices.
+**“Payoff of selling the 25800 call and buying the 26000 call”** (`fno.py payoff NIFTY --leg SELL:CE:25800:1 --leg BUY:CE:26000:1 --chart …`, 17 Nov 2026 data): net credit ₹1,693, maximum loss ₹11,307, breakeven 25,826, probability of profit 81.6% as implied by option prices.
 
 ![Payoff chart for a NIFTY 25800/26000 bear call spread, expiry 23 November 2026: profit of ₹1,693 below the 25,826 breakeven, loss capped at ₹11,307 above 26,000, with a dashed line showing the value today.](assets/example-payoff.svg)
 
@@ -124,33 +132,29 @@ python scripts/daily.py india-daily --collect-public
 
 The `--demo` command uses **fictional demo data**. The last two fetch public data and need internet access. Use `python3` on macOS/Linux or `py` on Windows if `python` is unavailable. Core CLI workflows use the Python standard library; optional streaming and document-extraction paths have [additional requirements](references/operations.md).
 
-For a ZIP install, download both release assets into the same folder. Before extracting, run `sha256sum -c india-day-trader-1.0.0.zip.sha256` on Linux, or `shasum -a 256 -c india-day-trader-1.0.0.zip.sha256` on macOS. In Windows PowerShell, run `Get-FileHash .\india-day-trader-1.0.0.zip -Algorithm SHA256` and compare the hash with the `.sha256` file. Extract the ZIP, open its `india-day-trader` folder, then run the Python commands above.
+For a ZIP install, download both release assets (`india-day-trader-1.5.1.zip` and `india-day-trader-1.5.1.zip.sha256`) into the same folder. Before extracting, run `sha256sum -c india-day-trader-1.5.1.zip.sha256` on Linux, or `shasum -a 256 -c india-day-trader-1.5.1.zip.sha256` on macOS. In Windows PowerShell, run `(Get-FileHash .\india-day-trader-1.5.1.zip -Algorithm SHA256).Hash` and compare it with the first value in the `.sha256` file (PowerShell prints it in capitals; the comparison is not case-sensitive). For a later release, replace 1.5.1 with that version. Extract the ZIP, open its `india-day-trader` folder, then run the Python commands above.
 
 ## What is implemented
 
-**New in 1.0.0:** the skill now combines its scripts with **live web research** (BSE and NSE filings, results, concalls, macro and RBI/SEBI events, "why did it move") and with **your own broker connector**, so nothing has to be bundled for BSE or for your broker. See [web research](references/web-research.md) and [broker connectors](references/broker-connectors.md). Earlier releases added Angel One/FYERS carry orders, one-minute scanner variants and depth/cost/margin research ([release scope](references/release-status.md)).
+Version 1.5.1 includes the following. “Implemented” means code and offline tests exist. It does not mean coverage of every exchange source, or that any user's broker account or production environment has been accepted.
 
-The release also includes [sourced inventory reconciliation](references/inventory-book.md) for T1, pledged, funded and corporate-action lots. This is accounting support, not live trading permission for those holdings. Track the remaining areas in the [ordered completion checklist](references/completion-tracker.md).
+Two things the scripts do not do automatically:
 
-A separate opt-in [mixed cash-entry workflow](references/mixed-inventory-entries.md) supports MIS entries, including opt-in shorts, alongside long CNC and signed MIS exposure, with combined risk and exact margin checks.
+- **Exchange coverage is partial.** Scripts read NSE's public files and APIs (closing levels, bhavcopy, F&O and SPAN files, announcements, shareholding and results filings, surveillance and F&O-ban lists). BSE notices and filings, special sessions, emergency circulars, concalls and macro events are looked up by [web research](references/web-research.md) when you ask. That is a cited search at request time, not an automatic or comprehensive feed, and a search can miss things.
+- **Broker workflows are yours to validate.** The [broker connectors](references/broker-connectors.md) and built-in adapters are tested against recorded and simulated responses only. Each user confirms their own account before relying on them.
 
-[Automatic NSE exchange observations](references/exchange-coverage.md) collect dated surveillance indicators and the F&O ban report. BSE notices are read through web research.
-
-[Historical evidence workflows](references/historical-evidence.md) now support sourced constituent intervals, ISIN-based changes and split/bonus reconstruction of explicitly raw daily prices. They enforce information cutoffs and retain source hashes.
-
-[Announcement backfill](references/announcement-history.md) adds bounded NSE historical discovery, readable headline reports, multiple official attachments, symbol-plus-ISIN matching and Indian inline-XBRL number formats. BSE filings are read through web research; neither route claims complete coverage.
-
-[Dated closing reports](references/closing-context.md) add public NSE Nifty/Bank Nifty closes, EQ breadth and separately dated FII/DII and GIFT context to the daily commands. BSE closes and macro events come from web research at report time.
-
-**1.0.0** includes the following. “Implemented” means code and offline checks exist; it does not mean a user’s account or production environment has been accepted.
+Older capabilities (carry accounting and reducing orders, [inventory reconciliation](references/inventory-book.md), [mixed cash entries](references/mixed-inventory-entries.md), [exchange observations](references/exchange-coverage.md), [historical evidence](references/historical-evidence.md), [announcement backfill](references/announcement-history.md) and [closing reports](references/closing-context.md)) are unchanged; see [release status](references/release-status.md).
 
 | Capability | Available now | Boundary |
 | --- | --- | --- |
-| Screening | Nifty 50/Next 50/500, midcap, smallcap and 13 sector indices; filters and sorting on 15 fundamental and momentum fields | Yahoo financials can be stale or missing for smaller companies |
-| Portfolio review | Holdings from a broker connector, Zerodha CSV or JSON; P&L, sectors, concentration; FIFO capital gains with STCG/LTCG estimates | Tax figures are estimates; surcharge, grandfathering, bonus/split adjustments and business income are not modelled |
-| F&O analytics | Option chain, OI and build-up, PCR, max pain, IV and Greeks (Black-76), futures basis, India VIX, multi-leg payoff with SVG chart | End-of-day NSE data by default; live chains come from your broker connector |
-| Stock research | Price context, Nifty comparison, technicals, ratios, 5-year P/E band, sector peers, price chart and ranked news | Source availability and financial-statement coverage vary |
-| Daily briefings | India daily, Nifty, Sensex, Bank Nifty; pre-open / intraday / close modes | Public feeds can be delayed; membership and breadth are partial |
+| Market moves | Direction, sectors, the stocks that moved the index (estimated points, checked against the official change), breadth, VIX, FII/DII and NSDL flows, dated headlines and cues; one sector's stocks (`--sector`); indices over a week, month or year (`--period`); a mood view with Nifty P/E and VIX against their past-year ranges; weekend and holiday reports | Index weights are estimates anchored to the monthly NSE Indices factsheet; headlines are unverified possible causes |
+| Daily briefings | India daily, Nifty, Sensex, Bank Nifty; live NSE levels in market hours, close and closed-day modes with next-session levels | Sensex is an estimate or Yahoo quote (BSE blocks scripts); Yahoo data is unofficial and about 15 minutes delayed |
+| Stock research | Price context, technicals, ratios cross-checked with NSE consolidated filings, P/E history adjusted for bonuses and splits, one-offs stripped, 3-year growth, business peers, sum of parts, `--compare`, ranked news | Yahoo financials can be stale or wrong; the report flags disagreements it detects, not every error |
+| Shareholding | Latest pattern, promoter pledge and encumbrance trend over up to 8 quarters, SAST filings, fund houses matched across quarters | NSE filings only; BSE-only deals are pointed to, not read |
+| Screening | Nifty 50/100/200/500, Next 50, midcap, smallcap and sector indices; 15+ fundamental and momentum fields, dividend preset, `--exclude-sector` | Yahoo fundamentals; smaller companies often have gaps, listed separately |
+| Portfolio review | Holdings from a broker connector, Zerodha CSV or JSON; P&L, XIRR vs Nifty, sectors, concentration; bonuses, splits and demergers applied; capital-gains estimates under the Income-tax Act 2025 with set-offs | Tax figures are estimates; surcharge, grandfathering and business income are not modelled |
+| F&O analytics | Option chain (NSE's closing chain after 15:30), OI and build-up, PCR, max pain, IV and Greeks (Black-76), payoffs and strike grids incl. iron fly, relative strikes, indicative SPAN + exposure margin from NSE Clearing's files with the expiry-day extra shown separately | End-of-day NSE data by default; live chains come from your broker connector; your broker's margin is final |
+| Position sizing | From a stock name, % or N-day-low stop, delivery and intraday side by side, Indian charges included | Uses the last close or live price as labelled |
 | Scanning & paper plans | Six scanners and custom levels at one/five minutes; replay, sizing and risk checks | Regular-session rules; pre-open/regime and broader special-session models pending |
 | News & filings | RSS discovery, bounded NSE backfill, attachment discovery, supported XBRL and filing backlog; BSE and anything else via web research | Web facts are cited research, never risk-check evidence |
 | Repeated collection | Bounded foreground runs, saved reports, shared backlog and stop latch | No automatic service installation; partial sources stay partial |
@@ -178,13 +182,15 @@ Ordinary execution requires two human confirmations and fresh checks. The separa
 
 ## Release evidence, not performance claims
 
-The published 1.0.0 release has **984 passing offline tests**, including simulated broker responses and failure cases. Release validation checks Python syntax, JSON, local links and an explicit packaging allowlist. GitHub CI tests Python **3.10, 3.12 and 3.13**; the [release](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.0.0) includes a ZIP and SHA-256 checksum. Published CI results do not validate later local edits.
+The 1.5.1 release has **1,883 passing offline tests**, including recorded and simulated exchange and broker responses and failure cases; locally they also pass with network access blocked. Release validation checks Python syntax, JSON, local links and an explicit packaging allowlist. GitHub CI tests Python **3.10, 3.12 and 3.13**; the [release](https://github.com/kunalshinde1214/Day-Trader-Indian-Market/releases/tag/v1.5.1) includes a ZIP and SHA-256 checksum. Published CI results do not validate later local edits.
+
+Before release, separate AI reviewer agents scored answers to 45 everyday questions (30 of them not used during development) against a fixed rubric, and spot-checked figures against NSE files, company filings, Screener.in and a broker margin calculator. On the last unseen set they averaged about 8 out of 10 before the final fixes, which were not re-scored. See [release status](references/release-status.md) for the method and its limits.
 
 ```bash
 python scripts/release.py --check
 ```
 
-Offline tests do **not** prove live broker acceptance, profitability or production reliability. No publisher brokerage account, real acceptance trade or production service was used. See [release status](references/release-status.md) for the exact scope.
+Offline tests and these scores do **not** prove live broker acceptance, comprehensive exchange coverage, future source availability, profitability or production reliability. No publisher brokerage account, real acceptance trade or production service was used. See [release status](references/release-status.md) for the exact scope.
 
 ## Go deeper
 
@@ -195,7 +201,7 @@ Offline tests do **not** prove live broker acceptance, profitability or producti
 | Carry execution | [Kite](references/mixed-inventory-exits.md) · [Upstox](references/upstox-execution.md) · [Dhan](references/dhan-execution.md) · [Angel/FYERS](references/angel-fyers-execution.md) |
 | Project | [Changelog](CHANGELOG.md) · [Requirements](references/requirements.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Advanced tools](references/advanced.md) |
 
-**Scope:** the skill is complete for its purpose: research, daily reports, analysis and paper trading, with web research and your own broker filling what scripts cannot bundle. Optional future enhancements (calibrated execution models, pre-open/regime models, extra inventory types) are listed in the [completion checklist](references/completion-tracker.md). Each user validates their own broker connection.
+**Scope:** research, daily reports, analysis and paper-trading workflows are implemented. Exchange coverage is partial: NSE public data through the scripts, everything else through request-time web research, which is not comprehensive. Broker workflows are tested offline only, and each user validates their own connection. Optional future enhancements are listed in the [completion status](references/completion-tracker.md).
 
 ## License & responsible use
 
